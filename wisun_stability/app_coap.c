@@ -1,0 +1,833 @@
+/***************************************************************************//**
+ * @file app_coap.c
+ * @brief CoAP implementation for Wi-SUN device stability & statistics
+ *
+ * It provides access to the following CoAP URIs
+ *
+ * "/info/device"                        Tag made of last 2 bytes of device's MAC address
+ * "/info/chip"                          Text matching the part number
+ * "/info/board"                         Text matching the board name
+ * "/info/version"                       Version 'info'
+ * "/info/application"                   Application 'info'
+ * "/info/all"                           All 'info'
+ * "/status/running"                     How much time the application has been running
+ * "/status/parent"                      Tag made of last 2 bytes of parent's MAC address
+ * "/status/neighbor"                    Neighbor info (per index required by '-e <payload>')
+ * "/status/connections"                 How many times the device connected
+ * "/status/connected"                   How much time the device has been connected for the current connection
+ * "/status/all"                         All 'status'
+ * "/statistics/app/join_state_secs"     How much seconds to jump to each join state
+ * "/statistics/app/connected_total"     How much time the device has been connected since the first connection
+ * "/statistics/app/disconnected_total"  How much time the device has been disconnected since the first connection
+ * "/statistics/app/availability"        connected_total / (connected_total + disconnected_total) ratio
+ * "/statistics/app/all"                 All 'app' statistics
+ * "/statistics/stack/phy"               PHY statistics stored in sl_wisun_statistics_phy_t
+ * "/statistics/stack/mac"               MAC statistics stored in sl_wisun_statistics_mac_t
+ * "/statistics/stack/fhss"              FHSS statistics stored in sl_wisun_statistics_fhss_t
+ * "/statistics/stack/wisun"             WISUN statistics stored in sl_wisun_statistics_wisun_t
+ * "/statistics/stack/network"           NETWORK statistics stored in sl_wisun_statistics_network_t
+ * "/statistics/stack/regulation"        REGULATION statistics stored in sl_wisun_statistics_regulation_t
+ * "/sensor/temp"                        Current Temperature
+ * "/sensor/humidity"                    Current Humidity
+ * "/sensor/light"                       Current light level
+ *
+ *******************************************************************************
+ * # License
+ * <b>Copyright 2021 Silicon Laboratories Inc. www.silabs.com</b>
+ *******************************************************************************
+ *
+ * SPDX-License-Identifier: Zlib
+ *
+ * The licensor of this software is Silicon Laboratories Inc.
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty. In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ *
+ ******************************************************************************
+* # Experimental Quality
+* This code has not been formally tested and is provided as-is. It is not
+* suitable for production environments. In addition, this code will not be
+* maintained and there may be no bug maintenance planned for these resources.
+* Silicon Labs may update projects from time to time.
+******************************************************************************/
+// -----------------------------------------------------------------------------
+//                                   Includes
+// -----------------------------------------------------------------------------
+#include "app.h"
+#include "app_coap.h"
+#include "sl_wisun_api.h"
+#include "sl_wisun_config.h"
+#include "sl_wisun_trace_util.h"
+#include "app_check_neighbors.h"
+#include "sl_wisun_app_core.h"
+
+// -----------------------------------------------------------------------------
+//                              Macros and Typedefs
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+//                          Variables
+//------------------------------------------------------------------------------
+char coap_response[COAP_MAX_RESPONSE_LEN];
+uint8_t coap_response_current_len = 0;
+
+sl_status_t ret;
+sl_wisun_statistics_t statistics;
+// -----------------------------------------------------------------------------
+//                          Static Function Declarations
+// -----------------------------------------------------------------------------
+
+
+
+void  print_coap_help (char* device_global_ipv6_string, char* border_router_ipv6_string) {
+  printf("\n");
+  printf("To start a CoAP server on the linux Border Router:\n");
+  printf("  coap-server -A %s -p %d -d 10\n", border_router_ipv6_string, 5685);
+  printf("CoAP discovery:\n");
+  printf("  coap-client -m get -N -B 3 coap://[%s]:5683/.well-known/core\n", device_global_ipv6_string);
+  printf("CoAP GET requests:\n");
+  printf("  coap-client -m get -N -B 3 coap://[%s]:5683/<resource>, for the following resources:\n", device_global_ipv6_string);
+  sl_wisun_coap_rhnd_print_resources();
+  printf("  '/settings/auto_send'         returns the current notification duration in seconds\n");
+  printf("  '/settings/auto_send' -e <d>' changes the notification duration to d seconds\n");
+  printf("  '/status/neighbor'            returns the neighbor_count\n");
+  printf("  '/status/neighbor -e <n>'     returns the neighbor information for neighbor at index n\n");
+  printf("  '/statistics/stack/<group> -e reset' clears the Stack statistics for the selected group\n");
+  printf("  '/statistics/app/all       -e reset' clears all statistics\n");
+  printf("\n");
+}
+
+sl_wisun_coap_packet_t * app_coap_reply(char *response_string,
+                  const sl_wisun_coap_packet_t *const req_packet) {
+
+  sl_wisun_coap_packet_t* resp_packet = NULL;
+  // Prepare CoAP response packet with default response string
+  resp_packet = sl_wisun_coap_build_response(req_packet, COAP_MSG_CODE_RESPONSE_BAD_REQUEST);
+  if (resp_packet == NULL) {
+    return NULL;
+  }
+
+  resp_packet->msg_code       = COAP_MSG_CODE_RESPONSE_CONTENT;
+  resp_packet->content_format = COAP_CT_TEXT_PLAIN;
+  resp_packet->payload_ptr    = (uint8_t *)response_string;
+  resp_packet->payload_len    = (uint16_t)sl_strnlen(response_string, COAP_MAX_RESPONSE_LEN);
+
+  return resp_packet;
+}
+
+// CoAP Callback functions definition (one callback function per URI)
+sl_wisun_coap_packet_t * coap_callback_all_infos (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  #define JSON_ALL_INFOS_FORMAT_STR  \
+    "{\n"                          \
+    "  \"device\": \"%s\",\n"      \
+    "  \"chip\": \"%s\",\n"        \
+    "  \"board\": \"%s\",\n"       \
+    "  \"device_type\": \"%s\",\n" \
+    "  \"application\": \"%s\",\n" \
+    "  \"version\": \"%s\"\n"      \
+    "}\n"
+
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, JSON_ALL_INFOS_FORMAT_STR,
+            device_tag,
+            chip,
+            SL_BOARD_NAME,
+            device_type,
+            application,
+            version
+  );
+  return app_coap_reply(coap_response, req_packet);
+}
+
+sl_wisun_coap_packet_t * coap_callback_all_statuses (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  #define JSON_ALL_STATUSES_FORMAT_STR      \
+    "{\n"                                 \
+    "  \"running\": \"%s\",\n"            \
+    "  \"connected\": \"%s\"\n"           \
+    "  \"parent\": \"%s\",\n"             \
+    "  \"neighbor_count\": \"%d\"\n"      \
+    "}\n"
+
+  char running_str[40];
+  char connected_str[40];
+  uint8_t neighbor_count;
+  sl_wisun_get_neighbor_count(&neighbor_count);
+
+  snprintf(running_str  , 40, dhms(now_sec()) );
+  snprintf(connected_str, 40, dhms(now_sec() - connection_time_sec) );
+
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, JSON_ALL_STATUSES_FORMAT_STR,
+            running_str,
+            connected_str,
+            parent_tag,
+            neighbor_count
+  );
+  return app_coap_reply(coap_response, req_packet);
+}
+
+sl_wisun_coap_packet_t * coap_callback_device (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", device_tag);
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_chip (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", chip);
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_board (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", SL_BOARD_NAME);
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_device_type (
+    const  sl_wisun_coap_packet_t *const req_packet)  {
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", device_type);
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_application (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  int res;
+  char cmd[100];
+  if (req_packet->payload_len) {
+    // Make sure payload last char is NULL
+    req_packet->payload_ptr[req_packet->payload_len] = 0x00;
+    res = sscanf((char *)req_packet->payload_ptr, "%s", cmd);
+    if (res) {
+      if (strcmp(cmd, "clear_and_reconnect")==0) {
+        sl_wisun_disconnect();
+        sl_wisun_clear_credential_cache();
+        app_wisun_network_connect();
+        return NULL;
+      }
+      if (strcmp(cmd, "reconnect")==0) {
+        sl_wisun_disconnect();
+        app_wisun_network_connect();
+        return NULL;
+      }
+      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Unknown '%s' command", cmd);
+    }
+  } else {
+    snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", application);
+  }
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_version (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", version);
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_running (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", dhms(now_sec()));
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_parent (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  refresh_parent_tag();
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", parent_tag);
+return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_neighbor (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  int index = 0;
+  int res;
+  uint8_t neighbor_count;
+  if (req_packet->payload_len) {
+    res = sscanf((char *)req_packet->payload_ptr, "%d", &index);
+    if (res) {
+      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", app_neighbor_info_str(index));
+      return app_coap_reply(coap_response, req_packet);
+    }
+  }
+  sl_wisun_get_neighbor_count(&neighbor_count);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "neighbor_count: %d", neighbor_count);
+return app_coap_reply(coap_response, req_packet); }
+
+//#define   COAP_APP_STATISTICS
+#ifdef    COAP_APP_STATISTICS
+sl_wisun_coap_packet_t * coap_callback_join_states_sec (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "[%llu,%llu,%llu,%llu,%llu]",
+           app_join_state_delay_sec[1],
+           app_join_state_delay_sec[2],
+           app_join_state_delay_sec[3],
+           app_join_state_delay_sec[4],
+           app_join_state_delay_sec[5]
+  );
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_connections (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%d", connection_count);
+  _check_app_statistics_reset(req_packet);
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_connected (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", dhms(now_sec() - connection_time_sec));
+  _check_app_statistics_reset(req_packet);
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_connected_total (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", dhms(connected_total_sec + now_sec() - connection_time_sec));
+  _check_app_statistics_reset(req_packet);
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_disconnected_total (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", dhms(disconnected_total_sec));
+  _check_app_statistics_reset(req_packet);
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_availability (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%6.2f", 100.0*(connected_total_sec + now_sec() - connection_time_sec)/(connected_total_sec + now_sec() - connection_time_sec + disconnected_total_sec) );
+  _check_app_statistics_reset(req_packet);
+  return app_coap_reply(coap_response, req_packet); }
+
+#ifdef    HISTORY
+sl_wisun_coap_packet_t * coap_callback_history (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", history_string );
+  return app_coap_reply(coap_response, req_packet); }
+#endif /* HISTORY */
+#endif /* COAP_APP_STATISTICS */
+
+bool _check_app_statistics_reset  (
+                             const  sl_wisun_coap_packet_t *const req_packet) {
+  if (req_packet->payload_len) {
+    // We need to check using payload_len since it's not followed by a null
+    if ( !strncmp( (char*)req_packet->payload_ptr, "reset", req_packet->payload_len) ) {
+      app_reset_statistics();
+      return true;
+    }
+  }
+  return false;
+}
+
+sl_wisun_coap_packet_t * coap_callback_all_app_statistics (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  #define JSON_ALL_STATISTICS_FORMAT_STR  \
+    "{\n"                                 \
+    "  \"join_states_sec\":[%llu,%llu,%llu,%llu,%llu],\n" \
+    "  \"connections\": \"%d\",\n"        \
+    "  \"connected_total\": \"%s\",\n"    \
+    "  \"disconnected_total\": \"%s\",\n" \
+    "  \"availability\": \"%6.2f\"\n"     \
+    "}\n"
+  char connected_total_str[40];
+  char disconnected_total_str[40];
+  float availability;
+
+  snprintf(connected_total_str   , 40, dhms(connected_total_sec + now_sec() - connection_time_sec) );
+  snprintf(disconnected_total_str, 40, dhms(disconnected_total_sec) );
+  availability = 100.0*(connected_total_sec + now_sec() - connection_time_sec)/
+      (connected_total_sec + now_sec() - connection_time_sec + disconnected_total_sec);
+
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, JSON_ALL_STATISTICS_FORMAT_STR,
+            app_join_state_delay_sec[1],
+            app_join_state_delay_sec[2],
+            app_join_state_delay_sec[3],
+            app_join_state_delay_sec[4],
+            app_join_state_delay_sec[5],
+            connection_count,
+            connected_total_str,
+            disconnected_total_str,
+            availability
+  );
+  _check_app_statistics_reset(req_packet);
+  return app_coap_reply(coap_response, req_packet);
+}
+
+//#define   COAP_STACK_STATISTICS
+#ifdef    COAP_STACK_STATISTICS
+char * phy_statistics_str        (sl_wisun_statistics_t statistics)  {
+  #define JSON_PHY_STATISTICS_FORMAT_STR  \
+  "{\n"                            \
+  "  \"crc_fails\": \"%ld\",\n"    \
+  "  \"tx_timeouts\": \"%ld\",\n"  \
+  "  \"rx_timeouts\": \"%ld\"\n"   \
+  "}\n"
+
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, JSON_PHY_STATISTICS_FORMAT_STR,
+           statistics.phy.crc_fails,
+           statistics.phy.tx_timeouts,
+           statistics.phy.rx_timeouts
+  );
+  return coap_response;
+}
+
+char * mac_statistics_str        (sl_wisun_statistics_t statistics)  {
+  #define JSON_MAC_STATISTICS_FORMAT_STR    \
+    "{\n"                                   \
+    "  \"tx_queue_size\": \"%d\",\n"        \
+    "  \"tx_queue_peak\": \"%d\",\n"        \
+    "  \"rx_count\": \"%lu\",\n"            \
+    "  \"tx_count\": \"%lu\",\n"            \
+    "  \"bc_rx_count\": \"%lu\",\n"         \
+    "  \"bc_tx_count\": \"%lu\",\n"         \
+    "  \"tx_bytes\": \"%lu\",\n"            \
+    "  \"rx_bytes\": \"%lu\",\n"            \
+    "  \"tx_failed_count\": \"%lu\",\n"     \
+    "  \"retry_count\": \"%lu\",\n"         \
+    "  \"cca_attempts_count\": \"%lu\",\n"  \
+    "  \"failed_cca_count\": \"%lu\",\n"    \
+    "  \"rx_ms_count\": \"%lu\",\n"         \
+    "  \"tx_ms_count\": \"%lu\",\n"         \
+    "  \"rx_ms_failed_count\": \"%lu\",\n"  \
+    "  \"tx_ms_failed_count\": %lu\n"       \
+    "}\n"
+
+
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, JSON_MAC_STATISTICS_FORMAT_STR,
+           statistics.mac.tx_queue_size,
+           statistics.mac.tx_queue_peak,
+           statistics.mac.rx_count,
+           statistics.mac.tx_count,
+           statistics.mac.bc_rx_count,
+           statistics.mac.bc_tx_count,
+           statistics.mac.tx_bytes,
+           statistics.mac.rx_bytes,
+           statistics.mac.tx_failed_count,
+           statistics.mac.retry_count,
+           statistics.mac.cca_attempts_count,
+           statistics.mac.failed_cca_count,
+           statistics.mac.rx_ms_count,
+           statistics.mac.tx_ms_count,
+           statistics.mac.rx_ms_failed_count,
+           statistics.mac.tx_ms_failed_count
+  );
+  return coap_response;
+}
+
+char * fhss_statistics_str       (sl_wisun_statistics_t statistics)  {
+  #define JSON_FHSS_STATISTICS_FORMAT_STR \
+    "{\n"                                 \
+    "  \"drift_compensation\": \"%d\",\n" \
+    "  \"hop_count\": \"%d\",\n"          \
+    "  \"synch_interval\": \"%d\",\n"     \
+    "  \"prev_avg_synch_fix\": \"%d\",\n" \
+    "  \"synch_lost\": \"%lu\",\n"        \
+    "  \"unknown_neighbor\": \"%lu\"\n" \
+    "}\n"
+
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, JSON_FHSS_STATISTICS_FORMAT_STR,
+           statistics.fhss.drift_compensation,
+           statistics.fhss.hop_count,
+           statistics.fhss.synch_interval,
+           statistics.fhss.prev_avg_synch_fix,
+           statistics.fhss.synch_lost,
+           statistics.fhss.unknown_neighbor
+  );
+  return coap_response;
+}
+
+char * wisun_statistics_str      (sl_wisun_statistics_t statistics)  {
+  #define JSON_WISUN_STATISTICS_FORMAT_STR   \
+    "{\n"                                    \
+    "  \"pan_control_tx_count\": \"%lu\",\n" \
+    "  \"pan_control_rx_count\": \"%lu\"\n"  \
+  "}\n"
+
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, JSON_WISUN_STATISTICS_FORMAT_STR,
+           statistics.wisun.pan_control_tx_count,
+           statistics.wisun.pan_control_rx_count
+  );
+  return coap_response;
+}
+
+char * network_statistics_str    (sl_wisun_statistics_t statistics)  {
+  #define JSON_NETWORK_STATISTICS_FORMAT_STR \
+    "{\n"                                     \
+    "  \"ip_rx_count\": \"%lu\",\n"           \
+    "  \"ip_tx_count\": \"%lu\",\n"           \
+    "  \"ip_rx_drop\": \"%lu\",\n"            \
+    "  \"ip_cksum_error\": \"%lu\",\n"        \
+    "  \"ip_tx_bytes\": \"%lu\",\n"           \
+    "  \"ip_rx_bytes\": \"%lu\",\n"           \
+    "  \"ip_routed_up\": \"%lu\",\n"          \
+    "  \"ip_no_route\": \"%lu\",\n"           \
+    "  \"frag_rx_errors\": \"%lu\",\n"        \
+    "  \"frag_tx_errors\": \"%lu\",\n"        \
+    "  \"rpl_route_routecost_better_change\": \"%lu\",\n" \
+    "  \"ip_routeloop_detect\": \"%lu\",\n"   \
+    "  \"rpl_memory_overflow\": \"%lu\",\n"   \
+    "  \"rpl_parent_tx_fail\": \"%lu\",\n"    \
+    "  \"rpl_unknown_instance\": \"%lu\",\n"  \
+    "  \"rpl_local_repair\": \"%lu\",\n"      \
+    "  \"rpl_global_repair\": \"%lu\",\n"     \
+    "  \"rpl_malformed_message\": \"%lu\",\n" \
+    "  \"rpl_time_no_next_hop\": \"%lu\",\n"  \
+    "  \"rpl_total_memory\": \"%lu\",\n"      \
+    "  \"buf_alloc\": \"%lu\",\n"             \
+    "  \"buf_headroom_realloc\": \"%lu\",\n"  \
+    "  \"buf_headroom_shuffle\": \"%lu\",\n"  \
+    "  \"buf_headroom_fail\": \"%lu\",\n"     \
+    "  \"etx_1st_parent\": \"%d\",\n"         \
+    "  \"etx_2nd_parent\": \"%d\",\n"         \
+    "  \"adapt_layer_tx_queue_size\": \"%d\",\n" \
+    "  \"adapt_layer_tx_queue_peak\": \"%d\"\n" \
+    "}\n"
+
+
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, JSON_NETWORK_STATISTICS_FORMAT_STR,
+           statistics.network.ip_rx_count,
+           statistics.network.ip_tx_count,
+           statistics.network.ip_rx_drop,
+           statistics.network.ip_cksum_error,
+           statistics.network.ip_tx_bytes,
+           statistics.network.ip_rx_bytes,
+           statistics.network.ip_routed_up,
+           statistics.network.ip_no_route,
+           statistics.network.frag_rx_errors,
+           statistics.network.frag_tx_errors,
+           statistics.network.rpl_route_routecost_better_change,
+           statistics.network.ip_routeloop_detect,
+           statistics.network.rpl_memory_overflow,
+           statistics.network.rpl_parent_tx_fail,
+           statistics.network.rpl_unknown_instance,
+           statistics.network.rpl_local_repair,
+           statistics.network.rpl_global_repair,
+           statistics.network.rpl_malformed_message,
+           statistics.network.rpl_time_no_next_hop,
+           statistics.network.rpl_total_memory,
+           statistics.network.buf_alloc,
+           statistics.network.buf_headroom_realloc,
+           statistics.network.buf_headroom_shuffle,
+           statistics.network.buf_headroom_fail,
+           statistics.network.etx_1st_parent,
+           statistics.network.etx_2nd_parent,
+           statistics.network.adapt_layer_tx_queue_size,
+           statistics.network.adapt_layer_tx_queue_peak  );
+  return coap_response;
+}
+
+char * regulation_statistics_str (sl_wisun_statistics_t statistics)  {
+  #define JSON_REGULATION_STATISTICS_FORMAT_STR \
+    "{\n"                       \
+    "  \"arib.tx_duration_ms\": \"%lu\"" \
+    "}\n"                       \
+
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, JSON_REGULATION_STATISTICS_FORMAT_STR,
+           statistics.regulation.arib.tx_duration_ms
+  );
+  return coap_response;
+}
+
+bool _check_stack_statistics_reset(sl_wisun_statistics_type_t statistics_type,
+                             const  sl_wisun_coap_packet_t *const req_packet) {
+  if (req_packet->payload_len) {
+    // We need to check using payload_len since it's not followed by a null
+    if ( !strncmp( (char*)req_packet->payload_ptr, "reset", req_packet->payload_len) ) {
+      sl_wisun_reset_statistics(statistics_type);
+      return true;
+    }
+  }
+  return false;
+}
+
+sl_wisun_coap_packet_t * coap_callback_phy_statistics (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  ret = sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_PHY, &statistics);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", phy_statistics_str(statistics) );
+  _check_stack_statistics_reset(SL_WISUN_STATISTICS_TYPE_PHY, req_packet);
+  return app_coap_reply(coap_response, req_packet);
+}
+
+sl_wisun_coap_packet_t * coap_callback_mac_statistics (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  ret = sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_MAC, &statistics);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", mac_statistics_str(statistics) );
+  _check_stack_statistics_reset(SL_WISUN_STATISTICS_TYPE_MAC, req_packet);
+  return app_coap_reply(coap_response, req_packet);
+}
+
+sl_wisun_coap_packet_t * coap_callback_fhss_statistics (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  ret = sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_FHSS, &statistics);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", fhss_statistics_str(statistics) );
+  _check_stack_statistics_reset(SL_WISUN_STATISTICS_TYPE_FHSS, req_packet);
+  return app_coap_reply(coap_response, req_packet);
+}
+
+sl_wisun_coap_packet_t * coap_callback_wisun_statistics (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  ret = sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_WISUN, &statistics);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", wisun_statistics_str(statistics) );
+  _check_stack_statistics_reset(SL_WISUN_STATISTICS_TYPE_WISUN, req_packet);
+  return app_coap_reply(coap_response, req_packet);
+}
+
+sl_wisun_coap_packet_t * coap_callback_network_statistics (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  ret = sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_NETWORK, &statistics);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", network_statistics_str(statistics) );
+  _check_stack_statistics_reset(SL_WISUN_STATISTICS_TYPE_NETWORK, req_packet);
+  return app_coap_reply(coap_response, req_packet);
+}
+
+sl_wisun_coap_packet_t * coap_callback_regulation_statistics (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  ret = sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_REGULATION, &statistics);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", regulation_statistics_str(statistics) );
+  _check_stack_statistics_reset(SL_WISUN_STATISTICS_TYPE_REGULATION, req_packet);
+  return app_coap_reply(coap_response, req_packet);
+}
+#endif /* COAP_STACK_STATISTICS */
+
+sl_wisun_coap_packet_t * coap_callback_auto_send (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  int sec = 0;
+  int res;
+  if (req_packet->payload_len) {
+    // Make sure payload last char is NULL
+    req_packet->payload_ptr[req_packet->payload_len] = 0x00;
+    res = sscanf((char *)req_packet->payload_ptr, "%d", &sec);
+    if (res) {
+        auto_send_sec = (uint16_t)sec;
+    }
+  }
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", auto_send_sec);
+return app_coap_reply(coap_response, req_packet); }
+
+// CoAP resources init in resource handler (one block per URI)
+uint8_t app_coap_resources_init() {
+  sl_wisun_coap_rhnd_resource_t coap_resource = { 0 };
+  uint8_t count = 0;
+
+  // Add CoAP resources (one per item)
+
+  coap_resource.data.uri_path = "/info/all";
+  coap_resource.data.resource_type = "json";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_all_infos;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/info/device";
+  coap_resource.data.resource_type = "tag";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_device;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/info/chip";
+  coap_resource.data.resource_type = "tag";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_chip;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/info/board";
+  coap_resource.data.resource_type = "txt";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_board;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/info/device_type";
+  coap_resource.data.resource_type = "text";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_device_type;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/info/application";
+  coap_resource.data.resource_type = "text";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_application;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/info/version";
+  coap_resource.data.resource_type = "text";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_version;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/status/all";
+  coap_resource.data.resource_type = "json";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_all_statuses;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/status/running";
+  coap_resource.data.resource_type = "dhms";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_running;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/status/parent";
+  coap_resource.data.resource_type = "tag";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_parent;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/status/neighbor";
+  coap_resource.data.resource_type = "json";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_neighbor;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+#ifdef    COAP_APP_STATISTICS
+  coap_resource.data.uri_path = "/status/connected";
+  coap_resource.data.resource_type = "dhms";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_connected;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/statistics/app/join_states_sec";
+  coap_resource.data.resource_type = "array";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_join_states_sec;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/statistics/app/disconnected_total";
+  coap_resource.data.resource_type = "dhms";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_disconnected_total;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/statistics/app/connections";
+  coap_resource.data.resource_type = "int";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_connections;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/statistics/app/connected_total";
+  coap_resource.data.resource_type = "dhms";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_connected_total;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/statistics/app/availability";
+  coap_resource.data.resource_type = "ratio";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_availability;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+#ifdef    HISTORY
+  coap_resource.data.uri_path = "/history";
+  coap_resource.data.resource_type = "text";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_history;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+#endif /* HISTORY */
+
+#endif /* COAP_APP_STATISTICS */
+
+  coap_resource.data.uri_path = "/statistics/app/all";
+  coap_resource.data.resource_type = "json";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_all_app_statistics;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+#ifdef    COAP_STACK_STATISTICS
+  coap_resource.data.uri_path = "/statistics/stack/phy";
+  coap_resource.data.resource_type = "json";
+  coap_resource.data.interface = "phy";
+  coap_resource.auto_response = coap_callback_phy_statistics;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/statistics/stack/mac";
+  coap_resource.data.resource_type = "json";
+  coap_resource.data.interface = "mac";
+  coap_resource.auto_response = coap_callback_mac_statistics;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/statistics/stack/fhss";
+  coap_resource.data.resource_type = "json";
+  coap_resource.data.interface = "fhss";
+  coap_resource.auto_response = coap_callback_fhss_statistics;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/statistics/stack/wisun";
+  coap_resource.data.resource_type = "json";
+  coap_resource.data.interface = "wisun";
+  coap_resource.auto_response = coap_callback_wisun_statistics;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/statistics/stack/network";
+  coap_resource.data.resource_type = "json";
+  coap_resource.data.interface = "network";
+  coap_resource.auto_response = coap_callback_network_statistics;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/statistics/stack/regulation";
+  coap_resource.data.resource_type = "json";
+  coap_resource.data.interface = "regulation";
+  coap_resource.auto_response = coap_callback_regulation_statistics;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+#endif /* COAP_STACK_STATISTICS */
+
+  coap_resource.data.uri_path = "/settings/auto_send";
+  coap_resource.data.resource_type = "sec";
+  coap_resource.data.interface = "settings";
+  coap_resource.auto_response = coap_callback_auto_send;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  printf("  %d/%d CoAP resources added to CoAP Resource handler\n", count, SL_WISUN_COAP_RESOURCE_HND_MAX_RESOURCES);
+  return count;
+}

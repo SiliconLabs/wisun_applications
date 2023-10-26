@@ -1,0 +1,66 @@
+graph g {
+	layout=dot # Specify used layout engine
+
+	bgcolor="#fffffff00"
+	overlap=scale
+	start=1
+
+	edge [penwidth=0.75,arrowsize=0.6]
+	edge [color=blue, fontsize=8, forcelabels=true, penwidth=2]
+
+	node [
+			shape=circle,
+#			fixedsize=true,
+#			width=0.25,
+			color="black",
+			fillcolor="cyan",
+			style="filled,solid",
+#			fontsize=12,
+		];
+
+	subgraph cluster_linux {
+        label = "Linux Platform"
+        style = "filled"
+        color = "grey"
+
+        node [style="filled,solid"]
+
+        subgraph cluster_border_router {
+            label = "Wi-SUN\nBorder Router"
+            style = "filled"
+            color = "orange"
+
+            node [shape="circle" fillcolor="cyan"]
+            RCP   [label="RCP\nnode0"]
+
+            node [shape="oval" fillcolor="green" ]
+            wsbrd [label="wsbrd"]
+
+            wsbrd -- RCP
+        }
+
+        node  [fillcolor="aquamarine" shape="oval"]
+        UDP   [label="UDP receiver\nPort 1237\ndevice-initiated messages" pos="0,0"]
+        CoAP  [label="coap_client\nuser-initiated requests" pos="0,0"]
+
+        node  [fillcolor="black" fontcolor="white" shape="rectangle"]
+        get [label="CoAP get /status/all\nnode1: { \"running\": \" 1-06:47:52\", \"connected\": \" 0-11:40:44\" \"parent\": \"node0\",...\nnode2: { \"running\": \" 0-23:13:54\", \"connected\": \" 0-11:36:18\" \"parent\": \"node1\",...\nnode4: { \"running\": \" 1-06:48:58\", \"connected\": \" 0-11:27:12\" \"parent\": \"node2\",..."]
+        udp [label="UDP messages\n{ \"device\":\"node1\", \"chip\":\"xG25\", \"parent\":\"node0\", \"running\":\"1-06:47:37\",...\n{ \"device\":\"node2\", \"chip\":\"xG25\", \"parent\":\"node1\", \"running\":\"0:23:13:31\",...\n{ \"device\":\"node4\", \"chip\":\"xG25\", \"parent\":\"node2\", \"running\":\"1-06:48:37\",...", pos="1,10"]
+
+        wsbrd -- UDP -- udp
+        wsbrd -- CoAP -- get
+    }
+
+    subgraph cluster_network {
+        label="Wi-SUN nodes                   "
+        edge [color=blueviolet style=dashed penwidth=3]
+        RCP   -- node1
+        node1 -- node2
+        node1 -- node3
+        node2 -- node4
+        node3 -- node5
+        node5 -- node6
+        node5 -- node7
+        node2 -- node8
+    }
+}

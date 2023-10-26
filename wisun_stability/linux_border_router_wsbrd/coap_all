@@ -1,0 +1,33 @@
+#!/bin/bash
+# usage: sending a CoAP request to all connected devices
+# ./coap_all coap_uri [-e <payload>]
+
+ipv6s=$(python get_nodes_ipv6_address.py)
+
+# by default, perform discovery
+if [ -z "$1" ]; then
+   coap_uri="/.well-known/core"
+else
+   coap_uri="$1"
+fi
+
+# by default, no payload
+if [ -z "$2" ]; then
+   coap_payload=""
+else
+   # take all remaining arguments as the 'payload' (should start with `-e`, can also be used to set more coap-client parameters)
+   coap_payload="${@:2}"
+fi
+
+count=0
+
+for ipv6 in $ipv6s
+do
+    dev=$(echo $ipv6 | cut -d ':' -f 8)
+    cmd="coap-client -m get -N -B 3 coap://[${ipv6}]:5683${coap_uri} ${coap_payload}"
+    res=$( ${cmd} )
+    echo " " ${cmd}: ${res}
+    count=$(($count+1))
+done
+
+echo $count devices at $(date +"%H:%M:%S")

@@ -1,0 +1,9 @@
+#!/bin/bash
+# usage: listing IPv6 addresses of all nodes currently connected
+# ./ipv6s
+
+ipv6s=$(python /home/pi/wisun-apps-tools/get_nodes_ipv6_address.py)
+for ipv6 in $ipv6s
+do
+    echo $ipv6
+done

@@ -1,0 +1,1 @@
+tftp localhost -c status
