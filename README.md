@@ -20,7 +20,7 @@ The Silicon Labs Wi-SUN stack allows for a wide variety applications to be built
 
 ## Examples ##
 
-- [Wi-SUN stability](https://github.com/SiliconLabs/wisun_applications_staging/tree/main/wisun_stability)
+- [Wi-SUN stability](https://github.com/SiliconLabs/wisun_applications_staging/tree/main/wisun_stability): An extendable monitoring application providing information on the device/board/application and connected statistics. It can be easily extended to monitor sensors and control actuators.
 
 ## Add the Wi-SUN Application Examples to Simplicity Studio 5 ##
 

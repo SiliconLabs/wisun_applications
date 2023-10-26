@@ -171,6 +171,6 @@ The URIs are
     - Configure
       - 'Size of the socket fifo buffer' `516`
 
-![components to install](image\components.png)
+![components to install](image/components.png)
 
 - Drop the `.c` files from `src` and the `.h` files from `inc` in your project folder (overwrite the existing files)
