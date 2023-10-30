@@ -1,7 +1,7 @@
 <table border="0">
   <tr>
     <td align="left" valign="middle">
-    <h1>Wi-SUN Stability and Monitoring application</h1>
+    <h1>Wi-SUN Stability Application</h1>
   </td>
   <td align="left" valign="middle">
     <a href="https://www.silabs.com/wireless/wi-sun">
@@ -18,7 +18,7 @@
 
 ## Summary ##
 
-This project aims to implement a Wi-SUN network monitoring system using a Linux Border Router and a Wi-SUN device stability and monitoring application flashed on [Wi-SUN capable Silicon Labs development kits](https://www.silabs.com/wireless/wi-sun?tab=hardware).
+This project aims to implement a Wi-SUN network monitoring system using a Linux Border Router and a Wi-SUN device stability monitoring application flashed on [Wi-SUN capable Silicon Labs development kits](https://www.silabs.com/wireless/wi-sun?tab=hardware).
 
 The block diagram of this application is shown in the image below:
 
@@ -26,7 +26,7 @@ The block diagram of this application is shown in the image below:
 
 - To learn Wi-SUN technology basics, see [the Wi-SUN pages on docs.silabs.com](https://docs.silabs.com/wisun/latest/wisun-start/).
 
-- To learn code-level information on the stability and monitoring application, see [Add a Custom Application in the Wi-SUN Developer's Journey](https://docs.silabs.com/wisun/latest/wisun-custom-application/)
+- To learn code-level information on the stability application, see [Add a Custom Application in the Wi-SUN Developer's Journey](https://docs.silabs.com/wisun/latest/wisun-custom-application/)
 
 ## Gecko SDK Version ##
 
@@ -59,14 +59,18 @@ or
 
 ## Setup ##
 
-A single example application is required in order to use this demonstration: **Wi-SUN Stability and Monitoring**, created based on **Wi-SUN -SoC Empty** provided by Simplicity Studio.
+A single example application is required in order to use this demonstration: **Wi-SUN Stability**, created based on **Wi-SUN -SoC Empty** provided by Simplicity Studio.
 
-To test this application, you can either
+To test this application, you can
 
-- Import the provided wisun_soc_stability_monitoring.sls project file
-- Start with an empty example project as the following:
+- [Add the 'Wi-SUN Applications' Repository to Simplicity Studio 5](../README.md#add-the-wi-sun-applications-repository-to-simplicity-studio-5)
+- Create the Wi-SUN Applications 'Stability' Project as described [here](../README.mdcreate-the-wi-sun-applications-example-projects)
+
+Or
+
+- Start with an empty project as the following:
   - Create a **Wi-SUN - SoC Empty** project for a [Silicon Labs Wi-SUN Evaluation Kit](https://www.silabs.com/wireless/wi-sun?tab=kits) using **Simplicity Studio 5**.
-  - Copy all attached files in `inc` and `src` folders into the project root folder (overwriting existing app.c).
+  - Copy all `.c` and `.h` files from the current folder into the project root folder (overwriting existing files).
 
 ## Communication methods ##
 
@@ -74,15 +78,17 @@ The demonstration uses a Wi-SUN network, supporting
 
 - UDP (natively)
 - CoAP (using the Wi-SUN CoAP Service)
+- OTA DFU (this requires using a bootloader with storage enabled and the selected compression mechanism installed)
 
 ## How it works ##
 
 ### Wi-SUN Network Set Up ###
 
 - A [Linux Wi-SUN Border Router](https://github.com/SiliconLabs/wisun-br-linux) is set up and started, waiting for Wi-SUN nodes to connect.
-- Convenience scripts are copied from [wisun_stability_linux_border_router](wisun_stability_linux_border_router). Bash scripts are made executable using
+- Convenience scripts are copied from [linux_border_router_wsbrd](linux_border_router_wsbrd) to the user's home. Bash scripts are made executable using
   - `chmod a+x coap_all`
   - `chmod a+x ipv6s`
+  - `chmod a+x *.sh`
 - The [UDP notification receiver](https://stash.silabs.com/users/mdorval/repos/wisun_stability/browse/Border_Router_scripts/udp_notification_receiver.py) is started using
   - `python udp_notification_receiver.py 1237 " "`, waiting for messages from the Wi-SUN Nodes on port `1237`.
 - The application is built and flashed to all Wi-SUN devices
