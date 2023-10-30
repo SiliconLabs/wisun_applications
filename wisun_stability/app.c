@@ -50,8 +50,7 @@
 
 #include "sl_wisun_event_mgr.h"
 #include "printf.h"
-#include "socket.h"
-#include "sl_ftp_config.h"
+#include "socket/socket.h"
 #include "sl_wisun_config.h"
 
 #include "app_timestamp.h"
@@ -62,7 +61,6 @@
 
 #include "app_coap.h"
 #include "app_check_neighbors.h"
-#include "sl_tftp_clnt.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -122,7 +120,7 @@ char*       _connection_json_string();
 char*       _status_json_string (char * start_text);
 sl_wisun_mac_address_t _get_parent_mac_address(void);
 sl_status_t _select_destinations(void);
-sl_status_t _open_udp_sockets_with_Border_Router(void);
+sl_status_t _open_udp_sockets(void);
 sl_status_t _coap_notify(char* json_string);
 uint8_t     _print_and_send_messages (char *in_msg, bool with_time,
                             bool to_console, bool to_rtt, bool to_udp, bool to_coap);
@@ -153,8 +151,8 @@ uint16_t history_len;
 //                                Static Variables
 // -----------------------------------------------------------------------------
 sl_wisun_join_state_t join_state = SL_WISUN_JOIN_STATE_DISCONNECTED;
-static uint64_t app_join_state_sec[6];
-       uint64_t app_join_state_delay_sec[6];
+static  uint64_t app_join_state_sec[6];
+        uint64_t app_join_state_delay_sec[6];
 static uint16_t previous_join_state = 0;
 char json_string[SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE];
 #ifdef    HISTORY
@@ -164,10 +162,13 @@ sl_wisun_mac_address_t device_mac;
 sl_wisun_mac_address_t parent_mac;
 
 // IPv6 address structures
-sl_wisun_ip_address_t device_global_ipv6;
-sl_wisun_ip_address_t border_router_ipv6;
-sl_wisun_ip_address_t udp_notification_ipv6;
-sl_wisun_ip_address_t coap_notification_ipv6;
+in6_addr_t device_global_ipv6;
+in6_addr_t border_router_ipv6;
+in6_addr_t udp_notification_ipv6;
+in6_addr_t coap_notification_ipv6;
+
+sockaddr_in6_t udp_notification_sockaddr_in6;
+sockaddr_in6_t coap_notification_sockaddr_in6;
 
 // IPv6 address strings (for printing)
 char  device_global_ipv6_string[40];
@@ -203,7 +204,7 @@ typedef struct sl_wisun_coap_notify_ch {
   /// Notification socket
   int32_t sockid;
   /// Notification address
-  wisun_addr_t addr;
+  sockaddr_in6_t addr;
   /// Notification packet
   sl_wisun_coap_packet_t pkt;
 } sl_wisun_coap_notify_ch_t;
@@ -327,29 +328,29 @@ void app_task(void *args)
 
   // Get ready to listen to and send notifications to the Border Router
   //  also get ready for CoAP communication
-  _open_udp_sockets_with_Border_Router();
+  _open_udp_sockets();
 
 #ifdef    SL_CATALOG_WISUN_OTA_DFU_PRESENT
-  sl_wisun_ip_address_t global_ipv6;
+  in6_addr_t global_ipv6;
 
   printf("OTA DFU will download chunks of '<TFTP_DIRECTORY>/%s' from %s/%d\n",
-         SL_WISUN_OTA_DFU_GBL_FILE,
-         SL_WISUN_OTA_DFU_HOST_ADDR,
-         SL_WISUN_OTA_DFU_TFTP_PORT
-       );
+        SL_WISUN_OTA_DFU_GBL_FILE,
+        SL_WISUN_OTA_DFU_HOST_ADDR,
+        SL_WISUN_OTA_DFU_TFTP_PORT
+      );
 
   sl_wisun_get_ip_address(SL_WISUN_IP_ADDRESS_TYPE_GLOBAL, &global_ipv6);
   printf("OTA DFU 'start' command:\n");
   printf(" coap-client -m post -N -B 10 -t text coap://[%s]:%d%s -e \"start\"\n",
-         app_wisun_trace_util_get_ip_str(&global_ipv6),
-         5683,
-         SL_WISUN_OTA_DFU_URI_PATH
-       );
+        app_wisun_trace_util_get_ip_str(&global_ipv6),
+        5683,
+        SL_WISUN_OTA_DFU_URI_PATH
+      );
   printf("Follow OTA DFU progress (from node, intrusive) using:\n");
   printf(" coap-client -m get -N -B 10 -t text coap://[%s]:%d%s\n",
-       app_wisun_trace_util_get_ip_str(&global_ipv6),
-       SL_WISUN_COAP_RESOURCE_HND_SERVICE_PORT,
-       SL_WISUN_OTA_DFU_URI_PATH
+      app_wisun_trace_util_get_ip_str(&global_ipv6),
+      SL_WISUN_COAP_RESOURCE_HND_SERVICE_PORT,
+      SL_WISUN_OTA_DFU_URI_PATH
   );
 
   if (SL_WISUN_OTA_DFU_HOST_NOTIFY_ENABLED) {
@@ -357,15 +358,15 @@ void app_task(void *args)
         SL_WISUN_OTA_DFU_NOTIFY_DOWNLOAD_CHUNK_CNT
       );
       printf("OTA DFU notifications will be POSTed to notification server coap://[%s]:%d%s\n",
-         SL_WISUN_OTA_DFU_NOTIFY_HOST_ADDR,
-         SL_WISUN_OTA_DFU_NOTIFY_PORT,
-         SL_WISUN_OTA_DFU_NOTIFY_URI_PATH
+        SL_WISUN_OTA_DFU_NOTIFY_HOST_ADDR,
+        SL_WISUN_OTA_DFU_NOTIFY_PORT,
+        SL_WISUN_OTA_DFU_NOTIFY_URI_PATH
       );
     printf("Follow OTA DFU progress (from notification server) using:\n");
     printf(" coap-client -m get -N -B 1 -t text coap://[%s]:%d%s\n",
-       SL_WISUN_OTA_DFU_NOTIFY_HOST_ADDR,
-       SL_WISUN_OTA_DFU_NOTIFY_PORT,
-       SL_WISUN_OTA_DFU_NOTIFY_URI_PATH
+      SL_WISUN_OTA_DFU_NOTIFY_HOST_ADDR,
+      SL_WISUN_OTA_DFU_NOTIFY_PORT,
+      SL_WISUN_OTA_DFU_NOTIFY_URI_PATH
     );
   }
 #endif /* SL_CATALOG_WISUN_OTA_DFU_PRESENT */
@@ -400,7 +401,7 @@ void app_task(void *args)
 
     // Print status message every auto_send_sec seconds
     _print_and_send_messages (_status_json_string(""),
-               with_time, to_console, to_rtt, to_udp, to_coap);
+              with_time, to_console, to_rtt, to_udp, to_coap);
     osDelay(auto_send_sec*1000);
 
   }
@@ -496,7 +497,7 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
       if (udp_notification_socket_id) {
         to_udp = to_coap = true;
         _print_and_send_messages (_connection_json_string(""),
-             with_time, to_console, to_rtt, to_udp, to_coap);
+            with_time, to_console, to_rtt, to_udp, to_coap);
       }
       app_set_all_traces(SL_WISUN_TRACE_LEVEL_WARN, true);
     }
@@ -549,16 +550,16 @@ char* _connection_json_string () {
   refresh_parent_tag();
 
   snprintf(json_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE,
-     CONNECTION_JSON_FORMAT_STR,
-     device_tag,
-     CHIP,
-     parent_tag,
-     sec_string,
-     app_join_state_delay_sec[1],
-     app_join_state_delay_sec[2],
-     app_join_state_delay_sec[3],
-     app_join_state_delay_sec[4],
-     app_join_state_delay_sec[5]
+    CONNECTION_JSON_FORMAT_STR,
+    device_tag,
+    CHIP,
+    parent_tag,
+    sec_string,
+    app_join_state_delay_sec[1],
+    app_join_state_delay_sec[2],
+    app_join_state_delay_sec[3],
+    app_join_state_delay_sec[4],
+    app_join_state_delay_sec[5]
   );
   return json_string;
 };
@@ -592,18 +593,18 @@ char* _status_json_string (char * start_text) {
     sprintf(connected_sec_string,   "%s", dhms(connected_total_sec + current_state_sec));
     sprintf(disconnected_sec_string,"%s", dhms(disconnected_total_sec));
     snprintf(json_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE,
-       CONNECTED_JSON_FORMAT_STR,
-       start_text,
-       device_tag,
-       CHIP,
-       parent_tag,
-       running_sec_string,
-       current_sec_string,
-       "no",
-       connection_count,
-       100.0*(connected_total_sec + current_state_sec)/(connected_total_sec + current_state_sec + disconnected_total_sec),
-       connected_sec_string,
-       disconnected_sec_string
+      CONNECTED_JSON_FORMAT_STR,
+      start_text,
+      device_tag,
+      CHIP,
+      parent_tag,
+      running_sec_string,
+      current_sec_string,
+      "no",
+      connection_count,
+      100.0*(connected_total_sec + current_state_sec)/(connected_total_sec + current_state_sec + disconnected_total_sec),
+      connected_sec_string,
+      disconnected_sec_string
     );
   } else {
     current_state_sec = now_sec() - disconnection_time_sec;
@@ -611,18 +612,18 @@ char* _status_json_string (char * start_text) {
     sprintf(connected_sec_string,   "%s", dhms(connected_total_sec));
     sprintf(disconnected_sec_string,"%s", dhms(disconnected_total_sec + current_state_sec));
     snprintf(json_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE,
-       CONNECTED_JSON_FORMAT_STR,
-       start_text,
-       device_tag,
-       CHIP,
-       parent_tag,
-       running_sec_string,
-       "no",
-       current_sec_string,
-       connection_count,
-       100.0*(connected_total_sec)/(connected_total_sec + disconnected_total_sec + current_state_sec),
-       connected_sec_string,
-       disconnected_sec_string
+      CONNECTED_JSON_FORMAT_STR,
+      start_text,
+      device_tag,
+      CHIP,
+      parent_tag,
+      running_sec_string,
+      "no",
+      current_sec_string,
+      connection_count,
+      100.0*(connected_total_sec)/(connected_total_sec + disconnected_total_sec + current_state_sec),
+      connected_sec_string,
+      disconnected_sec_string
     );
   }
 
@@ -638,68 +639,45 @@ sl_status_t _select_destinations(void) {
   NO_ERROR(ret, "Device Global IPv6:            %s\n", device_global_ipv6_string);
   IF_ERROR(ret, "[Failed: unable to retrieve the Device Global IPv6: 0x%04x]\n", (uint16_t)ret);
 
-  // Store Border Router IPV6 and set the corresponding string
-  ret = sl_wisun_get_ip_address(SL_WISUN_IP_ADDRESS_TYPE_BORDER_ROUTER, &border_router_ipv6);
-  sl_wisun_ip6tos(border_router_ipv6.address, border_router_ipv6_string);
-  NO_ERROR(ret, "Border Router IPv6:            %s\n", border_router_ipv6_string);
-  IF_ERROR(ret, "[Failed: unable to retrieve the Border Router IPv6: 0x%04x]\n", (uint16_t)ret);
-
-  // Set the UDP notification destination (Border Router by default)
+  // Set the UDP notification destination
   printfBothTime("UDP_NOTIFICATION_DEST: %s\n", UDP_NOTIFICATION_DEST);
-  if (sl_strcasecmp(UDP_NOTIFICATION_DEST, "border_router") == 0) {
-    memcpy(udp_notification_ipv6.address,   border_router_ipv6.address, sizeof(device_global_ipv6.address));
-  } else {
-    sl_wisun_stoip6(UDP_NOTIFICATION_DEST    , strlen(UDP_NOTIFICATION_DEST), udp_notification_ipv6.address);
-  }
-  sl_wisun_ip6tos(udp_notification_ipv6.address       , udp_notification_ipv6_string);
-  printfBothTime("UDP  Notification destination: %s\n", udp_notification_ipv6_string);
+  sl_wisun_stoip6(UDP_NOTIFICATION_DEST, strlen(UDP_NOTIFICATION_DEST), udp_notification_sockaddr_in6.sin6_addr.address);
+  sl_wisun_ip6tos(udp_notification_sockaddr_in6.sin6_addr.address, udp_notification_ipv6_string);
+  printfBothTime("UDP  Notification destination: %s/%5d\n" , udp_notification_ipv6_string, udp_notification_sockaddr_in6.sin6_port);
 
-  // Set the CoAP notification destination (border Router by default)
+  // Set the CoAP notification destination
   printfBothTime("COAP_NOTIFICATION_DEST: %s\n", COAP_NOTIFICATION_DEST);
-  if (sl_strcasecmp(COAP_NOTIFICATION_DEST, "border_router") == 0) {
-    memcpy(coap_notification_ipv6.address,   border_router_ipv6.address, sizeof(device_global_ipv6.address));
-  } else {
-    sl_wisun_stoip6(COAP_NOTIFICATION_DEST   , strlen(COAP_NOTIFICATION_DEST), coap_notification_ipv6.address);
-  }
-  sl_wisun_ip6tos(coap_notification_ipv6.address      , coap_notification_ipv6_string);
-  printfBothTime("COAP Notification destination: %s\n", coap_notification_ipv6_string);
+  sl_wisun_stoip6(COAP_NOTIFICATION_DEST   , strlen(COAP_NOTIFICATION_DEST), coap_notification_sockaddr_in6.sin6_addr.address);
+  sl_wisun_ip6tos(coap_notification_sockaddr_in6.sin6_addr.address, coap_notification_ipv6_string);
+  printfBothTime("COAP Notification destination: %s/%5d\n"  , coap_notification_ipv6_string, coap_notification_sockaddr_in6.sin6_port);
 
   return ret;
 }
 
-sl_status_t _open_udp_sockets_with_Border_Router(void){
+sl_status_t _open_udp_sockets(void){
   sl_status_t ret;
 
   _select_destinations();
 
   // UDP Notifications (autonomously sent by the device)
-  ret = sl_wisun_open_socket (SL_WISUN_SOCKET_PROTOCOL_UDP, &udp_notification_socket_id);
-  NO_ERROR(ret, "Opened    the UDP  notification socket (%ld)\n", udp_notification_socket_id);
-  IF_ERROR_RETURN(ret, "[Failed: unable to open the UDP notification socket: 0x%04x]\n", (uint16_t)ret);
+  udp_notification_socket_id = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+  ret =(udp_notification_socket_id == SOCKET_INVALID_ID) ? 1 : 0;
+  NO_ERROR(ret, "Opened    the UDP  notification socket (id %ld)\n", udp_notification_socket_id);
+  IF_ERROR_RETURN(ret, "[Failed: unable to open the UDP notification socket]\n");
 
-  ret = sl_wisun_connect_socket(udp_notification_socket_id, &udp_notification_ipv6, UDP_NOTIFICATION_PORT);
-  NO_ERROR(ret, "Connected the UDP  notification socket (%ld %s/%d)]\n",
-           udp_notification_socket_id, udp_notification_ipv6_string, UDP_NOTIFICATION_PORT);
-  IF_ERROR_RETURN(ret, "[Failed: unable to connect the UDP notification socket: 0x%04x]\n", (uint16_t)ret);
-
+  udp_notification_sockaddr_in6.sin6_family = AF_INET6;
+  udp_notification_sockaddr_in6.sin6_port = UDP_NOTIFICATION_PORT;
 
   // (UDP) CoAP Notifications (autonomously sent by the device)
-  ret = sl_wisun_open_socket (SL_WISUN_SOCKET_PROTOCOL_UDP, &coap_notification_socket_id);
-  NO_ERROR(ret, "Opened    the COAP notification socket (%ld)\n", coap_notification_socket_id);
-  IF_ERROR_RETURN(ret, "[Failed: unable to open the COAP notification socket: 0x%04x]\n", (uint16_t)ret);
+  ret = coap_notification_socket_id = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+  ret =(coap_notification_socket_id == SOCKET_INVALID_ID) ? 1 : 0;
+  NO_ERROR(ret, "Opened    the COAP notification socket (id %ld)\n", coap_notification_socket_id);
+  IF_ERROR_RETURN(ret, "[Failed: unable to open the COAP notification socket]\n");
 
-  ret = sl_wisun_connect_socket(coap_notification_socket_id, &coap_notification_ipv6, COAP_NOTIFICATION_PORT);
-  NO_ERROR(ret, "Connected the CoAP notification socket (%ld %s/%d)]\n",
-           coap_notification_socket_id, coap_notification_ipv6_string, COAP_NOTIFICATION_PORT);
-  IF_ERROR_RETURN(ret, "[Failed: unable to connect the CoAP notification socket (%ld %s/%d): 0x%04x]\n",
-                  coap_notification_socket_id, coap_notification_ipv6_string, COAP_NOTIFICATION_PORT, (uint16_t)ret);
-
+  coap_notification_sockaddr_in6.sin6_family = AF_INET6;
+  coap_notification_sockaddr_in6.sin6_port = COAP_NOTIFICATION_PORT;
   coap_notify_ch.sockid = coap_notification_socket_id;
-  coap_notify_ch.addr.sin6_family = AF_WISUN;
-  coap_notify_ch.addr.sin6_port = COAP_NOTIFICATION_PORT;
-
-  assert(inet_pton(AF_WISUN, border_router_ipv6_string,
-                   &coap_notify_ch.addr.sin6_addr.s6_addr) != -1L);
+  coap_notify_ch.addr = coap_notification_sockaddr_in6;
 
   // Prepare CoAP notification packet
   coap_notify_ch.pkt.msg_code = COAP_MSG_CODE_REQUEST_PUT;
@@ -734,15 +712,21 @@ sl_status_t _coap_notify(char* json_string)
   buff = (uint8_t *) sl_wisun_coap_malloc(req_buff_size);
   if (buff == NULL) {
     printfBothTime("_coap_notify() error on line %d: sl_wisun_coap_malloc buff(%d)\n", __LINE__,
-                   req_buff_size);
+                  req_buff_size);
     return __LINE__;
   }
   if (sl_wisun_coap_builder(buff, &coap_notify_ch.pkt) < 0) {
     printfBothTime("_coap_notify() error on line %d: sl_wisun_coap_builder()\n", __LINE__);
   } else {
-    ret = sl_wisun_send_on_socket(coap_notify_ch.sockid, req_buff_size, (uint8_t *)buff);
-    IF_ERROR(ret, "[Failed (line %d): can't send %d bytes on socket %ld. ret 0x%x]\n", __LINE__,
-             req_buff_size, coap_notify_ch.sockid, (int)ret);
+      /* Casting udp_notification_sockaddr_in6 (type sockaddr_in6_t) to (const struct sockaddr *) to match POSIX socket interface */
+      if (sendto(coap_notify_ch.sockid,
+                  buff,
+                  req_buff_size,
+                  0,
+                  (const struct sockaddr *) &coap_notification_sockaddr_in6,
+                  sizeof(sockaddr_in6_t)) == -1) {
+          ret = SL_STATUS_TRANSMIT;
+      }
   }
   sl_wisun_coap_free(buff);
   return ret;
@@ -773,21 +757,27 @@ uint8_t _print_and_send_messages (char *in_msg, bool with_time,
   }
   if (to_udp == true) {     // Send to UDP port
     udp_msg_len  = snprintf(udp_msg,  1024, "%s", in_msg);
-    ret = sl_wisun_send_on_socket(udp_notification_socket_id, udp_msg_len, (uint8_t *)udp_msg);
-    IF_ERROR(ret, "[Failed (line %d): unable to send to the UDP notification socket (%ld %s/%d): 0x%04x. Check sl_status.h] udp_msg_len %d\n", __LINE__,
-             udp_notification_socket_id, udp_notification_ipv6_string , UDP_NOTIFICATION_PORT, (uint16_t)ret, udp_msg_len);
-    if (ret == SL_STATUS_OK) messages_processed++;
+    if (sendto(udp_notification_socket_id,
+                (uint8_t *)udp_msg,
+                udp_msg_len,
+                0L,
+                (const struct sockaddr *) &udp_notification_sockaddr_in6,
+                sizeof(sockaddr_in6_t)) == -1) {
+      printfBothTime("\n[Failed (line %d): unable to send to the UDP notification socket (%ld %s/%d)] udp_msg_len %d\n", __LINE__,
+              udp_notification_socket_id, udp_notification_ipv6_string , UDP_NOTIFICATION_PORT, udp_msg_len);
+    } else {
+      messages_processed++;
+    }
   }
   if (to_coap == true) {    // Send to CoAP notification port
     coap_msg_len = snprintf(coap_msg, 1024, "%s", in_msg);
     if (coap_msg_len > SL_WISUN_STATUS_JSON_STR_MAX_LEN) {
-        ret = 1;
-        IF_ERROR(ret, "[Failed (line %d): CoAP message len %d is higher than MAX %d]. Message not sent because it would overflow\n", __LINE__,
-                 coap_msg_len, SL_WISUN_STATUS_JSON_STR_MAX_LEN);
+        printfBothTime("\n[Failed (line %d): CoAP message len %d is higher than MAX %d]. Message not sent because it would overflow\n", __LINE__,
+                coap_msg_len, SL_WISUN_STATUS_JSON_STR_MAX_LEN);
     } else {
       ret = _coap_notify(coap_msg);
       IF_ERROR(ret, "[Failed (line %d): unable to send to the CoAP notification socket (%ld %s/%d): 0x%04x. Check sl_status.h]\n", __LINE__,
-               coap_notification_socket_id, coap_notification_ipv6_string, COAP_NOTIFICATION_PORT, (uint16_t)ret);
+              coap_notification_socket_id, coap_notification_ipv6_string, COAP_NOTIFICATION_PORT, (uint16_t)ret);
       if (ret == SL_STATUS_OK) messages_processed++;
     }
   }
