@@ -22,7 +22,7 @@ The Silicon Labs Wi-SUN stack allows for a wide variety applications to be built
 
 - [Wi-SUN stability](https://github.com/SiliconLabs/wisun_applications_staging/tree/main/wisun_stability): An extendable monitoring application providing information on the device/board/application and connected statistics. It can be easily extended to monitor sensors and control actuators.
 
-## Add the Wi-SUN Application Examples to Simplicity Studio 5 ##
+## Add the 'Wi-SUN Applications' Repository to Simplicity Studio 5 ##
 
 1. Download and install [Simplicity Studio 5](https://www.silabs.com/developers/simplicity-studio).
 2. On Simplicity Studio 5, go to **Window -> Preferences -> Simplicity Studio -> External Repos**.
@@ -42,11 +42,11 @@ The Silicon Labs Wi-SUN stack allows for a wide variety applications to be built
 ## Documentation ##
 
 - Official Wi-SUN documentation can be found in [the Wi-SUN pages on docs.silabs.com](https://docs.silabs.com/wisun/latest/wisun-start/).
-- Project-specific information is provided in a README.md file in each project folder.
+- Project-specific information is provided in the **README.md** file in each project folder.
 
 ## Reporting Bugs/Issues and Posting Questions and Comments ##
 
-To report bugs in the Application Examples projects, please create a new "Issue" in the "Issues" section of this repo. Please reference the board, project, and source files associated with the bug, and reference line numbers. If you are proposing a fix, also include information on the proposed fix. Since these examples are provided as-is, there is no guarantee that these examples will be updated to fix these issues.
+To report bugs in the Wi-SUN Application Examples projects, please create a new "Issue" in the "Issues" section of this repo. Please reference the board, project, and source files associated with the bug, and reference line numbers. If you are proposing a fix, also include information on the proposed fix. Since these examples are provided as-is, there is no guarantee that these examples will be updated to fix these issues.
 
 Questions and comments related to these examples should be made by creating a new "Issue" in the "Issues" section of this repo.
 
