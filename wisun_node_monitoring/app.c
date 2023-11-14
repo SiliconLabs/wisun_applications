@@ -1,32 +1,38 @@
 /***************************************************************************//**
- * @file
- * @brief Application code
- *******************************************************************************
- * # License
- * <b>Copyright 2021 Silicon Laboratories Inc. www.silabs.com</b>
- *******************************************************************************
- *
- * SPDX-License-Identifier: Zlib
- *
- * The licensor of this software is Silicon Laboratories Inc.
- *
- * This software is provided 'as-is', without any express or implied
- * warranty. In no event will the authors be held liable for any damages
- * arising from the use of this software.
- *
- * Permission is granted to anyone to use this software for any purpose,
- * including commercial applications, and to alter it and redistribute it
- * freely, subject to the following restrictions:
- *
- * 1. The origin of this software must not be misrepresented; you must not
- *    claim that you wrote the original software. If you use this software
- *    in a product, an acknowledgment in the product documentation would be
- *    appreciated but is not required.
- * 2. Altered source versions must be plainly marked as such, and must not be
- *    misrepresented as being the original software.
- * 3. This notice may not be removed or altered from any source distribution.
- *
- ******************************************************************************/
+* @file app.c
+* @brief Application code of the Wi-SUN Node Monitoring example
+*******************************************************************************
+* # License
+* <b>Copyright 2023 Silicon Laboratories Inc. www.silabs.com</b>
+*******************************************************************************
+*
+* SPDX-License-Identifier: Zlib
+*
+* The licensor of this software is Silicon Laboratories Inc.
+*
+* This software is provided 'as-is', without any express or implied
+* warranty. In no event will the authors be held liable for any damages
+* arising from the use of this software.
+*
+* Permission is granted to anyone to use this software for any purpose,
+* including commercial applications, and to alter it and redistribute it
+* freely, subject to the following restrictions:
+*
+* 1. The origin of this software must not be misrepresented; you must not
+*    claim that you wrote the original software. If you use this software
+*    in a product, an acknowledgment in the product documentation would be
+*    appreciated but is not required.
+* 2. Altered source versions must be plainly marked as such, and must not be
+*    misrepresented as being the original software.
+* 3. This notice may not be removed or altered from any source distribution.
+*
+******************************************************************************
+*
+* EXPERIMENTAL QUALITY
+* This code has not been formally tested and is provided as-is.  It is not suitable for production environments.
+* This code will not be maintained.
+*
+******************************************************************************/
 // -----------------------------------------------------------------------------
 //                                   Includes
 // -----------------------------------------------------------------------------
@@ -34,10 +40,11 @@
 #include <assert.h>
 #include "app.h"
 #include "sl_wisun_api.h"
-#include "sl_wisun_app_core_util_config.h"
+#include "sl_string.h"
 
 #ifdef    SL_CATALOG_WISUN_APP_CORE_PRESENT
-  #include "sl_wisun_app_core.h"
+  #include "sl_wisun_app_core_util.h"
+  #include "sl_wisun_app_core_util_config.h"
 #endif /* SL_CATALOG_WISUN_APP_CORE_PRESENT */
 
 #ifdef    SL_CATALOG_WISUN_APP_OS_STAT_PRESENT
@@ -247,7 +254,7 @@ void app_task(void *args)
 
   printf("\n");
   sprintf(chip, "%s", CHIP);
-  snprintf(application, 100, "%s", "Wi-SUN Stability V1.0.0");
+  snprintf(application, 100, "%s", "Wi-SUN Node Monitoring V1.0.0");
   printfBothTime("%s/%s %s\n", chip, SL_BOARD_NAME, application);
   snprintf(version, 50, "Compiled on %s at %s", __DATE__, __TIME__);
   printfBothTime("%s\n", chip);

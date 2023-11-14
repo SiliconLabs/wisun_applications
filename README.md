@@ -3,7 +3,7 @@
     <td align="left" valign="middle">
       <h1>EFR32 Wi-SUN Application Examples</h1>
       <a href="https://www.silabs.com/wireless/wi-sun">
-        <img src="images/../wisun_stability/image/wi-sun-logo.jpg"  title="Wi-SUN" alt="Wi-SUN Logo" width="250" />
+        <img src="images/../wisun_node_monitoring/image/wi-sun-logo.jpg"  title="Wi-SUN" alt="Wi-SUN Logo" width="250" />
       </a>
     </td>
     <td align="left" valign="middle">
@@ -20,13 +20,13 @@ The Silicon Labs Wi-SUN stack allows for a wide variety applications to be built
 
 ## Examples ##
 
-- [Wi-SUN stability](https://github.com/SiliconLabs/wisun_applications_staging/tree/main/wisun_stability): An extendable monitoring application providing information on the device/board/application and connected statistics. It can be easily extended to monitor sensors and control actuators.
+- [Wi-SUN Node Monitoring](https://github.com/SiliconLabs/wisun_applications_staging/tree/main/wisun_node_monitoring): An extendable node monitoring application providing information on the device/board/application and connected statistics. It can be easily extended to monitor sensors and control actuators.
 
 ## Add the 'Wi-SUN Applications' Repository to Simplicity Studio 5 ##
 
 1. Download and install [Simplicity Studio 5](https://www.silabs.com/developers/simplicity-studio).
 2. On Simplicity Studio 5, go to **Window -> Preferences -> Simplicity Studio -> External Repos**.
-3. Click **[Add]**. In the **URI** field, copy & paste the following link: `https://github.com/SiliconLabs/wfx_applications.git`
+3. Click **[Add]**. In the **URI** field, copy & paste the following link: `https://github.com/SiliconLabs/wisun_applications.git`
 4. Click **[Next]** then **[Finish]** and **[Apply and Close]**.
 
 ## Create the Wi-SUN Applications Example Projects ##

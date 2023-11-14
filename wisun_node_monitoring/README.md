@@ -1,7 +1,7 @@
 <table border="0">
   <tr>
     <td align="left" valign="middle">
-    <h1>Wi-SUN Stability Application</h1>
+    <h1>Wi-SUN Node Monitoring Application</h1>
   </td>
   <td align="left" valign="middle">
     <a href="https://www.silabs.com/wireless/wi-sun">
@@ -11,14 +11,14 @@
   </tr>
 </table>
 
-![Type badge      ](https://img.shields.io/badge/dynamic/json?url=https://raw.githubusercontent.com/SiliconLabs/application_examples_ci/master/wisun_applications/wisun_stability_monitoring.json&label=Type&query=type&color=green)
-![Technology badge](https://img.shields.io/badge/dynamic/json?url=https://raw.githubusercontent.com/SiliconLabs/application_examples_ci/master/wisun_applications/wisun_stability_monitoring.json&label=Technology&query=technology&color=green)
-![License badge   ](https://img.shields.io/badge/dynamic/json?url=https://raw.githubusercontent.com/SiliconLabs/application_examples_ci/master/wisun_applications/wisun_stability_monitoring.json&label=License&query=license&color=green)
-![SDK badge       ](https://img.shields.io/badge/dynamic/json?url=https://raw.githubusercontent.com/SiliconLabs/application_examples_ci/master/wisun_applications/wisun_stability_monitoring.json&label=SDK&query=sdk&color=green)
+![Type badge      ](https://img.shields.io/badge/dynamic/json?url=https://raw.githubusercontent.com/SiliconLabs/application_examples_ci/master/wisun_applications/wisun_node_monitoring.json&label=Type&query=type&color=green)
+![Technology badge](https://img.shields.io/badge/dynamic/json?url=https://raw.githubusercontent.com/SiliconLabs/application_examples_ci/master/wisun_applications/wisun_node_monitoring.json&label=Technology&query=technology&color=green)
+![License badge   ](https://img.shields.io/badge/dynamic/json?url=https://raw.githubusercontent.com/SiliconLabs/application_examples_ci/master/wisun_applications/wisun_node_monitoring.json&label=License&query=license&color=green)
+![SDK badge       ](https://img.shields.io/badge/dynamic/json?url=https://raw.githubusercontent.com/SiliconLabs/application_examples_ci/master/wisun_applications/wisun_node_monitoring.json&label=SDK&query=sdk&color=green)
 
 ## Summary ##
 
-This project aims to implement a Wi-SUN network monitoring system using a Linux Border Router and a Wi-SUN device stability monitoring application flashed on [Wi-SUN capable Silicon Labs development kits](https://www.silabs.com/wireless/wi-sun?tab=hardware).
+This project aims to implement a Wi-SUN network monitoring system using a Linux Border Router and a Wi-SUN node monitoring application flashed on [Wi-SUN capable Silicon Labs development kits](https://www.silabs.com/wireless/wi-sun?tab=hardware).
 
 The block diagram of this application is shown in the image below:
 
@@ -26,7 +26,7 @@ The block diagram of this application is shown in the image below:
 
 - To learn Wi-SUN technology basics, see [the Wi-SUN pages on docs.silabs.com](https://docs.silabs.com/wisun/latest/wisun-start/).
 
-- To learn code-level information on the stability application, see [Add a Custom Application in the Wi-SUN Developer's Journey](https://docs.silabs.com/wisun/latest/wisun-custom-application/)
+- To learn code-level information on the node monitoring application, see [Add a Custom Application in the Wi-SUN Development Walkthrough](https://docs.silabs.com/wisun/latest/wisun-custom-application/)
 
 ## Gecko SDK Version ##
 
@@ -38,8 +38,8 @@ The following is required to run the demo:
 
 - A Linux platform, which will be used as
   - The [Linux Wi-SUN Border Router](https://www.silabs.com/documents/public/application-notes/an1332-wi-sun-network-configuration.pdf#page=8)
-  - (Stability) A UDP receiver, listening for initial connection and regularly sent status messages from all connected Wi-SUN nodes
-  - (Monitoring) A CoAP client used to get CoAP resources provided by the device application and remotely control some application parameters.
+  - A UDP receiver, listening for initial connection and regularly sent status messages from all connected Wi-SUN nodes
+  - A CoAP client used to get CoAP resources provided by the device application and remotely control some application parameters.
 - One [Wi-SUN Evaluation kit](https://www.silabs.com/wireless/wi-sun?tab=kits) used as the Border Router's Wi-SUN RCP (Radio Co-Processor).
 - One or more [Wi-SUN Evaluation kit(s)](https://www.silabs.com/wireless/wi-sun?tab=kits) used as the Wi-SUN nodes.
 
@@ -59,12 +59,12 @@ or
 
 ## Setup ##
 
-A single example application is required in order to use this demonstration: **Wi-SUN Stability**, created based on **Wi-SUN -SoC Empty** provided by Simplicity Studio.
+A single example application is required in order to use this demonstration: **Wi-SUN Node Monitoring**, created based on **Wi-SUN -SoC Empty** provided by Simplicity Studio.
 
 To test this application, you can
 
 - [Add the 'Wi-SUN Applications' Repository to Simplicity Studio 5](../README.md#add-the-wi-sun-applications-repository-to-simplicity-studio-5)
-- Create the Wi-SUN Applications 'Stability' Project as described [here](../README.mdcreate-the-wi-sun-applications-example-projects)
+- Create the Wi-SUN Applications 'Wi-SUN Node Monitoring' Project as described [here](../README.md#create-the-wi-sun-applications-example-projects)
 
 Or
 
@@ -89,7 +89,7 @@ The demonstration uses a Wi-SUN network, supporting
   - `chmod a+x coap_all`
   - `chmod a+x ipv6s`
   - `chmod a+x *.sh`
-- The [UDP notification receiver](https://stash.silabs.com/users/mdorval/repos/wisun_stability/browse/Border_Router_scripts/udp_notification_receiver.py) is started using
+- The [UDP notification receiver](linux_border_router_wsbrd/udp_notification_receiver.py) is started using
   - `python udp_notification_receiver.py 1237 " "`, waiting for messages from the Wi-SUN Nodes on port `1237`.
 - The application is built and flashed to all Wi-SUN devices
 
@@ -97,7 +97,7 @@ The demonstration uses a Wi-SUN network, supporting
 
 - The application firmware is configured with the same network settings as the Border Router, with automatic connection.
 
-- **Node Initial Connection** – After the application firmware is installed, the devices connect automatically to the Wi-SUN network, selecting the best parent, using several hops if needed.
+- **Node Initial Connection** – After the application firmware is installed, the devices connect automatically to the Wi-SUN network, selecting the best parent, using several hops if needed, as in any Wi-SUN network.
 
 - **Initial Connection Message** - Once connected, each node sends an initial UDP connection message to the Border Router's IPv6 address on port 1237.
 
@@ -113,11 +113,11 @@ The demonstration uses a Wi-SUN network, supporting
 
 ### Normal Mode ###
 
-Once all devices are connected, the [`coap_all`](https://stash.silabs.com/users/mdorval/repos/wisun_stability/browse/Border_Router_scripts/coap_all) bash script allows sending the same CoAP request to all connected devices, allowing an easy monitoring of the entire network.
+Once all devices are connected, the [`coap_all`](linux_border_router_wsbrd/coap_all) bash script allows sending the same CoAP request to all connected devices, allowing an easy monitoring of the entire network.
 
 ### CoAP Resources ###
 
-The following resources are available via CoAP, split in several groups:
+The following resources are available via CoAP, split in several groups. To reduce the initial code size, some are only conditionally compiled:
 
 - 'statistics' for values accumulated over time
   - 'statistics/app' for values coming from the application
@@ -134,7 +134,7 @@ The URIs are
 |info/device                      | last 4 digits of device MAC/IPv6 (as in the [wisun-br-gui](https://github.com/SiliconLabs/wisun-br-gui)) | '%04x' ||
 |info/chip                        | Silicon Labs part                           | 'xGyy'         ||
 |info/board                       | Silicon Labs Radio Board                    | 'BRDxxxxx'     ||
-|info/application                 | Application information string              | 'Wi-SUN Stability and Monitoring' ||
+|info/application                 | Application information string              | 'Wi-SUN Node Monitoring' ||
 |info/version                     | Application version string                  | 'Compiled on %s at %s' ||
 |info/all                         | all of the 'info' group above               | json           ||
 |status/running                   | time since application booted               | 'ddd-hh:mm:ss' ||
@@ -156,9 +156,9 @@ The URIs are
 |statistics/stack/regulation      | statistics from [sl_wisun_statistics_regulation_t](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-statistics-regulation-t) | json | '-e reset' resets these statistics |
 |settings/auto_send               | the current `auto_send_sec` value           | '%d' | '-e s' sets auto_send_sec to s     |
 
-## .sls Project Used ##
+## .slcp Project Used ##
 
-- [wisun_stability_monitoring.sls](SimplicityStudio/wisun_soc_stability_monitoring.sls)
+- [wisun_node_monitoring.slcp](wisun_node_monitoring.slcp)
 
 ## How to Port to Another Part ##
 

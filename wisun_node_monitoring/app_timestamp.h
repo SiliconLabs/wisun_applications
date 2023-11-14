@@ -1,66 +1,66 @@
 /***************************************************************************//**
- * @file app_timestamp.c
- * @brief 1 second time stamp and print utility
- *
- * How to use this code
- * inclusion:
- * #include "app_timestamp.h"
- * once:
- * sl_status_t status;
- * status = app_timestamp_init();
- * the 'app_timestamp' variable is the number of seconds since
- *  app_timestamp_init(). It can be used to compute durations in seconds
- *  and retrieved using 'now_ms()'
- * example:
- * printTime("Current app_timestamp = %6lu\n", now_ms());
- * results in:
- * [  0-00:10:32] Current app_timestamp =   632
- * (where the application time stamp is visible in ddd-hh:mm:ss (0:00:10:32) and in seconds (632)
- * Several options for printing are available (via macros):
- *  print a message in the console:
- *  printf("a message\n");
- *  print a message in the console with [ddd-hh:mm:ss] prefix:
- *  printfTime(formatString, ...);
- *  print a message in the RTT traces:
- *  printfRTT("a message\n");
- *  print a message in the RTT traces with [ddd-hh:mm:ss] prefix:
- *  printfRTT("a message\n");
- *  print a message in both console and RTT traces:
- *  printfBoth("a message\n");
- *  print a message in both console and RTT traces with [ddd-hh:mm:ss] prefix:
- *  printfBothTime("a message\n");
- *
- *******************************************************************************
- * # License
- * <b>Copyright 2023 Silicon Laboratories Inc. www.silabs.com</b>
- *******************************************************************************
- *
- * SPDX-License-Identifier: Zlib
- *
- * The licensor of this software is Silicon Laboratories Inc.
- *
- * This software is provided 'as-is', without any express or implied
- * warranty. In no event will the authors be held liable for any damages
- * arising from the use of this software.
- *
- * Permission is granted to anyone to use this software for any purpose,
- * including commercial applications, and to alter it and redistribute it
- * freely, subject to the following restrictions:
- *
- * 1. The origin of this software must not be misrepresented; you must not
- *    claim that you wrote the original software. If you use this software
- *    in a product, an acknowledgment in the product documentation would be
- *    appreciated but is not required.
- * 2. Altered source versions must be plainly marked as such, and must not be
- *    misrepresented as being the original software.
- * 3. This notice may not be removed or altered from any source distribution.
- *
- ******************************************************************************
-* # Experimental Quality
-* This code has not been formally tested and is provided as-is. It is not
-* suitable for production environments. In addition, this code will not be
-* maintained and there may be no bug maintenance planned for these resources.
-* Silicon Labs may update projects from time to time.
+* @file app_timestamp.c
+* @brief 1 second time stamp and print utility
+*
+* How to use this code
+* inclusion:
+* #include "app_timestamp.h"
+* once:
+* sl_status_t status;
+* status = app_timestamp_init();
+* the 'app_timestamp' variable is the number of seconds since
+*  app_timestamp_init(). It can be used to compute durations in seconds
+*  and retrieved using 'now_ms()'
+* example:
+* printTime("Current app_timestamp = %6lu\n", now_ms());
+* results in:
+* [  0-00:10:32] Current app_timestamp =   632
+* (where the application time stamp is visible in ddd-hh:mm:ss (0:00:10:32) and in seconds (632)
+* Several options for printing are available (via macros):
+*  print a message in the console:
+*  printf("a message\n");
+*  print a message in the console with [ddd-hh:mm:ss] prefix:
+*  printfTime(formatString, ...);
+*  print a message in the RTT traces:
+*  printfRTT("a message\n");
+*  print a message in the RTT traces with [ddd-hh:mm:ss] prefix:
+*  printfRTT("a message\n");
+*  print a message in both console and RTT traces:
+*  printfBoth("a message\n");
+*  print a message in both console and RTT traces with [ddd-hh:mm:ss] prefix:
+*  printfBothTime("a message\n");
+*
+*******************************************************************************
+* # License
+* <b>Copyright 2023 Silicon Laboratories Inc. www.silabs.com</b>
+*******************************************************************************
+*
+* SPDX-License-Identifier: Zlib
+*
+* The licensor of this software is Silicon Laboratories Inc.
+*
+* This software is provided \'as-is\', without any express or implied
+* warranty. In no event will the authors be held liable for any damages
+* arising from the use of this software.
+*
+* Permission is granted to anyone to use this software for any purpose,
+* including commercial applications, and to alter it and redistribute it
+* freely, subject to the following restrictions:
+*
+* 1. The origin of this software must not be misrepresented; you must not
+*    claim that you wrote the original software. If you use this software
+*    in a product, an acknowledgment in the product documentation would be
+*    appreciated but is not required.
+* 2. Altered source versions must be plainly marked as such, and must not be
+*    misrepresented as being the original software.
+* 3. This notice may not be removed or altered from any source distribution.
+*
+*******************************************************************************
+*
+* EXPERIMENTAL QUALITY
+* This code has not been formally tested and is provided as-is.  It is not suitable for production environments.
+* This code will not be maintained.
+*
 ******************************************************************************/
 
 #include <stdio.h>
