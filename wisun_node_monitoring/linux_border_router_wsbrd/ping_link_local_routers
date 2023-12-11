@@ -1,0 +1,24 @@
+#!/bin/bash
+# usage: sending a PING request to all Link local routers
+# ./ping_link_local_routers [args]
+
+ipv6s="ff02::2"
+
+# by default, simple ping
+if [ -z "$1" ]; then
+   args=""
+else
+   args="${@}"
+fi
+
+count=0
+responded=0
+
+for ipv6 in $ipv6s
+do
+    dev=$(echo $ipv6 | cut -d ':' -f 8)
+    cmd="ping -6 -w 20 -I tun0 -i 20 ${ipv6} ${args} "
+    echo -n "${cmd} : "
+    ${cmd}
+done
+

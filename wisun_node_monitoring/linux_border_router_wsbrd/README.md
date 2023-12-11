@@ -1,7 +1,12 @@
 # Linux Border Router Scripts
 
-The following scripts are convenient to more easily manage `wsbrd`, `tftpd`, OTA/DFU and check the Wi-SUN network status.
-They should be copied to the Linux Border Router user's directory to be used as documented below.
+The following bash and Python scripts are convenient to more easily manage `wsbrd`, `tftpd`, OTA/DFU and check the Wi-SUN network status.
+To be used as documented below, they should be
+
+- Copied to the Linux Border Router user's directory.
+- Set as executable using `chmod a+x *.sh`
+
+> Use the `--help` option or check the scripts code for more details.
 
 ## `wsbrd` control and monitoring
 
@@ -14,7 +19,7 @@ They should be copied to the Linux Border Router user's directory to be used as 
 | `wsbrd_clear.sh`   | bash | Clear all `wsbrd` storage files | `./wsbrd_clear.sh` | no file left in `/var/lib/wsbrd/* |
 | `wsbrd_add.sh`     | bash | Add fixed IPv6 Addresses to `tun0` | `~/wsbrd_add.sh` | `ip address show tun0` shows `fd00:6172:6d00::1/64` and `fd00:6172:6d00::2/64` |
 | `wsbrd_info.sh`    | bash | Check wsbrd lifetime | `~/wsbrd_info.sh` |`PID USER COMMAND %MEM ELAPSED` |
-| `wsbrd_follow.sh`  | bash | Follow wsbrd traces from `journalctl` | `~/wsbrd_follows.sh` | `sudo journalctl -u wisun-borderrouter.service -f` |
+| `wsbrd_follow.sh`  | bash | Follow wsbrd traces from `journalctl`. All traces with no argument, otherwise filtering on device_tag | `~/wsbrd_follows.sh [device_tag]` | `sudo journalctl -u wisun-borderrouter.service -f` |
 | `wsbrd_listen.sh`  | bash | Start UDP notification receiver | `~/wsbrd_listen.sh` | UDP notifications received from connected Wi-SUN devices |
 
 ## Network checks
@@ -48,3 +53,9 @@ They should be copied to the Linux Border Router user's directory to be used as 
 | Name | Language | Usage | Call | Result |
 |------|----------|-------|------|--------|
 | `coap_all <coap_uri> [-e <coap_payload>]` | bash | `~/coap_all /status/all` | Sending a CoAP request (default `/.well-known/core`) to all connected devices | Recursive response to `coap-client -m get -N -B 3 coap://[${ipv6}]:5683${coap_uri} ${coap_payload}` |
+
+## Testing
+
+| Name | Language | Usage | Call | Result |
+|------|----------|-------|------|--------|
+| `iperf_test.sh --client <client_ipv6> --server <server_ipv6> --bandwidth <bw_bps> --duration <ms> --interval <ms> --buffer_length <1232_by_default> [--ping] [--stop]` | bash | `~/iperf_test.sh --client <client_ipv6> --server <server_ipv6> --bandwidth <bw_bps> --duration <ms> --interval <ms> --buffer_length <1232_by_default> [--ping] [--stop]` | Launching iperf test from client to server using COAP | Measured bandwidth vs required bandwidth |

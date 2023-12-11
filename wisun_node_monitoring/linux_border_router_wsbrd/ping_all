@@ -1,0 +1,32 @@
+#!/bin/bash
+# usage: sending a PING request to all connected devices
+# ./ping_all [args]
+
+ipv6s=$(python get_nodes_ipv6_address.py)
+
+# by default, simple ping
+if [ -z "$1" ]; then
+   args=""
+else
+   args="${@}"
+fi
+
+count=0
+responded=0
+
+for ipv6 in $ipv6s
+do
+    dev=$(echo $ipv6 | cut -d ':' -f 8)
+    cmd="ping -6 -w 3 -c 1 ${ipv6} ${args} "
+    echo -n "${cmd} : "
+    res=$( ${cmd} )
+    count=$(($count+1))
+    time=$( echo ${res} | grep -oP ' time=[0-9]*.[0-9]* ms')
+    received=$( echo ${res} | grep -oP ' [0-9]* received')
+    echo "${received}  ${time}"
+    if [ "${time}" != "" ]; then
+      responded=$(($responded+1))
+    fi
+done
+
+echo $count devices at $(date +"%H:%M:%S"). $responded responded.

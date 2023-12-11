@@ -15,19 +15,30 @@ fi
 if [ -z "$2" ]; then
    coap_payload=""
 else
-   # take all remaining arguments as the 'payload' (should start with `-e`, can also be used to set more coap-client parameters)
-   coap_payload="${@:2}"
+  if [ "${2}" = "-e" ]; then
+    # take all remaining arguments as the 'payload' (should start with `-e`, can also be used to set more coap-client parameters)
+    E=" -e "
+    coap_payload="'${@:3}'"
+  else
+    E=""
+   coap_payload=" ${@:2}"
+  fi
+
 fi
 
 count=0
+responded=0
 
 for ipv6 in $ipv6s
 do
     dev=$(echo $ipv6 | cut -d ':' -f 8)
-    cmd="coap-client -m get -N -B 3 coap://[${ipv6}]:5683${coap_uri} ${coap_payload}"
+    cmd="coap-client -m get -N -B 5 -t text coap://[${ipv6}]:5683${coap_uri} $E ${coap_payload} "
     res=$( ${cmd} )
-    echo " " ${cmd}: ${res}
+    echo " ${cmd} : ${res}"
     count=$(($count+1))
+    if [ "${res}" != "" ]; then
+      responded=$(($responded+1))
+    fi
 done
 
-echo $count devices at $(date +"%H:%M:%S")
+echo $count devices at $(date +"%H:%M:%S"). $responded responded.
