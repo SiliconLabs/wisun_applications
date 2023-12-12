@@ -96,9 +96,11 @@ ui_hints:
   - {path: README.md, focus: true}
   - {path: config/wisun/wisun_settings.wisunconf}
 other_file:
-  - path: image
-    file_list:
-    - path: image/overview.png
-    - path: image/wstk_usb_rpi.png
-    - path: image/brd8016A_rpi.png
-    - path: image/components.png
+  - path: image/overview.png
+    directory: image
+  - path: image/wstk_usb_rpi.png
+    directory: image
+  - path: image/brd8016A_rpi.png
+    directory: image
+  - path: image/components.png
+    directory: image
