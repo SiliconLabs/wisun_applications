@@ -1,8 +1,8 @@
 project_name: wisun_node_monitoring
 label: wisun_node_monitoring
-description: The Wi-SUN Node Monitoring sample application is based on Wi-SUN SoC Empty.
-  It adds OTA DFU & CoAP support to monitor the device connection status. It can be
-  easily expanded to monitor sensors and control actuators. Defining COAP_APP_STATISTICS
+description: The Wi-SUN Node Monitoring sample application is based on Wi-SUN SoC
+  Empty. It adds OTA DFU & CoAP support to monitor the device connection status. It
+  can be easily expanded to monitor sensors and control actuators. Defining COAP_APP_STATISTICS
   allows monitoring connection statistics. Defining COAP_STACK_STATISTICS allows monitoring
   stack statistics.
 category: Wi-SUN Examples
@@ -35,7 +35,6 @@ include:
   - {path: app_rtt_traces.h}
   - {path: app_timestamp.h}
 component:
-- {id: sl_wisun_lfn_device_support}
 - {id: radio_config_brd_wisun_singlephy}
 - {id: slist}
 - {id: segger_rtt}

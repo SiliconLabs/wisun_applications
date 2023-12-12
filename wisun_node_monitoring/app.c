@@ -201,10 +201,9 @@ uint16_t auto_send_sec = 60; // Notification period in seconds
 #define SL_WISUN_STATUS_JSON_STR_MAX_LEN 280
 
 // Notifications destinations (UDP and CoAP)
-// Set to "border_router" to auto select the Border Router
-// or to a fixed IPv6 string
-#define UDP_NOTIFICATION_DEST  "fd00:6172:6d00::1" // "border_router" or fixed IPv6 string
-#define COAP_NOTIFICATION_DEST "fd00:6172:6d00::2" // "border_router" or fixed IPv6 string
+// Set to fixed IPv6 strings
+#define UDP_NOTIFICATION_DEST  "fd00:6172:6d00::1" // fixed IPv6 string
+#define COAP_NOTIFICATION_DEST "fd00:6172:6d00::2" // fixed IPv6 string
 
 // CoAP Notification channel structure definition
 typedef struct sl_wisun_coap_notify_ch {
