@@ -35,7 +35,6 @@ include:
   - {path: app_rtt_traces.h}
   - {path: app_timestamp.h}
 component:
-- {id: sl_wisun_lfn_device_support}
 - {id: radio_config_brd_wisun_singlephy}
 - {id: slist}
 - {id: segger_rtt}
