@@ -158,25 +158,15 @@ The URIs are
 
 ## .slcp Project Used ##
 
-- [wisun_node_monitoring.slcp](wisun_node_monitoring.slcp)
+- [wisun_node_monitoring.slcp](https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/wisun_node_monitoring.slcp)
 
 ## How to Port to Another Part ##
 
 - Connect the new hardware with the new part
 - Select it in Simplicity Studio
-- Create a new **Wi-SUN SoC Empty** project
-  - Use the Wi-SUN Configurator to set the Network (Name/Tx power/PHY) to match the Border Router settings
-- Add the following components
-  - Third Party / Segger / RTT / SEGGER RTT printf
-  - Wi-SUN / Wi-SUN Services / CoAP
-    - Configure
-      - 'Maximum capacity of the CoAP Resource Table' `30`
-      - 'Resource handler service stack size in CPU word' `768`
-      - 'Resource handler service socket communication buffer size' `1200`
-  - Wi-SUN / Services / POSIX-compliant Socket
-    - Configure
-      - 'Size of the socket fifo buffer' `516`
-
-![components to install](image/components.png)
-
-- Drop the `.c` files from `src` and the `.h` files from `inc` in your project folder (overwrite the existing files)
+- [Add the 'Wi-SUN Applications' Repository to Simplicity Studio 5](https://github.com/SiliconLabs/wisun_applications/blob/main/README.md#add-the-wi-sun-applications-repository-to-simplicity-studio-5)
+- In the Launcher's EXAMPLE PROJECTS & DEMOS, Select 'wisun_applications' in the 'Provider' Area (at the bottom of the list)
+  - if the project doesn't appear in the list, check that your hardware is compatible with Wi-SUN (it should be possible to create Wi-SUN projects)
+- Create a new **Wi-SUN Node Monitoring Application** project
+- Use the Wi-SUN Configurator to set the Network (Name/Tx power/PHY) to match the Border Router settings
+- Use the SOFTWARE COMPONENTS/Wi-SUN Over-The-Air Device Firmware Upgrade (OTA DFU) GUI or `config/sl_wisun_ota_dfu_config.h` to set OTA DFU to match the Border Router settings
