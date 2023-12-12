@@ -11,6 +11,8 @@ else
    coap_uri="$1"
 fi
 
+echo "there are {$#} arguments; {$@}"
+
 # by default, no payload
 if [ -z "$2" ]; then
    coap_payload=""
@@ -18,10 +20,14 @@ else
   if [ "${2}" = "-e" ]; then
     # take all remaining arguments as the 'payload' (should start with `-e`, can also be used to set more coap-client parameters)
     E=" -e "
-    coap_payload="'${@:3}'"
+    if [ "$#" = "3" ]; then
+      coap_payload="${@:3}"
+    else
+      coap_payload="'${@:3}'"
+    fi
   else
     E=""
-   coap_payload=" ${@:2}"
+    coap_payload=" ${@:2}"
   fi
 
 fi
