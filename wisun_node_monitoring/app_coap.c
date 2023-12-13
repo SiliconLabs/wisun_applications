@@ -74,6 +74,7 @@
 #include "sl_wisun_trace_util.h"
 #include "app_check_neighbors.h"
 #include "sl_wisun_app_core.h"
+#include "sl_string.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs

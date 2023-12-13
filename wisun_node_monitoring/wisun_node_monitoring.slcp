@@ -49,6 +49,7 @@ component:
 - {id: sl_system}
 - {id: restrictions_profile_wisun_fan_1_0}
 - {id: restrictions_profile_wisun_fan_1_1}
+- {id: wisun_stack_debug}
 - {id: silabs_core_sl_malloc}
 - {id: printf}
 - {id: wisun_stack}
