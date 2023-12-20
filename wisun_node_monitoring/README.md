@@ -30,7 +30,7 @@ The block diagram of this application is shown in the image below:
 
 ## Gecko SDK Version ##
 
-GSDK v4.3.1
+GSDK v4.4.0
 
 ## Hardware Required ##
 
@@ -57,6 +57,10 @@ or
 
 ![BRD8016A + RPi](image/brd8016A_rpi.png)
 
+## The Application Requires a Bootloader ##
+
+This example application support OTA DFU, therefore you need to create and flash a **bootloader** to your devices before flashing the **Wi-SUN Node Monitoring** Application.
+
 ## Setup ##
 
 A single example application is required in order to use this demonstration: **Wi-SUN Node Monitoring**, created based on **Wi-SUN -SoC Empty** provided by Simplicity Studio.
@@ -65,12 +69,6 @@ To test this application, you can
 
 - [Add the 'Wi-SUN Applications' Repository to Simplicity Studio 5](../README.md#add-the-wi-sun-applications-repository-to-simplicity-studio-5)
 - Create the Wi-SUN Applications 'Wi-SUN Node Monitoring' Project as described [here](../README.md#create-the-wi-sun-applications-example-projects)
-
-Or
-
-- Start with an empty project as the following:
-  - Create a **Wi-SUN - SoC Empty** project for a [Silicon Labs Wi-SUN Evaluation Kit](https://www.silabs.com/wireless/wi-sun?tab=kits) using **Simplicity Studio 5**.
-  - Copy all `.c` and `.h` files from the current folder into the project root folder (overwriting existing files).
 
 ## Communication methods ##
 
@@ -155,6 +153,7 @@ The URIs are
 |statistics/stack/network         | statistics from [sl_wisun_statistics_network_t](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-statistics-network-t)       | json | '-e reset' resets these statistics |
 |statistics/stack/regulation      | statistics from [sl_wisun_statistics_regulation_t](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-statistics-regulation-t) | json | '-e reset' resets these statistics |
 |settings/auto_send               | the current `auto_send_sec` value           | '%d' | '-e s' sets auto_send_sec to s     |
+|settings/trace_level             | the current `trace_level` value             | '%d' | '-e [0-4]' sets trace_level [(0=None to 4=DEBUG)](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-types#sl-wisun-trace-level-t) |
 
 ## .slcp Project Used ##
 
@@ -164,9 +163,12 @@ The URIs are
 
 - Connect the new hardware with the new part
 - Select it in Simplicity Studio
+- Create, build and flash a **bootloader** application to your device (the application supports OTA DFU, which requires a bootloader)
 - [Add the 'Wi-SUN Applications' Repository to Simplicity Studio 5](https://github.com/SiliconLabs/wisun_applications/blob/main/README.md#add-the-wi-sun-applications-repository-to-simplicity-studio-5)
-- In the Launcher's EXAMPLE PROJECTS & DEMOS, Select 'wisun_applications' in the 'Provider' Area (at the bottom of the list)
-  - if the project doesn't appear in the list, check that your hardware is compatible with Wi-SUN (it should be possible to create Wi-SUN projects)
+- In the Launcher's EXAMPLE PROJECTS & DEMOS, Select **wisun_applications** in the 'Provider' Area (at the bottom of the list)
+  - if the project doesn't appear in the list
+    - Uncheck all filter boxes in the filter area except **wisun_applications**
+    - Check that your hardware is compatible with Wi-SUN (it should be possible to create Wi-SUN projects)
 - Create a new **Wi-SUN Node Monitoring Application** project
 - Use the Wi-SUN Configurator to set the Network (Name/Tx power/PHY) to match the Border Router settings
 - Use the SOFTWARE COMPONENTS/Wi-SUN Over-The-Air Device Firmware Upgrade (OTA DFU) GUI or `config/sl_wisun_ota_dfu_config.h` to set OTA DFU to match the Border Router settings

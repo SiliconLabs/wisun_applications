@@ -192,6 +192,7 @@ char coap_msg[1024];
 
 uint16_t msg_len;
 uint16_t auto_send_sec = 60; // Notification period in seconds
+uint8_t  trace_level = SL_WISUN_TRACE_LEVEL_DEBUG;    // Trace level for all trace groups
 
 // UDP ports
 #define UDP_NOTIFICATION_PORT  1237
@@ -260,7 +261,9 @@ void app_task(void *args)
   printfBothTime("%s\n", SL_BOARD_NAME);
   printfBothTime("%s\n", application);
   printfBothTime("%s\n", version);
-  app_set_all_traces(SL_WISUN_TRACE_LEVEL_INFO, true);
+  app_set_all_traces(SL_WISUN_TRACE_LEVEL_DEBUG, true);
+  app_set_trace(SL_WISUN_TRACE_GROUP_RF  , SL_WISUN_TRACE_LEVEL_INFO, true);
+  app_set_trace(SL_WISUN_TRACE_GROUP_FHSS, SL_WISUN_TRACE_LEVEL_INFO, true);
 
 #ifdef    HISTORY
   snprintf(history_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE, "%s", "");
@@ -523,6 +526,8 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
       APPEND_TO_HISTORY(" (%d) %s /", join_state , now_str());
 #endif /* HISTORY */
       app_set_all_traces(SL_WISUN_TRACE_LEVEL_DEBUG, true);
+      app_set_trace(SL_WISUN_TRACE_GROUP_RF  , SL_WISUN_TRACE_LEVEL_INFO, true);
+      app_set_trace(SL_WISUN_TRACE_GROUP_FHSS, SL_WISUN_TRACE_LEVEL_INFO, true);
       just_disconnected = true;
     }
     previous_join_state = join_state;

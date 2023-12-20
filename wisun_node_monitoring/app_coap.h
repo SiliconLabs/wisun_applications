@@ -48,6 +48,8 @@ extern uint64_t connected_total_sec;        // total time connected
 extern uint64_t disconnected_total_sec;     // total time disconnected
 extern uint64_t app_join_state_delay_sec[]; // array of delays to go to join states
 extern uint16_t auto_send_sec;              // auto-notification period
+extern uint8_t  trace_level;                // Trace level for all trace groups
+
 
 extern char chip[];
 extern char application[];

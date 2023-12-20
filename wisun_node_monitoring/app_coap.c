@@ -75,6 +75,7 @@
 #include "app_check_neighbors.h"
 #include "sl_wisun_app_core.h"
 #include "sl_string.h"
+#include "app_rtt_traces.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -608,6 +609,22 @@ sl_wisun_coap_packet_t * coap_callback_auto_send (
   snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", auto_send_sec);
 return app_coap_reply(coap_response, req_packet); }
 
+sl_wisun_coap_packet_t * coap_callback_trace_level (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  int level = 0;
+  int res;
+  if (req_packet->payload_len) {
+    // Make sure payload last char is NULL
+    req_packet->payload_ptr[req_packet->payload_len] = 0x00;
+    res = sscanf((char *)req_packet->payload_ptr, "%d", &level);
+    if (res) {
+        trace_level = (uint8_t)level;
+        app_set_all_traces(level, true);
+    }
+  }
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", level);
+return app_coap_reply(coap_response, req_packet); }
+
 // CoAP resources init in resource handler (one block per URI)
 uint8_t app_coap_resources_init() {
   sl_wisun_coap_rhnd_resource_t coap_resource = { 0 };
@@ -826,6 +843,14 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "sec";
   coap_resource.data.interface = "settings";
   coap_resource.auto_response = coap_callback_auto_send;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/settings/trace_level";
+  coap_resource.data.resource_type = "level";
+  coap_resource.data.interface = "settings";
+  coap_resource.auto_response = coap_callback_trace_level;
   coap_resource.discoverable = true;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
