@@ -175,7 +175,7 @@ The URIs are
 
 ## LFN parenting and LFN device ##
 
-(Refer to [LFN in Silicon Labs Wi-SUN Stack](https://docs.silabs.com/wisun/latest/wisun-lfn/#lfn-in-silicon-labs-wi-sun-stack) for details on Wi-SUN LFN)
+(Refer to [LFN in Silicon Labs Wi-SUN Stack](https://docs.silabs.com/wisun/latest/wisun-lfn/#lfn-in-silicon-labs-wi-sun-stack) for details on Wi-SUN LFN, including power management aspects)
 
 Adding the **Wi-SUN Stack LFN Support Plugin** is required to turn the device into a LFN.
 
