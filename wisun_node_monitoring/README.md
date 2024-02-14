@@ -181,15 +181,15 @@ Adding the **Wi-SUN Stack LFN Support Plugin** is required to turn the device in
 
 With GSDK 4.4.0, the 'Wi-SUN Stack LFN Support Plugin' is listed with 'Evaluation' quality in Simplicity Studio, so it is found in the 'SOFTWARE COMPONENTS' once the 'Evaluation' level has been selected in the 'Quality' drop down list.
 
-![LFN Plugin Component](image\LFN_plugin.png)
+![LFN Plugin Component](image/LFN_plugin.png)
 
 Install this component to get access to the 'Device Type' Drop down box in the Wi-SUN Configurator.
 
-![Device Type Box](image\device_type.png)
+![Device Type Box](image/device_type.png)
 
 This box selects the value set for `WISUN_CONFIG_DEVICE_TYPE` in `autogen\sl_wisun_config.h`.
 
-![WISUN_CONFIG_DEVICE_TYPE](image\config_device_type.png)
+![WISUN_CONFIG_DEVICE_TYPE](image/config_device_type.png)
 
 ## Access to RTT traces ##
 
