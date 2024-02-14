@@ -173,6 +173,24 @@ The URIs are
 - Use the Wi-SUN Configurator to set the Network (Name/Tx power/PHY) to match the Border Router settings
 - Use the SOFTWARE COMPONENTS/Wi-SUN Over-The-Air Device Firmware Upgrade (OTA DFU) GUI or `config/sl_wisun_ota_dfu_config.h` to set OTA DFU to match the Border Router settings
 
-## Access to RTT traces
+## LFN parenting and LFN device ##
+
+(Refer to [LFN in Silicon Labs Wi-SUN Stack](https://docs.silabs.com/wisun/latest/wisun-lfn/#lfn-in-silicon-labs-wi-sun-stack) for details on Wi-SUN LFN)
+
+Adding the **Wi-SUN Stack LFN Support Plugin** is required to turn the device into a LFN.
+
+With GSDK 4.4.0, the 'Wi-SUN Stack LFN Support Plugin' is listed with 'Evaluation' quality in Simplicity Studio, so it is found in the 'SOFTWARE COMPONENTS' once the 'Evaluation' level has been selected in the 'Quality' drop down list.
+
+![LFN Plugin Component](image\LFN_plugin.png)
+
+Install this component to get access to the 'Device Type' Drop down box in the Wi-SUN Configurator.
+
+![Device Type Box](image\device_type.png)
+
+This box selects the value set for `WISUN_CONFIG_DEVICE_TYPE` in `autogen\sl_wisun_config.h`.
+
+![WISUN_CONFIG_DEVICE_TYPE](image\config_device_type.png)
+
+## Access to RTT traces ##
 
 The project being based on Wi-SUN SoC Empty, which doesn't include the **wisun_stack_debug** component, this component is added to the `.slcp` file. This can be uninstalled for release versions of the application.

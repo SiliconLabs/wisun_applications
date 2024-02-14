@@ -289,15 +289,15 @@ void app_task(void *args)
       sprintf(device_type, "LFN (null profile)");
       #else /* WISUN_CONFIG_DEVICE_PROFILE */
       switch (WISUN_CONFIG_DEVICE_PROFILE) {
-        case SL_WISUN_LFN_PROFILE_TEST): {
+        case SL_WISUN_LFN_PROFILE_TEST: {
           sprintf(device_type, "LFN (Test Profile)");
           break;
         }
-        case SL_WISUN_LFN_PROFILE_BALANCED): {
+        case SL_WISUN_LFN_PROFILE_BALANCED: {
           sprintf(device_type, "LFN (Balanced Profile)");
           break;
         }
-        case SL_WISUN_LFN_PROFILE_ECO): {
+        case SL_WISUN_LFN_PROFILE_ECO: {
           sprintf(device_type, "LFN (Eco Profile)");
           break;
         }
