@@ -40,11 +40,18 @@
 #include <assert.h>
 #include "app.h"
 #include "sl_wisun_api.h"
+#include "sl_wisun_version.h"
 #include "sl_string.h"
 
 #ifdef    SL_CATALOG_WISUN_APP_CORE_PRESENT
   #include "sl_wisun_app_core_util.h"
-  #include "sl_wisun_app_core_util_config.h"
+  #if (SL_WISUN_VERSION_MAJOR > 2) || ((SL_WISUN_VERSION_MAJOR == 1) && (SL_WISUN_VERSION_MINOR > 8))
+         // API_ABOVE_1_8
+    #include "sl_wisun_trace_util.h"
+  #else  /* API_ABOVE_1_8 */
+    #include "sl_wisun_app_core_util_config.h"
+    #define  sl_wisun_app_core_util_connect_and_wait   app_wisun_connect_and_wait
+  #endif /* API_ABOVE_1_8 */
 #endif /* SL_CATALOG_WISUN_APP_CORE_PRESENT */
 
 #ifdef    SL_CATALOG_WISUN_APP_OS_STAT_PRESENT
@@ -325,7 +332,7 @@ void app_task(void *args)
 
   #ifdef    SL_CATALOG_WISUN_APP_CORE_PRESENT
     // connect to the wisun network
-    app_wisun_connect_and_wait();
+  sl_wisun_app_core_util_connect_and_wait();
   #endif /* SL_CATALOG_WISUN_APP_CORE_PRESENT */
 
   /*******************************************
@@ -350,14 +357,15 @@ void app_task(void *args)
 
   sl_wisun_get_ip_address(SL_WISUN_IP_ADDRESS_TYPE_GLOBAL, &global_ipv6);
   printf("OTA DFU 'start' command:\n");
+  sprintf(device_global_ipv6_string, app_wisun_trace_util_get_ip_str(&global_ipv6));
   printf(" coap-client -m post -N -B 10 -t text coap://[%s]:%d%s -e \"start\"\n",
-        app_wisun_trace_util_get_ip_str(&global_ipv6),
+        device_global_ipv6_string,
         5683,
         SL_WISUN_OTA_DFU_URI_PATH
       );
   printf("Follow OTA DFU progress (from node, intrusive) using:\n");
   printf(" coap-client -m get -N -B 10 -t text coap://[%s]:%d%s\n",
-      app_wisun_trace_util_get_ip_str(&global_ipv6),
+      device_global_ipv6_string,
       SL_WISUN_COAP_RESOURCE_HND_SERVICE_PORT,
       SL_WISUN_OTA_DFU_URI_PATH
   );

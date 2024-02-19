@@ -74,8 +74,18 @@
 #include "sl_wisun_trace_util.h"
 #include "app_check_neighbors.h"
 #include "sl_wisun_app_core.h"
+#include "sl_wisun_version.h"
+#include "sl_wisun_app_core_util.h"
 #include "sl_string.h"
 #include "app_rtt_traces.h"
+
+#if (SL_WISUN_VERSION_MAJOR > 2) || ((SL_WISUN_VERSION_MAJOR == 1) && (SL_WISUN_VERSION_MINOR > 8))
+       // API_ABOVE_1_8
+#include "sl_wisun_trace_util.h"
+#else  /* API_ABOVE_1_8 */
+  #include "sl_wisun_app_core_util_config.h"
+  #define  sl_wisun_app_core_util_connect_and_wait   app_wisun_connect_and_wait
+#endif /* API_ABOVE_1_8 */
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -214,12 +224,12 @@ sl_wisun_coap_packet_t * coap_callback_application (
       if (strcmp(cmd, "clear_and_reconnect")==0) {
         sl_wisun_disconnect();
         sl_wisun_clear_credential_cache();
-        app_wisun_network_connect();
+        sl_wisun_app_core_util_connect_and_wait();
         return NULL;
       }
       if (strcmp(cmd, "reconnect")==0) {
         sl_wisun_disconnect();
-        app_wisun_network_connect();
+        sl_wisun_app_core_util_connect_and_wait();
         return NULL;
       }
       snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Unknown '%s' command", cmd);
