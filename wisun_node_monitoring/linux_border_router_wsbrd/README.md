@@ -1,33 +1,104 @@
 # Linux Border Router Scripts
 
 The following bash and Python scripts are convenient to more easily manage `wsbrd`, `tftpd`, OTA/DFU and check the Wi-SUN network status.
-To be used as documented below, they should be
+To be used as documented below:
 
-- Copied to the Linux Border Router user's directory.
-- Set as executable using `chmod a+x *.sh`
+- Make sure they are all set as executable using `chmod a+x *.*`
+- Accessible from anywhere by adding `export PATH=$PATH:~/wisun_applications_staging/wisun_node_monitoring/linux_border_router_wsbrd/` at the end of ` ~/.bashrc`
 
 > Use the `--help` option or check the scripts code for more details.
 
+---
+
+- [Linux Border Router Scripts](#linux-border-router-scripts)
+  - [`wsbrd` control and monitoring](#wsbrd-control-and-monitoring)
+    - [`wsbrd` Configuration](#wsbrd-configuration)
+    - [`wsbrd` Start \&  Stop](#wsbrd-start---stop)
+    - [`wsbrd` Storage/Cache check and cleanup](#wsbrd-storagecache-check-and-cleanup)
+    - [`wsbrd` Monitoring](#wsbrd-monitoring)
+  - [IPv6 networking](#ipv6-networking)
+    - [`tun0` IPv6 addresses addition (for UDP/CoAP/OTA)](#tun0-ipv6-addresses-addition-for-udpcoapota)
+    - [`tun0` multicast](#tun0-multicast)
+    - [Network checks](#network-checks)
+  - [UDP \& TCP](#udp--tcp)
+  - [TFTP control and checks](#tftp-control-and-checks)
+  - [OTA control and monitoring](#ota-control-and-monitoring)
+  - [CoAP](#coap)
+  - [Testing](#testing)
+    - [Throughput testing between Wi-SUN nodes](#throughput-testing-between-wi-sun-nodes)
+  - [Ease of use](#ease-of-use)
+    - [IPv6 from Wi-SUN Node Nickname](#ipv6-from-wi-sun-node-nickname)
+
+---
+
 ## `wsbrd` control and monitoring
 
-| Name | Language | Usage | Call | Result |
-|------|----------|-------|------|--------|
-| `wsbrd_conf.sh`    | bash | Show current `wsbrd` config file (`/etc/wsbrd.conf`) | `~/wsbrd_conf.sh` | All active lines of `/etc/wsbrd.conf` |
-| `wsbrd_service.sh` | bash | Show current `wsbrd` service file | `~/wsbrd_service.sh` | cat of ` /usr/local/lib/systemd/system/wisun-borderrouter.service` and doc on: enabling capture, disabling auto-restart, applying updates |
-| `wsbrd_reload.sh`  | bash | Reload `systemd` daemon after changing settings | `~wsbrd_reload.sh` | `sudo systemctl daemon-reload` |
-| `wsbrd_files.sh`   | bash | Show wsbrd storage files: key files per device, etc.| `~/wsbrd_files.sh` | `ls` of `/var/lib/wsbrd/*` |
-| `wsbrd_clear.sh`   | bash | Clear all `wsbrd` storage files | `./wsbrd_clear.sh` | no file left in `/var/lib/wsbrd/* |
-| `wsbrd_add.sh`     | bash | Add fixed IPv6 Addresses to `tun0` | `~/wsbrd_add.sh` | `ip address show tun0` shows `fd00:6172:6d00::1/64` and `fd00:6172:6d00::2/64` |
-| `wsbrd_info.sh`    | bash | Check wsbrd lifetime | `~/wsbrd_info.sh` |`PID USER COMMAND %MEM ELAPSED` |
-| `wsbrd_follow.sh`  | bash | Follow wsbrd traces from `journalctl`. All traces with no argument, otherwise filtering on device_tag | `~/wsbrd_follows.sh [device_tag]` | `sudo journalctl -u wisun-borderrouter.service -f` |
-| `wsbrd_listen.sh`  | bash | Start UDP notification receiver | `~/wsbrd_listen.sh` | UDP notifications received from connected Wi-SUN devices |
-
-## Network checks
+### `wsbrd` Configuration
 
 | Name | Language | Usage | Call | Result |
 |------|----------|-------|------|--------|
-| `get_nodes_ipv6_address.py` | Python | List all IPv6s addresses of connected Wi-SUN nodes (from DBus) | `python ~/get_nodes_ipv6_address.py` | All Global IPv6 addresses |
-| `ipv6s`                     | bash   | Shortcut to the above Python script                            | `~/ipv6s` |  All Global IPv6 addresses |
+| `wsbrd_conf.sh`    | bash | Show current `wsbrd` config file (`/etc/wsbrd.conf`) | `wsbrd_conf.sh` | All active lines of `/etc/wsbrd.conf` |
+| `wsbrd_service.sh` | bash | Show current `wsbrd` service file | `wsbrd_service.sh` | cat of ` /usr/local/lib/systemd/system/wisun-borderrouter.service` and doc on: enabling capture, disabling auto-restart, applying updates |
+| `wsbrd_reload.sh`  | bash | Reload `systemd` daemon after changing settings | `wsbrd_reload.sh` | `sudo systemctl daemon-reload` |
+
+### `wsbrd` Start &  Stop
+
+| Name | Language | Usage | Call | Result |
+|------|----------|-------|------|--------|
+| `wsbrd_enable.sh`  | bash | Allow wsbrd as a service | `wsbrd_enable.sh` | Necessary to start wsbrd from the GUI || `wsbrd_restart.sh` | bash | Start/Restart wsbrd as a service | `~/wsbrd_restart.sh` | Useful to test wsbrd start/restart |
+| `wsbrd_disable.sh` | bash | Stop wsbrd (if started as a service) | `wsbrd_disable.sh` | Useful to test wsbrd restart |
+| `wsbrd_restart.sh` | bash | Start/Restart wsbrd as a service | `wsbrd_restart.sh` | wsbrd restart if access from D-Bus (which is the case using `wsbrd_cli` or the GUI)! |
+| `wsbrd_stop.sh`    | bash | Temporarily stop wsbrd as a service | `wsbrd_stop.sh` | wsbrd restarts if access from D-Bus (which is the case using `wsbrd_cli` or the GUI)! |
+
+### `wsbrd` Storage/Cache check and cleanup
+
+| Name | Language | Usage | Call | Result |
+|------|----------|-------|------|--------|
+| `wsbrd_files.sh`   | bash | Show wsbrd storage files: key files per device, etc.| `wsbrd_files.sh` | `ls` of `/var/lib/wsbrd/*` |
+| `wsbrd_clear.sh`   | bash | Clear all `wsbrd` storage files | `wsbrd_clear.sh` | no file left in `/var/lib/wsbrd/*` |
+
+### `wsbrd` Monitoring
+
+| Name | Language | Usage | Call | Result |
+|------|----------|-------|------|--------|
+| `wsbrd_info.sh`    | bash | Check wsbrd lifetime | `wsbrd_info.sh` |`PID USER COMMAND %MEM ELAPSED` |
+| `wsbrd_follow.sh`  | bash | Follow wsbrd traces from `journalctl`. All traces with no argument, otherwise filtering on device_tag | `wsbrd_follow.sh [device_tag]` | `sudo journalctl -u wisun-borderrouter.service -f` |
+| `wsbrd_since_yesterday.sh`  | bash | Same as `wsbrd_follow.sh`, limited to 1 day | `wsbrd_since_yesterday.sh` | `sudo journalctl -u wisun-borderrouter.service --since $time` |
+| `wsbrd_listen.sh`  | bash | Start UDP notification receiver | `wsbrd_listen.sh` | UDP notifications received from connected Wi-SUN devices |
+
+## IPv6 networking
+
+### `tun0` IPv6 addresses addition (for UDP/CoAP/OTA)
+
+| Name | Language | Usage | Call | Result |
+|------|----------|-------|------|--------|
+| `wsbrd_add.sh`     | bash | Add fixed IPv6 Addresses to `tun0` | `wsbrd_add.sh` | `ip address show tun0` shows `fd00:6172:6d00::1/64` and `fd00:6172:6d00::2/64` |
+
+### `tun0` multicast
+
+| Name | Language | Usage | Call | Result |
+|------|----------|-------|------|--------|
+| `multicast_setup.sh` | bash | Allow multicast on `tun0` | `multicast_setup.sh` | 4 multicast routes added on `tun0` |
+| `multicast_check.sh` | bash | Check multicast info for `tun0` | `multicast_check.sh` | 4 multicast routes should be listed on `tun0` |
+
+### Network checks
+
+| Name | Language | Usage | Call | Result |
+|------|----------|-------|------|--------|
+| `get_nodes_ipv6_address.py` | Python | List all IPv6s addresses of connected Wi-SUN nodes (from DBus) | `get_nodes_ipv6_address.py` | All Global IPv6 addresses |
+| `ipv6s`                     | bash   | Shortcut to the above Python script                            | `ipv6s` | All Global IPv6 addresses |
+| `ping_all`                  | bash   | Recursive call to all `ipv6s`. Useful to check if nodes are responding | `ping_all` | One ping per device, number of devices, number of responses |
+| `ping_link_local_nodes`     | bash   | Multicast ping to `ff02::1` | `ping_link_local_nodes`   | One multicast ping request, one reply per device (max 1 hop)|
+| `ping_link_local_routers`   | bash   | Multicast ping to `ff02::2` | `ping_link_local_routers` | One multicast ping request, one reply per FFN device (max 1 hop)|
+| `ping_realm_local_nodes`    | bash   | Multicast ping to `ff03::1` | `ping_realm_local_nodes`  | One multicast ping request, one reply per device (any hop)|
+| `ping_realm local_routers`  | bash   | Multicast ping to `ff03::2` | `ping_realm_local_routers`| One multicast ping request, one reply per FFN device  (any hop)|
+
+## UDP & TCP
+
+| Name | Language | Usage | Call | Result |
+|------|----------|-------|------|--------|
+| `TCP_sender_client.py` | Python | Use TCP to send a text message to the destination     | `TCP_sender_client.py <IPv6> <port> "<message>"` | Message send to Wi-SUN node (TCP = no Multicast) |
+| `UDP_sender_client.py` | Python | Used UDP to send a text message to the destination(s) | `UDP_sender_client.py <IPv6> <port> "<message>"` | Message send to Wi-SUN node (UDP = Multicast compatible) |
 
 ## TFTP control and checks
 
@@ -52,10 +123,20 @@ To be used as documented below, they should be
 
 | Name | Language | Usage | Call | Result |
 |------|----------|-------|------|--------|
-| `coap_all <coap_uri> [-e <coap_payload>]` | bash | `~/coap_all /status/all` | Sending a CoAP request (default `/.well-known/core`) to all connected devices | Recursive response to `coap-client -m get -N -B 3 coap://[${ipv6}]:5683${coap_uri} ${coap_payload}` |
+| `coap_all` | bash | `coap_all <coap_uri> [-e <coap_payload>]` example:  `coap_all /status/all` | Sending a CoAP request (default `/.well-known/core`) to all connected devices | Recursive response to `coap-client -m get -N -B 3 coap://[${ipv6}]:5683${coap_uri} ${coap_payload}` |
 
 ## Testing
 
+### Throughput testing between Wi-SUN nodes
+
 | Name | Language | Usage | Call | Result |
 |------|----------|-------|------|--------|
-| `iperf_test.sh --client <client_ipv6> --server <server_ipv6> --bandwidth <bw_bps> --duration <ms> --interval <ms> --buffer_length <1232_by_default> [--ping] [--stop]` | bash | `~/iperf_test.sh --client <client_ipv6> --server <server_ipv6> --bandwidth <bw_bps> --duration <ms> --interval <ms> --buffer_length <1232_by_default> [--ping] [--stop]` | Launching iperf test from client to server using COAP | Measured bandwidth vs required bandwidth |
+| `iperf_test.sh` | bash | `~/iperf_test.sh --client <client_ipv6> --server <server_ipv6> --bandwidth <bw_bps> --duration <ms> --interval <ms> --buffer_length <1232_by_default> [--ping] [--stop]` | Launching iperf test from client to server using COAP | Measured bandwidth vs required bandwidth |
+
+## Ease of use
+
+### IPv6 from Wi-SUN Node Nickname
+
+| Name | Language | Usage | Call | Result |
+|------|----------|-------|------|--------|
+| `nick2ip` | bash | `nick2ip <nickname>` | Returning the corresponding IPv6. The `nickname` is that shown by the wsbrd GUI, i.e. the last 4 digits of the IPv6/MAC. Can be used as a replacement for the IPv6 in commands, via `$(nick2ip <nickname>)` | IPv6 for the Wi-SUN Node |
