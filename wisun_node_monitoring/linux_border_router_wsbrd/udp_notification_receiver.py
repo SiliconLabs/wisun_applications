@@ -1,6 +1,7 @@
+#!/usr/bin/env python
 # Used to receive UDP notifications strings
 # Call with
-# python udp_notification_receiver.py 1237 " "
+# udp_notification_receiver.py 1237 " "
 
 import socket
 import sys

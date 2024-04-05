@@ -1,0 +1,23 @@
+#!/bin/bash
+
+USAGE='This script is used to retrieve the full IPv6s from a device based on its nickname (the last 4 digits in its IPv6)
+'
+if [ -z ${1} ]
+then
+  echo "$USAGE"
+  exit 0
+fi
+ 
+nickname=$1
+ipv6s=$(get_nodes_ipv6_address.py)
+
+# use nickname to find IPV6
+for ipv6 in $ipv6s
+do
+  test=$(echo $ipv6 | grep $nickname)
+  if [ ! -z "$test" ]; then
+    echo $ipv6
+    exit 0
+    break
+  fi
+done

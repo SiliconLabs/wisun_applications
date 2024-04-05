@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+# Copyright (c) 2024, Silicon Laboratories
+# See license terms contained in COPYING file
+
 from pydbus import SystemBus
 import re
 
@@ -6,7 +10,7 @@ get_nodes_ipv6_address.py
 Prints the IPv6 address of each node connected to the running WSBRD instance.
 
 USAGE:
-    python3 get_nodes_ipv6_address.py
+    get_nodes_ipv6_address.py
 
 NOTES:
     - This script can only be used with the WSBRD + RCP setup and must be executed on the host.

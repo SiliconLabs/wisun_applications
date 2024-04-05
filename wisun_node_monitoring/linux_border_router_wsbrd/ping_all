@@ -2,7 +2,7 @@
 # usage: sending a PING request to all connected devices
 # ./ping_all [args]
 
-ipv6s=$(python get_nodes_ipv6_address.py)
+ipv6s=$(get_nodes_ipv6_address.py)
 
 # by default, simple ping
 if [ -z "$1" ]; then

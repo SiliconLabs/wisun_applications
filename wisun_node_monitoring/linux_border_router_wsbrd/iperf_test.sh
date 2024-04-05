@@ -27,7 +27,7 @@ fi
 TRACE=0
 TIME=0
 DURATION=10000
-B=20
+B=10
 SILENT=0
 ENABLE_SILENT=0
 PING=0
@@ -40,7 +40,6 @@ while true; do
         --client)        client="$2";         shift  ;;
         --server)        server="$2";         shift  ;;
         --bandwidth)     BANDWIDTH="$2";      shift  ;;
-        --buffer_length) BUFFER_LENGTH="S2";  shift  ;;
         --duration)      DURATION="$2";       shift  ;;
         --interval)      INTERVAL="$2";       shift  ;;
         --pause)         PAUSE="$2";          shift  ;;
@@ -57,7 +56,7 @@ while true; do
     shift
 done
 
-ipv6s=$(python get_nodes_ipv6_address.py)
+ipv6s=$(get_nodes_ipv6_address.py)
 
 # use nickname to find server IPV6
 for ipv6 in $ipv6s
@@ -79,7 +78,7 @@ do
   fi
 done
 
-echo -n "client ${client}  server ${server}  bandwidth ${BANDWIDTH}  "
+echo -n "client ${client}  server ${server}  bandwidth ${BANDWIDTH} "
 echo "PAUSE ${PAUSE}  PING ${PING}  STOP ${STOP}  TRACE ${TRACE}  TIME ${TIME}  CSV ${CSV} "
 
 set +ex
@@ -89,7 +88,7 @@ echo_date()
   if [ "${TIME}" = "1" ]; then
     echo $(date +"%H:%M:%S") ":  " $1
   else
-    echo ":  " $1
+    echo "  " $1
   fi
 }
 
@@ -101,16 +100,15 @@ trace()
 {
   if [ "${TRACE}" = "1" ]; then
     if [ "${TIME}" = "1" ]; then
-      echo -n $(date) ":  "
+      echo -n "$(date): "
     fi
-    echo ${*}
+    echo "${*}"
   fi
 }
 
 coap_cmd()
 {
   cmd="coap-client -m get -N -B ${B} -t text coap://[${1}]:5683/cli/iperf -e \"${2}\""
-  trace $cmd
 
   if [ "$SILENT" = "1" ];
   then
@@ -118,11 +116,33 @@ coap_cmd()
   else
     coap_cmd_res=$(eval $cmd && wait)
   fi
+
   if [ -n "${coap_cmd_res}" ];
   then
-    trace "  >  {$coap_cmd_res}"
+    trace " ${cmd} > {$coap_cmd_res}"
     sleep 1 && wait
+  else
+    coap_cmd_res="no_response"
+    trace " ${cmd} > ${coap_cmd_res}"
   fi
+}
+
+coap_cmd_grep_id()
+{
+  cmd="coap-client -m get -N -B ${B} -t text coap://[${1}]:5683/cli/iperf -e '${2}'"
+
+  coap_cmd_res=$(eval $cmd && wait)
+
+  if [ -n "${coap_cmd_res}" ];
+  then
+    coap_cmd_res=$(test_id ${coap_cmd_res})
+    trace " ${cmd} > Test id ${coap_cmd_res}"
+    sleep 1 && wait
+  else
+    coap_cmd_res="no_response"
+    trace " ${cmd} > ${coap_cmd_res}"
+  fi
+
 }
 
 test_id()
@@ -156,43 +176,53 @@ test_bandwidth()
 
 flush_test_queue()
 {
-  log_trace=${TRACE}
-  #TRACE=0
-  coap_cmd ${*} "iperf get json"
-  initial_test=$(test_id ${coap_cmd_res})
-  coap_cmd ${*} "iperf get json"
-  new_test=$(test_id ${coap_cmd_res})
-  while [ ! "${new_test}" = "${initial_test}" ]
+  coap_cmd_grep_id ${*} 'iperf get json'
+  # When no test has be run, the result will be an empty string, translated as 'no_response'
+  if [ -z "${coap_cmd_res}" ]
+  then
+    return
+  fi
+
+  if [ "no_response" = "${coap_cmd_res}" ]
+  then
+    return
+  fi
+
+  initial_test=${coap_cmd_res}
+
+  coap_cmd_grep_id ${*} "iperf get json"
+  new_test=${coap_cmd_res}
+
+  while [ "${new_test}" != "${initial_test}" ]
   do
-    coap_cmd ${*} "iperf get json"
-    new_test=$(test_id ${coap_cmd_res})
+    coap_cmd_grep_id ${*} "iperf get json"
+    new_test=${coap_cmd_res}
   done
-  TRACE=${log_trace}
-  echo ${new_test}
+
+  trace "${*} test queue flushed: Test id ${new_test}"
 }
 
 last_test_result()
 {
-  log_trace=${TRACE}
-  TRACE=0
   count=0
-  coap_cmd ${*} "iperf get json"
-  initial_test=$(test_id ${coap_cmd_res})
-  coap_cmd ${*} "iperf get json"
-  new_test=$(test_id ${coap_cmd_res})
-  while [ ! "${new_test}" = "${initial_test}" ]
+  coap_cmd ${*} 'iperf get json'
+  initial_test=$(test_id {coap_cmd_res})
+
+  coap_cmd ${*} 'iperf get json'
+  new_test=$(test_id {coap_cmd_res})
+
+  while [ "${new_test}" != "${initial_test}" ]
   do
-    echo "'${new_test}' ? '${initial_test}'"
-    TRACE=1
+    coap_cmd ${*} 'iperf get json'
+    new_test=$(test_id {coap_cmd_res})
     count=$(( $count+1 ))
     if [ $count > 5 ]
     then
+      coap_cmd_res="no test id change after 5 checks???"
       break
     fi
-    coap_cmd ${*} "iperf get json"
-    new_test=$(test_id ${coap_cmd_res})
   done
-  TRACE=${log_trace}
+
   echo ${coap_cmd_res}
 }
 
@@ -200,7 +230,9 @@ test_iperf()
 {
   # Starting iperf test
   printf " %s -> %s  bw %8d : " ${client} ${server} ${BANDWIDTH}
-  trace ""
+  if [ "${TRACE}" = "1" ]; then
+    printf "\n"
+  fi
 
   #trace "Starting server"
   coap_cmd ${server} "iperf server"
@@ -217,18 +249,7 @@ test_iperf()
   sleep_time=$(( ${DURATION}/1000 + 2 ))
   trace "Waiting for the duration of the test +2 (${sleep_time} seconds)..."
   sleep ${sleep_time}
-
-  # Retrieve new test id from client, as the proof that the test is complete
-  count=0
-  trace "initial client test ${initial_client_test}"
-  while [ "${new_client_test}" = "${initial_client_test}" ]
-  do
-    coap_cmd ${client} "iperf get json"
-    new_client_test=$(test_id ${coap_cmd_res})
-    trace "Current  client test ${new_client_test} (count ${count})"
-    count=$(( ${count} + 1 ))
-  done
-  
+ 
   #trace "# Retrieving test results from client, to flush its test queue"
   client_result=$( last_test_result ${client} )
   #trace "# Retrieving test results from server, now that the test is finished"
@@ -238,15 +259,15 @@ test_iperf()
   then
     echo "no result, aborting test"
     exit 1
-  else
-    server_test=$( test_id ${server_result} )
-    client_test=$( test_id ${client_result} )
-    requested_bw=$( test_bandwidth 1 ${client_result} )
-    client_bw=$( test_bandwidth 2 ${client_result} )
-    server_bw=$( test_bandwidth 2 ${server_result} )
-    #echo "client_test " ${client_test} " server_test " ${server_test} " requested" ${requested_bw} "got" ${server_bw} "(client got" ${client_bw} ")"
-    echo -n " server" ${server_bw} "(client " ${client_bw} ")"
   fi
+
+  server_test=$( test_id ${server_result} )
+  client_test=$( test_id ${client_result} )
+  requested_bw=$( test_bandwidth 1 ${client_result} )
+  client_bw=$( test_bandwidth 2 ${client_result} )
+  server_bw=$( test_bandwidth 2 ${server_result} )
+
+  echo -n " server" ${server_bw} "(client " ${client_bw} ")"
 }
 
 COUNT_DURATION=1
@@ -309,24 +330,16 @@ COUNT=$(( $COUNT_BW * $COUNT_DURATION ))
 
 trace "COUNT    ${COUNT}"
 
-initial_server_test=$(flush_test_queue ${server})
-initial_client_test=$(flush_test_queue ${client})
+flush_test_queue    ${client}
+initial_client_test=${new_test}
 
-trace "initial_server_test ${initial_server_test}  initial_client_test ${initial_client_test}"
-
-if [ ! -z ${BUFFER_LENGTH} ]; then
-  coap_cmd ${server} "iperf set options.buffer_length ${BUFFER_LENGTH}"
-  coap_cmd ${client} "iperf set options.buffer_length ${BUFFER_LENGTH}"
-fi
+flush_test_queue    ${server}
+initial_server_test=${new_test}
 
 if [ ! -z ${INTERVAL} ]; then
   coap_cmd ${server} "iperf set options.interval ${INTERVAL}"
   coap_cmd ${client} "iperf set options.interval ${INTERVAL}"
 fi
-
-initial_server_test=$(flush_test_queue ${server})
-initial_client_test=$(flush_test_queue ${client})
-
 
 if [   -z ${STOP} ]; then
 
@@ -357,5 +370,4 @@ if [   -z ${STOP} ]; then
   done
 fi
 
-echo "test complete"
-date
+echo_date "test complete"
