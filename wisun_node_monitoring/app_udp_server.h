@@ -1,7 +1,6 @@
 /***************************************************************************//**
-* @file app.h
-* @brief header file for application
-* @version 1.0.0
+* @file app_udp_server.h
+* @brief UDP server Header file
 *******************************************************************************
 * # License
 * <b>Copyright 2023 Silicon Laboratories Inc. www.silabs.com</b>
@@ -11,7 +10,7 @@
 *
 * The licensor of this software is Silicon Laboratories Inc.
 *
-* This software is provided \'as-is\', without any express or implied
+* This software is provided 'as-is', without any express or implied
 * warranty. In no event will the authors be held liable for any damages
 * arising from the use of this software.
 *
@@ -27,44 +26,29 @@
 *    misrepresented as being the original software.
 * 3. This notice may not be removed or altered from any source distribution.
 *
-*******************************************************************************
+******************************************************************************
 *
 * EXPERIMENTAL QUALITY
 * This code has not been formally tested and is provided as-is.  It is not suitable for production environments.
 * This code will not be maintained.
 *
 ******************************************************************************/
-
-#ifndef APP_H
-#define APP_H
 // -----------------------------------------------------------------------------
 //                                   Includes
 // -----------------------------------------------------------------------------
-#include "cmsis_os2.h"
-#include "sl_component_catalog.h"
+#include "app.h"
 
-// -----------------------------------------------------------------------------
-//                              Macros and Typedefs
-// -----------------------------------------------------------------------------
-#define HISTORY
-//#define LIST_RF_CONFIGS
-//#define WITH_UDP_SERVER
-//#define WITH_TCP_SERVER
-
-// -----------------------------------------------------------------------------
-//                                Global Variables
-// -----------------------------------------------------------------------------
+#ifdef WITH_UDP_SERVER
 
 // -----------------------------------------------------------------------------
 //                          Public Function Declarations
 // -----------------------------------------------------------------------------
-/**************************************************************************//**
- * @brief Application task function
- * @details This function is the main app task implementation
- * @param[in] args arguments
- *****************************************************************************/
-void app_task(void *args);
-void app_reset_statistics(void);
-void refresh_parent_tag(void);
 
-#endif  // APP_H
+/* UDP Server initialization function, to be called once connected */
+void init_udp_server(uint8_t socket_mode);
+
+/* UDP Server reception function, to be called from time to time */
+void check_udp_server_messages(void);
+
+#endif /* WITH_UDP_SERVER */
+

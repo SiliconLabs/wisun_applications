@@ -62,6 +62,14 @@
   #include "sl_wisun_ota_dfu_config.h"
 #endif /* SL_CATALOG_WISUN_OTA_DFU_PRESENT */
 
+#ifdef WITH_TCP_SERVER
+  #include "app_tcp_server.h"
+#endif /* WITH_TCP_SERVER */
+
+#ifdef WITH_UDP_SERVER
+  #include "app_udp_server.h"
+#endif /* WITH_UDP_SERVER */
+
 #include "sl_wisun_event_mgr.h"
 #include "printf.h"
 #include "socket/socket.h"
@@ -69,7 +77,9 @@
 
 #include "app_timestamp.h"
 #include "app_rtt_traces.h"
-
+#ifdef    LIST_RF_CONFIGS
+  #include "app_list_configs.h"
+#endif /* LIST_RF_CONFIGS */
 #include "sl_wisun_coap.h"
 #include "sl_wisun_coap_config.h"
 
@@ -252,6 +262,8 @@ void sl_wisun_on_event(sl_wisun_evt_t *evt)
 void app_task(void *args)
 {
   (void) args;
+  uint64_t now = 0;
+  bool print_keep_alive = true;
   bool with_time, to_console, to_rtt, to_udp, to_coap;
 
   app_timestamp_init();
@@ -261,7 +273,7 @@ void app_task(void *args)
 
   printf("\n");
   sprintf(chip, "%s", CHIP);
-  snprintf(application, 100, "%s", "Wi-SUN Node Monitoring V1.0.0");
+  snprintf(application, 100, "%s", "Wi-SUN Node Monitoring V2.0.0");
   printfBothTime("%s/%s %s\n", chip, SL_BOARD_NAME, application);
   snprintf(version, 50, "Compiled on %s at %s", __DATE__, __TIME__);
   printfBothTime("%s\n", chip);
@@ -269,8 +281,10 @@ void app_task(void *args)
   printfBothTime("%s\n", application);
   printfBothTime("%s\n", version);
   app_set_all_traces(SL_WISUN_TRACE_LEVEL_DEBUG, true);
-  app_set_trace(SL_WISUN_TRACE_GROUP_RF  , SL_WISUN_TRACE_LEVEL_INFO, true);
-  app_set_trace(SL_WISUN_TRACE_GROUP_FHSS, SL_WISUN_TRACE_LEVEL_INFO, true);
+  app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true);
+  app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_ERROR, true);
+  app_set_trace(SL_WISUN_TRACE_GROUP_TIM_SRV, SL_WISUN_TRACE_LEVEL_ERROR, true);
+  app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true);
 
 #ifdef    HISTORY
   snprintf(history_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE, "%s", "");
@@ -283,6 +297,14 @@ void app_task(void *args)
   #ifdef    SL_CATALOG_WISUN_OTA_DFU_PRESENT
     printfBothTime("With     OTA DFU Support\n");
   #endif /* SL_CATALOG_WISUN_OTA_DFU_PRESENT */
+
+  #ifdef WITH_TCP_SERVER
+    printfBothTime("With     TCP Server\n");
+  #endif /* WITH_TCP_SERVER */
+
+  #ifdef WITH_UDP_SERVER
+    printfBothTime("With     UDP Server\n");
+  #endif /* WITH_UDP_SERVER */
 
   // Set device_tag to last 2 bytes of MAC address
   sl_wisun_get_mac_address(&device_mac);
@@ -330,6 +352,10 @@ void app_task(void *args)
   sl_wisun_clear_credential_cache();
   printfBothTime("Cleared credential cache\n");
 
+#ifdef    LIST_RF_CONFIGS
+  list_rf_configs();
+#endif /* LIST_RF_CONFIGS */
+
   #ifdef    SL_CATALOG_WISUN_APP_CORE_PRESENT
     // connect to the wisun network
   sl_wisun_app_core_util_connect_and_wait();
@@ -341,10 +367,22 @@ void app_task(void *args)
 
   // Once connected for the first time, reduce RTT traces to the minimum
   app_set_all_traces(SL_WISUN_TRACE_LEVEL_WARN, true);
+  app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true);
+  app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_ERROR, true);
+  app_set_trace(SL_WISUN_TRACE_GROUP_TIM_SRV, SL_WISUN_TRACE_LEVEL_ERROR, true);
+  app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true);
 
   // Get ready to listen to and send notifications to the Border Router
   //  also get ready for CoAP communication
   _open_udp_sockets();
+
+#ifdef WITH_TCP_SERVER
+  init_tcp_server(SOCKET_EVENT_MODE);
+#endif /* WITH_TCP_SERVER */
+
+#ifdef WITH_UDP_SERVER
+  init_udp_server(SOCKET_EVENT_MODE);
+#endif /* WITH_UDP_SERVER */
 
 #ifdef    SL_CATALOG_WISUN_OTA_DFU_PRESENT
   in6_addr_t global_ipv6;
@@ -404,6 +442,15 @@ void app_task(void *args)
     // We can only send messages outside if connected
     if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
       to_udp = to_coap = true;
+
+      #ifdef    WITH_TCP_SERVER
+        check_tcp_server_messages();
+      #endif /* WITH_TCP_SERVER */
+
+      #ifdef    WITH_UDP_SERVER
+        check_udp_server_messages();
+      #endif /* WITH_UDP_SERVER */
+
     } else {
 #ifdef    AUTO_CLEAR_CREDENTIAL_CACHE
       if (just_disconnected) {
@@ -417,10 +464,20 @@ void app_task(void *args)
     }
 
     // Print status message every auto_send_sec seconds
-    _print_and_send_messages (_status_json_string(""),
-              with_time, to_console, to_rtt, to_udp, to_coap);
-    osDelay(auto_send_sec*1000);
-
+    now = now_sec();
+    if (now % auto_send_sec == 0) {
+        if (print_keep_alive == true) {
+          _print_and_send_messages (_status_json_string(""),
+                    with_time, to_console, to_rtt, to_udp, to_coap);
+          print_keep_alive = false;
+        }
+    }
+    if (now % 60 == 1) {
+        if (print_keep_alive == false) {
+            print_keep_alive = true;
+        }
+    }
+    sl_wisun_app_core_util_dispatch_thread();
   }
 }
 
