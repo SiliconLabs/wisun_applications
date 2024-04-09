@@ -1,6 +1,6 @@
 #!/bin/bash
 # usage: following wsbrd execution when it is started as a service
-# ./wsbrd_service.sh
+# wsbrd_service.sh
 NO="\e[0m"
 DEF="\e[39m"
 WHITE="\e[97m"
