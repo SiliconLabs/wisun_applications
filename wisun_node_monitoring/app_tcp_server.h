@@ -46,7 +46,7 @@
 // -----------------------------------------------------------------------------
 
 /* TCP Server initialization function, to be called once connected */
-void init_tcp_server(uint8_t socket_mode);
+void init_tcp_server(void);
 
 /* TCP Server reception function, to be called from time to time */
 void check_tcp_server_messages(void);

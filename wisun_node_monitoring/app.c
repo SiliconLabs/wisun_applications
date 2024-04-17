@@ -37,6 +37,7 @@
 //                                   Includes
 // -----------------------------------------------------------------------------
 #include <stdio.h>
+#include <stdint.h>
 #include <assert.h>
 #include "app.h"
 #include "sl_wisun_api.h"
@@ -299,11 +300,11 @@ void app_task(void *args)
   #endif /* SL_CATALOG_WISUN_OTA_DFU_PRESENT */
 
   #ifdef WITH_TCP_SERVER
-    printfBothTime("With     TCP Server\n");
+    printfBothTime("With     TCP Server %s\n", DEFINE_string(WITH_TCP_SERVER));
   #endif /* WITH_TCP_SERVER */
 
   #ifdef WITH_UDP_SERVER
-    printfBothTime("With     UDP Server\n");
+    printfBothTime("With     UDP Server %s\n", DEFINE_string(WITH_TCP_SERVER));
   #endif /* WITH_UDP_SERVER */
 
   // Set device_tag to last 2 bytes of MAC address
@@ -377,11 +378,11 @@ void app_task(void *args)
   _open_udp_sockets();
 
 #ifdef WITH_TCP_SERVER
-  init_tcp_server(SOCKET_EVENT_MODE);
+  init_tcp_server();
 #endif /* WITH_TCP_SERVER */
 
 #ifdef WITH_UDP_SERVER
-  init_udp_server(SOCKET_EVENT_MODE);
+  init_udp_server();
 #endif /* WITH_UDP_SERVER */
 
 #ifdef    SL_CATALOG_WISUN_OTA_DFU_PRESENT
@@ -654,6 +655,7 @@ char* _status_json_string (char * start_text) {
     END_JSON
 
   char running_sec_string[20];
+  char current_join_state_string[20];
   char current_sec_string[20];
   char connected_sec_string[20];
   char disconnected_sec_string[20];
@@ -684,6 +686,7 @@ char* _status_json_string (char * start_text) {
     );
   } else {
     current_state_sec = now_sec() - disconnection_time_sec;
+    sprintf(current_join_state_string, " no (join_state %d)", join_state);
     sprintf(current_sec_string,     "%s", dhms(current_state_sec));
     sprintf(connected_sec_string,   "%s", dhms(connected_total_sec));
     sprintf(disconnected_sec_string,"%s", dhms(disconnected_total_sec + current_state_sec));
@@ -694,7 +697,7 @@ char* _status_json_string (char * start_text) {
       CHIP,
       parent_tag,
       running_sec_string,
-      "no",
+      current_join_state_string,
       current_sec_string,
       connection_count,
       100.0*(connected_total_sec)/(connected_total_sec + disconnected_total_sec + current_state_sec),

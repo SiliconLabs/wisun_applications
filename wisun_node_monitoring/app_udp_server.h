@@ -45,7 +45,7 @@
 // -----------------------------------------------------------------------------
 
 /* UDP Server initialization function, to be called once connected */
-void init_udp_server(uint8_t socket_mode);
+void init_udp_server(void);
 
 /* UDP Server reception function, to be called from time to time */
 void check_udp_server_messages(void);

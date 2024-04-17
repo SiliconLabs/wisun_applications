@@ -271,6 +271,18 @@ sl_wisun_coap_packet_t * coap_callback_neighbor (
   snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "neighbor_count: %d", neighbor_count);
 return app_coap_reply(coap_response, req_packet); }
 
+bool _check_app_statistics_reset  (
+                             const  sl_wisun_coap_packet_t *const req_packet) {
+  if (req_packet->payload_len) {
+    // We need to check using payload_len since it's not followed by a null
+    if ( !strncmp( (char*)req_packet->payload_ptr, "reset", req_packet->payload_len) ) {
+      app_reset_statistics();
+      return true;
+    }
+  }
+  return false;
+}
+
 //#define   COAP_APP_STATISTICS
 #ifdef    COAP_APP_STATISTICS
 sl_wisun_coap_packet_t * coap_callback_join_states_sec (
@@ -321,18 +333,6 @@ sl_wisun_coap_packet_t * coap_callback_history (
   return app_coap_reply(coap_response, req_packet); }
 #endif /* HISTORY */
 #endif /* COAP_APP_STATISTICS */
-
-bool _check_app_statistics_reset  (
-                             const  sl_wisun_coap_packet_t *const req_packet) {
-  if (req_packet->payload_len) {
-    // We need to check using payload_len since it's not followed by a null
-    if ( !strncmp( (char*)req_packet->payload_ptr, "reset", req_packet->payload_len) ) {
-      app_reset_statistics();
-      return true;
-    }
-  }
-  return false;
-}
 
 sl_wisun_coap_packet_t * coap_callback_all_app_statistics (
       const  sl_wisun_coap_packet_t *const req_packet)  {
