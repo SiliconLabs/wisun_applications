@@ -56,13 +56,15 @@
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
 
-  #define SL_WISUN_UDP_SERVER_PORT_DEFAULT            7777
-  #define SL_WISUN_UDP_SERVER_BUFF_SIZE               1232
-  uint16_t udp_server_port                            = SL_WISUN_UDP_SERVER_PORT_DEFAULT;
+#define SL_WISUN_UDP_SERVER_PORT_DEFAULT            7777
+#define SL_WISUN_UDP_SERVER_BUFF_SIZE               1232
 
 // -----------------------------------------------------------------------------
 //                          Static Function Declarations
 // -----------------------------------------------------------------------------
+
+void _udp_custom_callback(sl_wisun_evt_t *evt);
+
 // -----------------------------------------------------------------------------
 //                                Global Variables
 // -----------------------------------------------------------------------------
@@ -71,24 +73,44 @@
 //                                Static Variables
 // -----------------------------------------------------------------------------
 
-  static char udp_buff[SL_WISUN_UDP_SERVER_BUFF_SIZE] = { 0U };
-  static sockaddr_in6_t udp_server_addr           = { 0U };
-  static sockaddr_in6_t udp_client_addr           = { 0U };
-  socklen_t udp_addr_len                          = sizeof(sockaddr_in6_t);
-  int32_t udp_server_sockid                       = SOCKET_INVALID_ID;
-  int32_t udp_r                                   = SOCKET_RETVAL_ERROR;
-  const char *udp_ip_str                          = NULL;
-  uint32_t count_udp_rx                           = 0;
+static char udp_buff[SL_WISUN_UDP_SERVER_BUFF_SIZE] = { 0U };
+static sockaddr_in6_t udp_server_addr           = { 0U };
+static sockaddr_in6_t udp_client_addr           = { 0U };
+socklen_t udp_addr_len                          = sizeof(sockaddr_in6_t);
+int32_t udp_server_sockid                       = SOCKET_INVALID_ID;
+int32_t udp_client_sockid                       = SOCKET_INVALID_ID;
+#if       (WITH_UDP_SERVER == SO_EVENT_MODE)
+int32_t udp_received_sockid                     = SOCKET_INVALID_ID;
+#endif /* (WITH_UDP_SERVER == SO_EVENT_MODE) */
+int32_t udp_r                                   = SOCKET_RETVAL_ERROR;
+const char *udp_ip_str                          = NULL;
+uint32_t count_udp_rx                           = 0;
+uint16_t udp_server_port                        = SL_WISUN_UDP_SERVER_PORT_DEFAULT;
+bool   udp_socket_data_received                 = false;
+uint8_t _udp_socket_mode;
+uint16_t udp_data_length;
 
 // -----------------------------------------------------------------------------
 //                          Public Function Definitions
 // -----------------------------------------------------------------------------
 
 /* UDP Server initialization function, to be called once connected */
-void init_udp_server(uint8_t socket_mode) {
-  socket_mode = socket_mode;
-  // Open UDP server socket in non-blocking mode
-  udp_server_sockid = socket(AF_INET6, (SOCK_DGRAM|SOCK_NONBLOCK), IPPROTO_UDP);
+void init_udp_server(void) {
+  int32_t socket_type;
+
+  #if       (WITH_UDP_SERVER == SO_EVENT_MODE)
+      // Open UDP server socket in blocking (event) mode
+      socket_type = SOCK_DGRAM;
+      printfBothTime("udp_server in blocking/Event mode\n");
+  #endif /* (WITH_UDP_SERVER == SO_EVENT_MODE) */
+
+  #if       (WITH_UDP_SERVER == SO_NONBLOCK)
+    // Open UDP server socket in non-blocking (polling) mode
+    socket_type = SOCK_DGRAM|SOCK_NONBLOCK;
+    printfBothTime("udp_server in non-blocking/Polling mode\n");
+  #endif /* (WITH_UDP_SERVER == SO_NONBLOCK) */
+
+  udp_server_sockid = socket(AF_INET6, socket_type, IPPROTO_UDP);
   printfBothTime("udp_server_sockid %ld\n", udp_server_sockid);
   assert_res(udp_server_sockid, "UDP server socket()");
 
@@ -101,24 +123,87 @@ void init_udp_server(uint8_t socket_mode) {
   udp_r = bind(udp_server_sockid, (const struct sockaddr *) &udp_server_addr, udp_addr_len);
   assert_res(udp_r, "UDP server bind()");
 
+  #if       (WITH_UDP_SERVER == SO_EVENT_MODE)
+    // Register the UDP_Server_Rx event callback function with the event manager (aka 'em')
+    app_wisun_em_custom_callback_register(SL_WISUN_MSG_SOCKET_DATA_IND_ID, _udp_custom_callback);
+    assert_res(udp_r, "_udp_custom_callback() will be called on SL_WISUN_MSG_SOCKET_CONNECTION_AVAILABLE_IND_ID ");
+  #endif /* (WITH_UDP_SERVER == SO_EVENT_MODE) */
+
   udp_ip_str = app_wisun_trace_util_get_ip_str((void *) &udp_server_addr.sin6_addr);
   printfBothTime("Waiting for UDP messages on %s port %d\n", udp_ip_str, udp_server_port);
   app_wisun_trace_util_destroy_ip_str(udp_ip_str);
 }
 
 void check_udp_server_messages(void) {
-  // 'Poll Check' for received UDP messages. The socket must be in non-blocking mode
-  //  otherwise recv() will wait forever
-  udp_r = recvfrom(udp_server_sockid, udp_buff, SL_WISUN_UDP_SERVER_BUFF_SIZE - 1, 0, (struct sockaddr *) &udp_client_addr, &udp_addr_len);
-  if (udp_r > 0) {
+  #if       (WITH_UDP_SERVER == SO_EVENT_MODE)
+    if (count_udp_rx == 0) {printfBothTime("UDP rx in Event mode\n"); count_udp_rx++;}
+    if (udp_socket_data_received) {
+      printfBothTime("UDP rx in Event mode %ld\n", count_udp_rx);
       count_udp_rx++;
       // Make sure the last byte is 0x00 (end of string).
-      udp_buff[udp_r] = 0;
+      udp_buff[udp_data_length] = 0;
       udp_ip_str = app_wisun_trace_util_get_ip_str((void *) &udp_client_addr.sin6_addr);
       // Print the received message
-      printfBothTime("UDP Rx %2ld from %s (%ld bytes): %s\n", count_udp_rx, udp_ip_str, udp_r, udp_buff);
+      printfBothTime("UDP Rx %2ld from %s (%d bytes): %s\n", count_udp_rx, udp_ip_str, udp_data_length, udp_buff);
       app_wisun_trace_util_destroy_ip_str(udp_ip_str);
-  }
-}
-#endif /* WITH_UDP_SERVER */
+      udp_socket_data_received = false;
+    }
+  #endif /* (WITH_UDP_SERVER == SO_EVENT_MODE) */
 
+  #if       (WITH_UDP_SERVER == SO_NONBLOCK)
+    if (count_udp_rx == 0) {printfBothTime("UDP rx in Polling mode\n"); count_udp_rx++;}
+    // 'Poll Check' for received UDP messages. The socket must be in non-blocking mode
+    //  otherwise recv() will wait forever
+    udp_r = recvfrom(udp_server_sockid, udp_buff, SL_WISUN_UDP_SERVER_BUFF_SIZE - 1, 0, (struct sockaddr *) &udp_client_addr, &udp_addr_len);
+    if (udp_r > 0) {
+        count_udp_rx++;
+        // Make sure the last byte is 0x00 (end of string).
+        udp_buff[udp_r] = 0;
+        udp_ip_str = app_wisun_trace_util_get_ip_str((void *) &udp_client_addr.sin6_addr);
+        // Print the received message
+        printfBothTime("UDP Rx %2ld from %s (%ld bytes): %s\n", count_udp_rx, udp_ip_str, udp_r, udp_buff);
+        app_wisun_trace_util_destroy_ip_str(udp_ip_str);
+    }
+  #endif /* (WITH_UDP_SERVER == SO_NONBLOCK) */
+}
+
+void _udp_custom_callback(sl_wisun_evt_t *evt) {
+  #if       (WITH_UDP_SERVER == SO_EVENT_MODE)
+    if (evt->header.id == SL_WISUN_MSG_SOCKET_CONNECTION_AVAILABLE_IND_ID) {
+        udp_client_sockid = accept(udp_server_sockid, (struct sockaddr *)&udp_client_addr, &udp_addr_len);
+        udp_ip_str = app_wisun_trace_util_get_ip_str((void *) &udp_client_addr.sin6_addr);
+        printfBothTime("UDP client connection available from %s on client socket id %ld\n",
+                       udp_ip_str,
+                       udp_client_sockid);
+    }
+    if (evt->header.id == SL_WISUN_MSG_SOCKET_DATA_AVAILABLE_IND_ID) {
+        udp_received_sockid = evt->evt.socket_data_available.socket_id;
+      if (udp_client_sockid == udp_received_sockid) {
+        udp_data_length = recv(udp_client_sockid, udp_buff, SL_WISUN_UDP_SERVER_BUFF_SIZE - 1, 0);
+        udp_socket_data_received = (udp_data_length > 0);
+        if (udp_data_length == 0) {
+          udp_r = close(udp_client_sockid);
+        }
+      } else {
+          printfBothTime("socket_data_received on socket %ld: not for the UDP server\n", evt->evt.socket_data_available.socket_id);
+      }
+    }
+    return;
+  #endif /* (WITH_UDP_SERVER == SO_EVENT_MODE) */
+
+  #if       (WITH_UDP_SERVER == SO_NONBLOCK)
+    if (evt->header.id == SL_WISUN_MSG_SOCKET_DATA_IND_ID) {
+      udp_data_length = evt->evt.socket_data.data_length;
+        udp_socket_data_received = (udp_data_length > 0);
+        udp_client_sockid = evt->evt.socket_data.socket_id;
+        ip6tos(&udp_client_addr, (char*)evt->evt.socket_data.remote_address.address);
+        sl_strcpy_s(udp_buff, udp_data_length, (char*)evt->evt.socket_data.data);
+    }
+    return;
+  #endif /* (WITH_UDP_SERVER == SO_NONBLOCK) */
+
+  // Un-managed Indications for which the callback is registered
+  printfBothTime("_udp_data_received_custom_callback() indication id 0x%02x (not managed)\n", evt->header.id);
+}
+
+#endif /* WITH_UDP_SERVER */
