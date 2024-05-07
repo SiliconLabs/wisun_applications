@@ -4,17 +4,24 @@
 # udp_notification_receiver.py 1237 " "
 
 import socket
+import os
 import sys
 import datetime
 
 HOST_IP = "::" # Host own address (tun0 IPv6 address)
 
 rcv_port = int(sys.argv[1])
+
 newline = " "
 
 if (len(sys.argv) > 2):
   newline = sys.argv[2]
   space = ""
+
+if (len(sys.argv) > 3):
+  monitoring_path = sys.argv[3]
+else:
+  monitoring_path = False
 
 PORT = rcv_port # Port used by the peer
 
@@ -23,8 +30,14 @@ sock.bind((HOST_IP, PORT))
 
 print(f"Receiving on {HOST_IP}/{PORT}...")
 
+if monitoring_path:
+  print(f"monitoring path '{monitoring_path}'")
+  if not os.path.isdir(monitoring_path):
+    os.mkdir(monitoring_path)
+
 while True:
   data, addr = sock.recvfrom(2048) # buffer size is 2048 bytes
+  addr_string = addr[0].replace(":","_")
   now = datetime.datetime.now()
   now_str = str(now.strftime('%Y-%m-%d %H:%M:%S'))
 
@@ -34,5 +47,38 @@ while True:
     print(f"Exception {e} (from {addr})")
 
   print (f"[{now_str}] Rx {PORT}: {newline}", message_string)
+
+  if monitoring_path:
+    try:
+      device_path        = os.path.join(monitoring_path, f"{addr_string}")
+
+      # First time we receive a notification from a device
+      if not os.path.isdir(device_path):
+        os.mkdir(device_path)
+
+        first_msg_date_path = os.path.join(device_path, "first_notification_date")
+        f = open(first_msg_date_path, 'w')
+        f.write(now_str+"\n")
+        f.close()
+
+        first_msg_path = os.path.join(device_path, "first_notification")
+        with open(first_msg_path, 'w') as f:
+          f.write(message_string+"\n")
+          f.close()
+
+      # Each time we receive a notification from a device
+      last_msg_date_path = os.path.join(device_path, "last_notification_date")
+      with open(last_msg_date_path, 'w') as f:
+        f.write(now_str+"\n")
+        f.close()
+
+      last_msg_path      = os.path.join(device_path, "last_notification")
+      with open(last_msg_path, 'w') as f:
+        f.write(message_string+"\n")
+        f.close()
+
+    except Exception as e:
+      print(f"Exception in monitoring {e} (from {addr})")
+      pass
 
 

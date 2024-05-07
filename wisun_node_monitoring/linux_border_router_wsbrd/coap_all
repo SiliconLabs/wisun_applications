@@ -1,8 +1,9 @@
 #!/bin/bash
 # usage: sending a CoAP request to all connected devices
-# ./coap_all coap_uri [-e <payload>]
+# coap_all coap_uri [-e <payload>]
 
 ipv6s=$(get_nodes_ipv6_address.py)
+monitoring_path="/home/pi/monitoring"
 
 # by default, perform discovery
 if [ -z "$1" ]; then
@@ -38,11 +39,19 @@ responded=0
 for ipv6 in $ipv6s
 do
     dev=$(echo $ipv6 | cut -d ':' -f 8)
-    cmd="coap-client -m get -N -B 5 -t text coap://[${ipv6}]:5683${coap_uri} $E ${coap_payload} "
-    res=$(eval ${cmd} )
+    cmd="coap-client -m get -N -B 5 -t text coap://[${ipv6}]:5683${coap_uri} $E ${coap_payload}"
+    res=$(eval ${cmd} 2>&1)
     echo "+++ ${cmd} : ${res}"
     count=$(($count+1))
+    ipv6_=$(echo $ipv6  | sed -r "s/::/_0_/g")
+    ipv6_=$(echo $ipv6_ | sed -r "s/:/_/g")
     if [ "${res}" != "" ]; then
+      device_path="${monitoring_path}/${ipv6_}"
+      if [ ! -d "${device_path}" ]; then
+        mkdir "${device_path}"
+      fi
+      echo "${res}"              > "${device_path}/last_coap_all"
+      echo "$(date +"%Y-%m-%d %H:%M:%S")" > "${device_path}/last_coap_all_date"
       responded=$(($responded+1))
     fi
 done

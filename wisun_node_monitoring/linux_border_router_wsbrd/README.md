@@ -64,7 +64,9 @@ To be used as documented below:
 | `wsbrd_info.sh`    | bash | Check wsbrd lifetime | `wsbrd_info.sh` |`PID USER COMMAND %MEM ELAPSED` |
 | `wsbrd_follow.sh`  | bash | Follow wsbrd traces from `journalctl`. All traces with no argument, otherwise filtering on device_tag | `wsbrd_follow.sh [device_tag]` | `sudo journalctl -u wisun-borderrouter.service -f` |
 | `wsbrd_since_yesterday.sh`  | bash | Same as `wsbrd_follow.sh`, limited to 1 day | `wsbrd_since_yesterday.sh` | `sudo journalctl -u wisun-borderrouter.service --since $time` |
-| `wsbrd_listen.sh`  | bash | Start UDP notification receiver | `wsbrd_listen.sh` | UDP notifications received from connected Wi-SUN devices |
+| `wsbrd_listen.sh`  | bash | Start UDP notification receiver | `wsbrd_listen.sh` | UDP notifications received from connected Wi-SUN devices, tracing messages in `~/monitoring/` |
+| `wsbrd_monitor.sh` | bash | Start wsbrd monitoring | `wsbrd_monitor.sh` | Changes in connected devices and topology are traced, new IPs are listed in `~/monitoring` |
+| `wsbrd_introspect.sh` | bash | First level DBus introspection of wsbrd DBus interface | `wsbrd_introspect.sh` | Displays the DBus properties/methods/interfaces for `com.silabs.Wisun.BorderRouter`|
 
 ## IPv6 networking
 
@@ -97,8 +99,11 @@ To be used as documented below:
 
 | Name | Language | Usage | Call | Result |
 |------|----------|-------|------|--------|
-| `TCP_sender_client.py` | Python | Use TCP to send a text message to the destination     | `TCP_sender_client.py <IPv6> <port> "<message>"` | Message send to Wi-SUN node (TCP = no Multicast) |
-| `UDP_sender_client.py` | Python | Used UDP to send a text message to the destination(s) | `UDP_sender_client.py <IPv6> <port> "<message>"` | Message send to Wi-SUN node (UDP = Multicast compatible) |
+| `TCP_receiver_server.py` | Python | Use TCP to listen to incoming messages     | `TCP_receiver_sender.py <port>` | Messages sent to tun0 will be traced |
+| `TCP_sender_client.py`   | Python | Use TCP to send a text message to the destination     | `TCP_sender_client.py <IPv6> <port> "<message>"` | Message send to Wi-SUN node (TCP = no Multicast) |
+| `UDP_sender_client.py`   | Python | Use UDP to send a text message to the destination(s) | `UDP_sender_client.py <IPv6> <port> "<message>"` | Message send to Wi-SUN node (UDP = Multicast compatible) |
+| `UDP_notification_receiver.py`| Python | Listen to UDP incoming messages | `UDP_notification_receiver.py <port> <separator>` | Message sent to the UDP notification port are traced |
+
 
 ## TFTP control and checks
 
@@ -117,7 +122,9 @@ To be used as documented below:
 | `ota_install.sh`                   | bash | Installing `libcoap2`| `~/ota_install.sh` | `sudo apt-get install libcoap2 libcoap2-bin tftpd-hpa tftp-hpa` |
 | `ota_notification_server_start.sh` | bash | Start `coap server` to receive OTA notifications from connected devices | `~/ota_notification_server_start.sh` | `coap-server -A fd00:6172:6d00::2 -p 5685 -d 10` |
 | `ota_start.sh`                     | bash | Start OTA DFU on <device_ipv6> | `~/ota_start.sh <device-ipv6>` | Initial OTA message from <device_ipv6>|
+| `ota_status.sh`                    | bash | Check OTA DFU status for <device_ipv6> | `~/ota_status.sh <device-ipv6>` | OTA status message from <device_ipv6>|
 | `ota_follow.sh`                    | bash | Ask `coap-server` for the last `/ota/dfu_notify` notification. Best used when called with `watch` | `~/ota_notification_server_start.sh` | `coap-client -m get -N -B 1 -t text coap://[fd00:6172:6d00::2]:5685/ota/dfu_notify` |
+| `view_gbl.sh`                      | bash | Hex display of selected input `.gbl` file | `view_gbl.sh <gbl_file> | Hex dump of `.gbl` file content |
 
 ## CoAP
 

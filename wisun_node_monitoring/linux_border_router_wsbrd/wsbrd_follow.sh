@@ -4,9 +4,10 @@
 
 # Usage:
 # Following wsbrd messages for a given device
-#  $ ./wsbrd_follow.sh <tag>
+#  $ wsbrd_follow.sh <tag>
 # Example:
-#  $ ./wsbrd_follow.sh ac96
+#  $ wsbrd_follow.sh
+#  $ wsbrd_follow.sh ac96
 
 #set -ex
 
