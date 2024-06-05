@@ -13,4 +13,17 @@
     <properties key="deviceType" value="SoC"/>
     <properties key="projectDifficulty" value="Beginner"/>
   </descriptors>
+  <descriptors name="efr32_wisun" label="Wi-SUN - CSMP Agent Skeleton" description="This project helps creating a skeleton for the Wi-SUN csmp agent sample application that can be built later on the cisco csmp agent repository.">
+    <properties key="namespace" value="template.uc"/>
+    <properties key="projectFilePaths" value="wisun_csmp_agent_skeleton\wisun_csmp_agent_skeleton.slcp"/>
+    <properties key="readmeFiles" value="wisun_node_monitoring/README.md"/>
+    <properties key="boardCompatibility" value="brd2705a brd4163a brd4164a brd4170a  brd4253a brd4254a brd4270b brd4271a brd4272a brd4400c brd4401a brd4401b brd4401c com.silabs.board.none"/>
+    <properties key="partCompatibility" value=".*efr32mg12.* .*efr32fg25.* .*efr32zg28.* "/>
+    <properties key="ideCompatibility" value="simplicity-ide makefile-ide"/>
+    <properties key="toolchainCompatibility" value="gcc"/>
+    <properties key="category" value="Example|Wi-SUN"/>
+    <properties key="quality" value="EXPERIMENTAL"/>
+    <properties key="deviceType" value="SoC"/>
+    <properties key="projectDifficulty" value="Beginner"/>
+  </descriptors>
 </model:MDescriptors>
