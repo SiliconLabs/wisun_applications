@@ -47,15 +47,18 @@ requires:
       - "device_sdid_220" # only for these devices
 source:
   - path: "main.c"
+  - path: "../component/ntp_timesync/sl_wisun_ntp_timesync.c"
+    directory: "component/ntp_timesync"
 
 include:
-  - path: "../component/csmp_agent/sample"
+  - path: "../component/ntp_timesync"
     file_list:
-    - path: "CsmpAgentLib_sample_config.h"
-    - path: "signature_verify.h"
-    - path: "CsmpAgentLib_sample_util.h"
-    - path: "CsmpAgentLib_sample.h"
-    - path: "CsmpAgentLib_sample_tlvs.h"
+      - "path": "sl_wisun_ntp_timesync.h"
+    directory: "component/ntp_timesync"
+  - path: "../component/ntp_timesync/config"
+    file_list:
+    - path: "sl_wisun_ntp_timesync_config.h"
+    directory: "config"
 
 define:
   - name: "DEBUG_EFM"
