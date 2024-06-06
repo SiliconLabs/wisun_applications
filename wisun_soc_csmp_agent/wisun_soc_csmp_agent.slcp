@@ -36,8 +36,6 @@ component:
   - id: "cli"
     instance:
       - vcom
-  - id: "sl_wisun_ntp_timesync"
-  - id: "csmp_agent"
 
 requires:
   - name: "cmsis_rtos2"
@@ -47,14 +45,99 @@ requires:
     condition:
       - "device_sdid_220" # only for these devices
 source:
-#   - path: "main.c"
   - path: "../component/csmp_agent/sample/CsmpAgentLib_sample.c"
   - path: "../component/csmp_agent/sample/CsmpAgentLib_sample_util.c"
   - path: "../component/csmp_agent/sample/CsmpAgentLib_sample_tlvs.c"
   - path: "../component/csmp_agent/sample/signature_verify.c"
   - path: "../component/csmp_agent/sample/tlvs/efr32_wisun_tlvs.c"
 
+  # NTP Time sync sources
+  - path: "../component/ntp_timesync/sl_wisun_ntp_timesync.c"
+    directory: "component/ntp_timesync"
+
+  # Csmp Agent sources
+  - path: "../component/csmp_agent/osal/efr32_wisun/osal_efr32_wisun.c"
+    directory: "component/csmp_agent/osal/efr32_wisun"
+
+  - path: "../component/csmp_agent/src/csmpagent/csmp_ipRouteRplMetrics.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_tlvindex.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_reportSubscribe.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_currenttime.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_interfaceMetrics.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_firmwareImageInfo.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_hardwareDesc.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_deviceid.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_interfaceDesc.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmpagent.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_sessionId.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_group.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_ipRoute.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_vendor.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_cgms.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_rplInstance.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_wpanStatus.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_uptime.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_ipAddress.c"
+    directory: "component/csmp_agent/src/csmpagent"
+  - path: "../component/csmp_agent/src/csmpagent/csmp_signature.c"
+    directory: "component/csmp_agent/src/csmpagent"
+
+  - path: "../component/csmp_agent/src/csmpagent/tlvs/CsmpTlvs.pb-c.c"
+    directory: "component/csmp_agent/src/csmpagent/tlvs"
+
+  - path: "../component/csmp_agent/src/csmpservice/cgmsagent.c"
+    directory: "component/csmp_agent/src/csmpservice"
+  - path: "../component/csmp_agent/src/csmpservice/csmpserver.c"
+    directory: "component/csmp_agent/src/csmpservice"
+
+  - path: "../component/csmp_agent/src/csmpapi/csmpservice.c"
+    directory: "component/csmp_agent/src/csmpapi"
+
+  - path: "../component/csmp_agent/src/lib/protobuf-c/protobuf-c.c"
+    directory: "component/csmp_agent/src/lib/protobuf-c"
+
+  - path: "../component/csmp_agent/src/csmptlv/csmptlv.c"
+    directory: "component/csmp_agent/src/csmptlv"
+  - path: "../component/csmp_agent/src/csmptlv/ProtobufVarint.c"
+    directory: "component/csmp_agent/src/csmptlv"
+
+  - path: "../component/csmp_agent/src/coap/coapclient.c"
+    directory: "component/csmp_agent/src/coap"
+  - path: "../component/csmp_agent/src/coap/coapserver.c"
+    directory: "component/csmp_agent/src/coap"
+
+
 include:
+
+  # NTP Time sync includes
+  - path: "../component/ntp_timesync"
+    file_list:
+      - "path": "sl_wisun_ntp_timesync.h"
+    directory: "component/ntp_timesync"
+  - path: "../component/ntp_timesync/config"
+    file_list:
+    - path: "sl_wisun_ntp_timesync_config.h"
+    directory: "config"
+  
+  # Csmp Agent includes
   - path: "../component/csmp_agent/sample"
     file_list:
     - path: "CsmpAgentLib_sample_config.h"
@@ -63,8 +146,81 @@ include:
     - path: "CsmpAgentLib_sample.h"
     - path: "CsmpAgentLib_sample_tlvs.h"
 
+  - path: "../component/csmp_agent/include"
+    file_list:
+    - "path": "csmp_service.h"
+    - "path": "csmp_info.h"
+    directory: "component/csmp_agent/include"
+
+  - path: "../component/csmp_agent/osal/efr32_wisun"
+    file_list:
+    - "path": "osal_platform_types.h"
+    directory: "component/csmp_agent/osal/efr32_wisun"
+
+  - path: "../component/csmp_agent/osal"
+    file_list:
+    - "path": "osal.h"
+    directory: "component/csmp_agent/osal"
+
+  - path: "../component/csmp_agent/sample"
+    file_list:
+    - "path": "CsmpAgentLib_sample_config.h"
+    - "path": "signature_verify.h"
+    - "path": "CsmpAgentLib_sample_util.h"
+    - "path": "CsmpAgentLib_sample.h"
+    - "path": "CsmpAgentLib_sample_tlvs.h"
+    directory: "component/csmp_agent/sample"
+
+  - path: "../component/csmp_agent/src/csmpagent"
+    file_list:
+    - "path": "csmpagent.h"
+    - "path": "csmp.h"
+    - "path": "csmpfunction.h"
+    directory: "component/csmp_agent/src/csmpagent"
+
+  - path: "../component/csmp_agent/src/csmpagent/tlvs"
+    file_list:
+    - "path": "CsmpTlvs.pb-c.h"
+    directory: "component/csmp_agent/src/csmpagent/tlvs"
+
+  - path: "../component/csmp_agent/src/csmpservice"
+    file_list:
+    - "path": "csmpserver.h"
+    - "path": "cgmsagent.h"
+    directory: "component/csmp_agent/src/csmpservice"
+  
+  - path: "../component/csmp_agent/src/csmpapi"
+    file_list:
+    - "path": "csmpinfo.h"
+    - "path": "csmpservice.h"
+    directory: "component/csmp_agent/src/csmpapi"
+
+  - path: "../component/csmp_agent/src/lib"
+    file_list:
+    - "path": "debug.h"
+    directory: "component/csmp_agent/src/lib"
+
+  - path: "../component/csmp_agent/src/lib/protobuf-c"
+    file_list:
+    - "path": "protobuf-c.h"
+    directory: "component/csmp_agent/src/lib/protobuf-c"
+
+  - path: "../component/csmp_agent/src/csmptlv"
+    file_list:
+    - "path": "ProtobufVarint.h"
+    - "path": "csmptlv.h"
+    directory: "component/csmp_agent/src/csmptlv"
+
+  - path: "../component/csmp_agent/src/coap"
+    file_list:
+    - "path": "coap.h"
+    - "path": "coapserver.h"
+    - "path": "coapclient.h"
+    directory: "component/csmp_agent/src/coap"
+
 define:
   - name: "DEBUG_EFM"
+  - name: "OSAL_EFR32_WISUN"
 configuration:
   - name: "SL_BOARD_ENABLE_VCOM"
     value: "1"
@@ -100,6 +256,8 @@ configuration:
     value: "3200000"
   - name: SL_SLEEPTIMER_WALLCLOCK_CONFIG
     value: "1"
+  - name: configTIMER_TASK_STACK_DEPTH
+    value: "4096"
 
   # SDK components config specialization
   - name: "SL_WISUN_PING_MAX_PAYLOAD_LENGTH"

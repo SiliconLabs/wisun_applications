@@ -36,7 +36,6 @@ component:
   - id: "cli"
     instance:
       - vcom
-  - id: "sl_wisun_ntp_timesync"
 
 requires:
   - name: "cmsis_rtos2"
@@ -97,6 +96,8 @@ configuration:
     value: "3200000"
   - name: SL_SLEEPTIMER_WALLCLOCK_CONFIG
     value: "1"
+  - name: configTIMER_TASK_STACK_DEPTH
+    value: "4096"
 
   # SDK components config specialization
   - name: "SL_WISUN_PING_MAX_PAYLOAD_LENGTH"
