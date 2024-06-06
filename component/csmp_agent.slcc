@@ -1,0 +1,115 @@
+id: "csmp_agent"
+label: "File Transfer Protocol"
+package: "wisun"
+description: >
+  Cisco CSMP Agent library and sample application
+category: "Wi-SUN|Wi-SUN Services"
+quality: "production"
+metadata:
+  sbom:
+    license: Zlib
+root_path: "component/csmp_agent"
+provides:
+  - name: csmp_agent
+
+source:
+  - path: "osal/efr32_wisun/osal_efr32_wisun.c"
+  - path: "src/csmpagent/csmp_ipRouteRplMetrics.c"
+  - path: "src/csmpagent/csmp_tlvindex.c"
+  - path: "src/csmpagent/csmp_reportSubscribe.c"
+  - path: "src/csmpagent/csmp_currenttime.c"
+  - path: "src/csmpagent/csmp_interfaceMetrics.c"
+  - path: "src/csmpagent/csmp_firmwareImageInfo.c"
+  - path: "src/csmpagent/csmp_hardwareDesc.c"
+  - path: "src/csmpagent/csmp_deviceid.c"
+  - path: "src/csmpagent/csmp_interfaceDesc.c"
+  - path: "src/csmpagent/csmpagent.c"
+  - path: "src/csmpagent/csmp_sessionId.c"
+  - path: "src/csmpagent/csmp_group.c"
+  - path: "src/csmpagent/csmp_ipRoute.c"
+  - path: "src/csmpagent/csmp_vendor.c"
+  - path: "src/csmpagent/csmp_cgms.c"
+  - path: "src/csmpagent/csmp_rplInstance.c"
+  - path: "src/csmpagent/csmp_wpanStatus.c"
+  - path: "src/csmpagent/csmp_uptime.c"
+  - path: "src/csmpagent/csmp_ipAddress.c"
+  - path: "src/csmpagent/csmp_signature.c"
+  - path: "src/csmpagent/tlvs/CsmpTlvs.pb-c.c"
+  - path: "src/csmpservice/cgmsagent.c"
+  - path: "src/csmpservice/csmpserver.c"
+  - path: "src/csmpapi/csmpservice.c"
+  - path: "src/lib/protobuf-c/protobuf-c.c"
+  - path: "src/csmptlv/csmptlv.c"
+  - path: "src/csmptlv/ProtobufVarint.c"
+  - path: "src/coap/coapclient.c"
+  - path: "src/coap/coapserver.c"
+  
+
+include:
+  - path: "./include"
+    file_list:
+    - "path": "csmp_service.h"
+    - "path": "csmp_info.h"
+
+
+  - path: "./osal/efr32_wisun"
+    file_list:
+    - "path": "osal_platform_types.h"
+
+  - path: "./osal"
+    file_list:
+    - "path": "osal.h"
+  
+  - path: "./sample"
+    file_list:
+    - "path": "CsmpAgentLib_sample_config.h"
+    - "path": "signature_verify.h"
+    - "path": "CsmpAgentLib_sample_util.h"
+    - "path": "CsmpAgentLib_sample.h"
+    - "path": "CsmpAgentLib_sample_tlvs.h"
+  
+  - path: "./src/csmpagent"
+    file_list:
+    - "path": "csmpagent.h"
+    - "path": "csmp.h"
+    - "path": "csmpfunction.h"
+
+  - path: "./src/csmpagent/tlvs"
+    file_list:
+    - "path": "CsmpTlvs.pb-c.h"
+  
+  - path: "./src/csmpservice"
+    file_list:
+    - "path": "csmpserver.h"
+    - "path": "cgmsagent.h"
+  
+  - path: "./src/csmpapi"
+    file_list:
+    - "path": "csmpinfo.h"
+    - "path": "csmpservice.h"
+
+  - path: "./src/lib"
+    file_list:
+    - "path": "debug.h"
+  
+  - path: "./src/lib/protobuf-c"
+    file_list:
+    - "path": "protobuf-c.h"
+  
+  - path: "./src/csmptlv"
+    file_list:
+    - "path": "ProtobufVarint.h"
+    - "path": "csmptlv.h"
+
+  - path: "./src/coap"
+    file_list:
+    - "path": "coap.h"
+    - "path": "coapserver.h"
+    - "path": "coapclient.h"
+
+
+#-------------- Template Contribution ----------------
+template_contribution:
+#---------------- Component Catalog ------------------
+  - name: component_catalog
+    value: csmp_agent

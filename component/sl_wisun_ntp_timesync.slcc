@@ -1,0 +1,35 @@
+id: "sl_wisun_ntp_timesync"
+label: "Wi-SUN Network Time Protocol (NTP Client)"
+package: "wisun"
+description: >
+  This component provides a solution to synchronise the time on the Wi-SUN nodes using NTP protcol.
+  The component includes an NTP Client implementation and a simple API to start time synchronisation.
+
+category: "Wi-SUN|Wi-SUN Services"
+quality: "production"
+metadata:
+  sbom:
+    license: Zlib
+root_path: "component/ntp_timesync"
+provides:
+  - name: sl_wisun_ntp_timesync
+
+source:
+  - path: "sl_wisun_ntp_timesync.c"
+
+
+include:
+  - path: "."
+    file_list:
+    - "path": "sl_wisun_ntp_timesync.h"
+
+config_file:
+  - path: "config/sl_wisun_ntp_timesync_config.h"
+
+
+#-------------- Template Contribution ----------------
+template_contribution:
+
+#---------------- Component Catalog ------------------
+  - name: component_catalog
+    value: ntp_timesync
