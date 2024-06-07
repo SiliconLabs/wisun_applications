@@ -162,6 +162,9 @@ ui_hints:
     - path: readme.md
       focus: true
 
+other_file:
+  - path: "make_silabs2cisco.py"
+
 #--------------------- Toolchain ------------------------
 toolchain_settings:
   - option: optimize
