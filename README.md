@@ -21,6 +21,7 @@ The Silicon Labs Wi-SUN stack allows for a wide variety applications to be built
 ## Examples ##
 
 - [Wi-SUN Node Monitoring](https://github.com/SiliconLabs/wisun_applications_staging/tree/main/wisun_node_monitoring): An extendable node monitoring application providing information on the device/board/application and connected statistics. It can be easily extended to monitor sensors and control actuators.
+- [Wi-SUN SoC CSMP Agent](/wisun_soc_csmp_agent/): A reference implementation of the CSMP agent hosted on [csmp-agent-lib](https://github.com/CiscoDevNet/csmp-agent-lib) to allow a node to connect to FND. 
 
 ## Add the 'Wi-SUN Applications' Repository to Simplicity Studio 5 ##
 
