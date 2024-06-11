@@ -43,6 +43,7 @@
 #include "socket.h"
 #include "sl_sleeptimer.h"
 #include "sl_sleeptimer_config.h"
+#include "cmsis_os2.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -131,7 +132,7 @@ sl_status_t sl_wisun_ntp_timesync(void)
 
   packet.li_vn_mode = 0x1b;
 
-  sockfd = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+  sockfd = socket(AF_INET6, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
   if (sockfd < 0) {
     printf("[NTP Timesync: Error opening socket]\n");
     return SL_STATUS_FAIL;
@@ -161,6 +162,7 @@ sl_status_t sl_wisun_ntp_timesync(void)
     ret = recvfrom(sockfd, &packet, sizeof(sl_wisun_ntp_packet_t), 0, 
                    (struct sockaddr *)&tmp_addr, &len);
     if (ret < 0) {
+        osDelay(10);
       continue;
     }
 
