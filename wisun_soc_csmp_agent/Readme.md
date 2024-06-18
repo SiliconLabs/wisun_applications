@@ -1,20 +1,23 @@
-<table border="0">
+<table style="border: none; border-collapse: collapse;">
   <tr>
-    <td align="left" valign="middle">
-    <h1>Wi-SUN - SoC CSMP Agent</h1>
-  </td>
-  <td align="left" valign="middle">
-    <a href="https://www.silabs.com/wireless/wi-sun">
-      <img src="http://pages.silabs.com/rs/634-SLU-379/images/WGX-transparent.png"  title="Silicon Labs Gecko and Wireless Gecko MCUs" alt="EFM32 32-bit Microcontrollers" width="100"/>
-    </a>
-  </td>
+    <td align="center" valign="middle" style="border: none;">
+      <h1>Wi-SUN - SoC CSMP Agent Projects</h1>
+      <a href="https://www.silabs.com/wireless/wi-sun">
+        <img src="https://docs.silabs.com/dsc-assets/icons/docspace/icon-wisun-blue.svg"  title="Wi-SUN" alt="Wi-SUN Logo" width="100" />
+      </a>
+    </td>
+    <td align="center" valign="middle" style="border: none;">
+      <a href="https://www.silabs.com/wireless/wi-sun">
+        <img src="http://pages.silabs.com/rs/634-SLU-379/images/WGX-transparent.png"  title="Silicon Labs Gecko and Wireless Gecko MCUs" alt="EFR32 32-bit Wireless Microcontrollers" width="200"/>
+      </a>
+    </td>
   </tr>
 </table>
 
 
 # Summary
 
-This project is a reference implementation of the CSMP agent hosted on [csmp-agent-lib](https://github.com/CiscoDevNet/csmp-agent-lib) to allow a node to connect to FND.
+This readme covers the steps needed to get started using the two projects **Wi-SUN - SoC CSMP Agent Sample Application** that can be built using Simplicity Studio and the **Wi-SUN - SoC CSMP Agent Skeleton** that can be built using the [csmp-agent-lib](https://github.com/CiscoDevNet/csmp-agent-lib) build system to allow a Wi-SUN node to connect to FND.
 
 # Requirements
 
@@ -27,7 +30,7 @@ One of the supported platforms listed below is required to run the example:
 
 ## Software Prerequisites
 
-- Simplicity Studio v5 and the Simplicity SDK Suit 2024.6.0.
+- Simplicity Studio v5 with the Simplicity SDK Suit 2024.6.0.
 
 ## Install Simplicity Studio 5 and the Gecko SDK
 
@@ -37,14 +40,27 @@ To install the Simplicity SDK Suit follow this [**procedure**](https://docs.sila
 
 ## Import the Project to Simplicity Studio 5
 
-If this step is not done already, follow the steps listed under [Add the Wi-SUN applications repository to Simplicity Studio 5](../README.md#add-the-wi-sun-applications-repository-to-simplicity-studio-5) section to create the project using Simplicity Studio.
+If this step is not done already, follow the steps listed under [Add the Wi-SUN applications repository to Simplicity Studio 5](../README.md#add-the-wi-sun-applications-repository-to-simplicity-studio-5) section to add the projects to Simplicity Studio.
 
 # Start the Example
 
+## Wi-SUN - SoC CSMP Agent Sample Application
+
 1. Create the project by following the steps listed under [Create the Wi-SUN applications example projects](../README.md#create-the-wi-sun-applications-example-projects) section.
-2. Build the project and flash it on your board.
-3. Refer to the folder **Vendors/Silabs** on the [CSMP Agent library](https://github.com/CiscoDevNet/csmp-agent-lib) to complete your setup and connect to FND.
+2. Refer to the folder **Vendors/Silabs** on the [CSMP Agent library](https://github.com/CiscoDevNet/csmp-agent-lib) to complete your setup and connect to FND.
+
+## Wi-SUN - SoC CSMP Agent Skeleton
+
+1. Create the project by following the steps listed under [Create the Wi-SUN applications example projects](../README.md#create-the-wi-sun-applications-example-projects) section. 
+2. In the **project configuration** perspective, select the **Copy Contents** option and click **Finish**. This step is very important to build the project successfully. 
+3. Generate the project makefiles in Simplicity Studio by following these steps:
+    * Go to the **OVERVIEW** tab in the slcp file perspective.
+    * Scroll down to the end of the *Target and Tool Settings* card and click **Change Target/SDK/Generators**.
+    * In the *CHANGE PROJECT GENERATORS* list, select **GCC Makefile**.
+    * Click Save and wait for Simplicity Studio to generate the project.
+4. Refer to the folder **Vendors/Silabs** on the [CSMP Agent library](https://github.com/CiscoDevNet/csmp-agent-lib) to complete your setup and connect to FND.
+
 
 > [!IMPORTANT]  
->At the time of writing this guide, the CSMP Agent port to FreeRTOS pull request is still open and not yet approved. If you can't find the folder **Vendors/Silabs** on the main branch please check the open pull requests.
+>At the time of writing this guide, the Silicon Labs EFR32 Wi-SUN platforms support pull request on the [CSMP Agent library](https://github.com/CiscoDevNet/csmp-agent-lib) is still open and not yet approved. If you can't find the folder **Vendors/Silabs** on the main branch please check the open pull requests.
 
