@@ -79,7 +79,7 @@
 #include "sl_string.h"
 #include "app_rtt_traces.h"
 
-#if (SL_WISUN_VERSION_MAJOR > 2) || ((SL_WISUN_VERSION_MAJOR == 1) && (SL_WISUN_VERSION_MINOR > 8))
+#if (SL_WISUN_VERSION_MAJOR >= 2) || ((SL_WISUN_VERSION_MAJOR == 1) && (SL_WISUN_VERSION_MINOR > 8))
        // API_ABOVE_1_8
 #include "sl_wisun_trace_util.h"
 #else  /* API_ABOVE_1_8 */
@@ -283,7 +283,7 @@ bool _check_app_statistics_reset  (
   return false;
 }
 
-//#define   COAP_APP_STATISTICS
+#define   COAP_APP_STATISTICS
 #ifdef    COAP_APP_STATISTICS
 sl_wisun_coap_packet_t * coap_callback_join_states_sec (
       const  sl_wisun_coap_packet_t *const req_packet)  {

@@ -22,18 +22,24 @@ source:
 - {path: app_coap.c}
 - {path: app.c}
 - {path: app_init.c}
+- {path: app_list_configs.c}
 - {path: app_rtt_traces.c}
+- {path: app_tcp_server.c}
 - {path: app_timestamp.c}
+- {path: app_udp_server.c}
 - {path: main.c}
 include:
-- path: ''
+- path: .
   file_list:
   - {path: app_check_neighbors.h}
   - {path: app_coap.h}
   - {path: app.h}
   - {path: app_init.h}
+  - {path: app_list_configs.h}
   - {path: app_rtt_traces.h}
+  - {path: app_tcp_server.h}
   - {path: app_timestamp.h}
+  - {path: app_udp_server.h}
 component:
 - {id: radio_config_brd_wisun_singlephy}
 - {id: slist}

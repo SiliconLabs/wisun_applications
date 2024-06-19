@@ -37,7 +37,6 @@
 //                                   Includes
 // -----------------------------------------------------------------------------
 #include <stdio.h>
-#include <stdint.h>
 #include <assert.h>
 #include "app.h"
 #include "sl_wisun_api.h"
@@ -46,7 +45,7 @@
 
 #ifdef    SL_CATALOG_WISUN_APP_CORE_PRESENT
   #include "sl_wisun_app_core_util.h"
-  #if (SL_WISUN_VERSION_MAJOR > 2) || ((SL_WISUN_VERSION_MAJOR == 1) && (SL_WISUN_VERSION_MINOR > 8))
+  #if (SL_WISUN_VERSION_MAJOR >= 2) || ((SL_WISUN_VERSION_MAJOR == 1) && (SL_WISUN_VERSION_MINOR > 8))
          // API_ABOVE_1_8
     #include "sl_wisun_trace_util.h"
   #else  /* API_ABOVE_1_8 */
@@ -259,6 +258,20 @@ void sl_wisun_on_event(sl_wisun_evt_t *evt)
 }
 #endif
 
+#define TRACES_WHILE_CONNECTING \
+    app_set_all_traces(SL_WISUN_TRACE_LEVEL_DEBUG, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_ERROR, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_TIM_SRV, SL_WISUN_TRACE_LEVEL_ERROR, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true);
+
+#define TRACES_WHEN_CONNECTED \
+    app_set_all_traces(SL_WISUN_TRACE_LEVEL_DEBUG, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_ERROR, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_TIM_SRV, SL_WISUN_TRACE_LEVEL_ERROR, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true);
+
 /* App task function*/
 void app_task(void *args)
 {
@@ -281,11 +294,7 @@ void app_task(void *args)
   printfBothTime("%s\n", SL_BOARD_NAME);
   printfBothTime("%s\n", application);
   printfBothTime("%s\n", version);
-  app_set_all_traces(SL_WISUN_TRACE_LEVEL_DEBUG, true);
-  app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true);
-  app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_ERROR, true);
-  app_set_trace(SL_WISUN_TRACE_GROUP_TIM_SRV, SL_WISUN_TRACE_LEVEL_ERROR, true);
-  app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true);
+  TRACES_WHILE_CONNECTING;
 
 #ifdef    HISTORY
   snprintf(history_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE, "%s", "");
@@ -367,11 +376,7 @@ void app_task(void *args)
   *******************************************/
 
   // Once connected for the first time, reduce RTT traces to the minimum
-  app_set_all_traces(SL_WISUN_TRACE_LEVEL_WARN, true);
-  app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true);
-  app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_ERROR, true);
-  app_set_trace(SL_WISUN_TRACE_GROUP_TIM_SRV, SL_WISUN_TRACE_LEVEL_ERROR, true);
-  app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true);
+  TRACES_WHEN_CONNECTED;
 
   // Get ready to listen to and send notifications to the Border Router
   //  also get ready for CoAP communication
@@ -536,7 +541,7 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
 
   join_state = (sl_wisun_join_state_t)evt->evt.join_state.join_state;
   if (join_state >  SL_WISUN_JOIN_STATE_OPERATIONAL) {
-      // Do not process intermediate join states, whose values ar > 5
+      // Do not process intermediate join states, whose values are > 5
       return;
   }
   if (join_state != previous_join_state) {
@@ -574,7 +579,7 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
         _print_and_send_messages (_connection_json_string(""),
             with_time, to_console, to_rtt, to_udp, to_coap);
       }
-      app_set_all_traces(SL_WISUN_TRACE_LEVEL_WARN, true);
+      TRACES_WHEN_CONNECTED;
     }
     // Prepare counting disconnected time
     if (previous_join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
@@ -591,10 +596,8 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
 #ifdef    HISTORY
       APPEND_TO_HISTORY(" (%d) %s /", join_state , now_str());
 #endif /* HISTORY */
-      app_set_all_traces(SL_WISUN_TRACE_LEVEL_DEBUG, true);
-      app_set_trace(SL_WISUN_TRACE_GROUP_RF  , SL_WISUN_TRACE_LEVEL_INFO, true);
-      app_set_trace(SL_WISUN_TRACE_GROUP_FHSS, SL_WISUN_TRACE_LEVEL_INFO, true);
       just_disconnected = true;
+      TRACES_WHILE_CONNECTING;
     }
     previous_join_state = join_state;
   }
@@ -619,10 +622,13 @@ char* _connection_json_string () {
   #define CONNECTION_JSON_FORMAT_STR                   \
     START_JSON                                         \
     DEVICE_PARENT_RUNNING_JSON                         \
+    "\"PAN_ID\": \"0x%04x (%d)\",\n"                   \
     "\"join_states_sec\":[%llu,%llu,%llu,%llu,%llu]\n" \
     END_JSON
 
   char sec_string[20];
+  sl_wisun_network_info_t network_info;
+  sl_wisun_get_network_info(&network_info);
   sprintf(sec_string, "%s", now_str());
   refresh_parent_tag();
 
@@ -632,6 +638,7 @@ char* _connection_json_string () {
     CHIP,
     parent_tag,
     sec_string,
+    network_info.pan_id, network_info.pan_id,
     app_join_state_delay_sec[1],
     app_join_state_delay_sec[2],
     app_join_state_delay_sec[3],
@@ -722,13 +729,13 @@ sl_status_t _select_destinations(void) {
   printfBothTime("UDP_NOTIFICATION_DEST: %s\n", UDP_NOTIFICATION_DEST);
   sl_wisun_stoip6(UDP_NOTIFICATION_DEST, strlen(UDP_NOTIFICATION_DEST), udp_notification_sockaddr_in6.sin6_addr.address);
   sl_wisun_ip6tos(udp_notification_sockaddr_in6.sin6_addr.address, udp_notification_ipv6_string);
-  printfBothTime("UDP  Notification destination: %s/%5d\n" , udp_notification_ipv6_string, udp_notification_sockaddr_in6.sin6_port);
+  printfBothTime("UDP  Notification destination: %s/%5d\n" , udp_notification_ipv6_string, UDP_NOTIFICATION_PORT);
 
   // Set the CoAP notification destination
   printfBothTime("COAP_NOTIFICATION_DEST: %s\n", COAP_NOTIFICATION_DEST);
   sl_wisun_stoip6(COAP_NOTIFICATION_DEST   , strlen(COAP_NOTIFICATION_DEST), coap_notification_sockaddr_in6.sin6_addr.address);
   sl_wisun_ip6tos(coap_notification_sockaddr_in6.sin6_addr.address, coap_notification_ipv6_string);
-  printfBothTime("COAP Notification destination: %s/%5d\n"  , coap_notification_ipv6_string, coap_notification_sockaddr_in6.sin6_port);
+  printfBothTime("COAP Notification destination: %s/%5d\n"  , coap_notification_ipv6_string, COAP_NOTIFICATION_PORT);
 
   return ret;
 }
@@ -741,20 +748,30 @@ sl_status_t _open_udp_sockets(void){
   // UDP Notifications (autonomously sent by the device)
   udp_notification_socket_id = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
   ret =(udp_notification_socket_id == SOCKET_INVALID_ID) ? 1 : 0;
-  NO_ERROR(ret, "Opened    the UDP  notification socket (id %ld)\n", udp_notification_socket_id);
+  NO_ERROR(ret, "Opened    the UDP  notification socket (id %d)\n", (int)udp_notification_socket_id);
   IF_ERROR_RETURN(ret, "[Failed: unable to open the UDP notification socket]\n");
 
   udp_notification_sockaddr_in6.sin6_family = AF_INET6;
+#if (SL_WISUN_VERSION_MAJOR >= 2)
+       // API_2.+
+  udp_notification_sockaddr_in6.sin6_port = htons(UDP_NOTIFICATION_PORT);
+#else  /* API_2.+ */
   udp_notification_sockaddr_in6.sin6_port = UDP_NOTIFICATION_PORT;
+#endif /* API_2.+ */
 
   // (UDP) CoAP Notifications (autonomously sent by the device)
   ret = coap_notification_socket_id = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
   ret =(coap_notification_socket_id == SOCKET_INVALID_ID) ? 1 : 0;
-  NO_ERROR(ret, "Opened    the COAP notification socket (id %ld)\n", coap_notification_socket_id);
+  NO_ERROR(ret, "Opened    the COAP notification socket (id %d)\n", (int)coap_notification_socket_id);
   IF_ERROR_RETURN(ret, "[Failed: unable to open the COAP notification socket]\n");
 
   coap_notification_sockaddr_in6.sin6_family = AF_INET6;
+#if (SL_WISUN_VERSION_MAJOR >= 2)
+       // API_2.+
+  coap_notification_sockaddr_in6.sin6_port = htons(COAP_NOTIFICATION_PORT);
+#else  /* API_2.+ */
   coap_notification_sockaddr_in6.sin6_port = COAP_NOTIFICATION_PORT;
+#endif /* API_2.+ */
   coap_notify_ch.sockid = coap_notification_socket_id;
   coap_notify_ch.addr = coap_notification_sockaddr_in6;
 
@@ -804,6 +821,7 @@ sl_status_t _coap_notify(char* json_string)
                   0,
                   (const struct sockaddr *) &coap_notification_sockaddr_in6,
                   sizeof(sockaddr_in6_t)) == -1) {
+          printfBothTime("_coap_notify() error on line %d: sendto(%ld)\n", __LINE__, coap_notify_ch.sockid);
           ret = SL_STATUS_TRANSMIT;
       }
   }
@@ -842,8 +860,8 @@ uint8_t _print_and_send_messages (char *in_msg, bool with_time,
                 0L,
                 (const struct sockaddr *) &udp_notification_sockaddr_in6,
                 sizeof(sockaddr_in6_t)) == -1) {
-      printfBothTime("\n[Failed (line %d): unable to send to the UDP notification socket (%ld %s/%d)] udp_msg_len %d\n", __LINE__,
-              udp_notification_socket_id, udp_notification_ipv6_string , UDP_NOTIFICATION_PORT, udp_msg_len);
+      printfBothTime("\n[Failed (line %d): unable to send to the UDP notification socket (%d %s/%d)] udp_msg_len %d\n", __LINE__,
+              (int)udp_notification_socket_id, udp_notification_ipv6_string , UDP_NOTIFICATION_PORT, udp_msg_len);
     } else {
       messages_processed++;
     }
@@ -855,8 +873,8 @@ uint8_t _print_and_send_messages (char *in_msg, bool with_time,
                 coap_msg_len, SL_WISUN_STATUS_JSON_STR_MAX_LEN);
     } else {
       ret = _coap_notify(coap_msg);
-      IF_ERROR(ret, "[Failed (line %d): unable to send to the CoAP notification socket (%ld %s/%d): 0x%04x. Check sl_status.h]\n", __LINE__,
-              coap_notification_socket_id, coap_notification_ipv6_string, COAP_NOTIFICATION_PORT, (uint16_t)ret);
+      IF_ERROR(ret, "[Failed (line %d): unable to send to the CoAP notification socket (%d %s/%d): 0x%04x. Check sl_status.h]\n", __LINE__,
+              (int)coap_notification_socket_id, coap_notification_ipv6_string, COAP_NOTIFICATION_PORT, (uint16_t)ret);
       if (ret == SL_STATUS_OK) messages_processed++;
     }
   }

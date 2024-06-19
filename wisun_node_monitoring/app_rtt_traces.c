@@ -34,7 +34,7 @@
 *
 ******************************************************************************/
 #include "app_rtt_traces.h"
-#include "sl_malloc.h"
+#include "sl_memory_manager.h"
 
 sl_status_t app_set_all_traces(uint8_t trace_level, bool verbose) {
   sl_status_t ret;
