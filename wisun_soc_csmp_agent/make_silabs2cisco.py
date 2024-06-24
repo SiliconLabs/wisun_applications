@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 
 import sys
+import os
 import re
 from pathlib import Path
 
 
 if __name__ == '__main__':
-    
+    abspath = os.path.abspath(__file__)
+    dname = os.path.dirname(abspath)
+    os.chdir(dname)
+
     destination_file = r"efr32_wisun.mak"
     
     # Find and validate the silabs makefile
