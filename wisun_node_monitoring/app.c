@@ -359,8 +359,10 @@ void app_task(void *args)
 
   // Store the time where we call app_wisun_connect_and_wait()
   connect_time_sec = now_sec();
+#ifdef    AUTO_CLEAR_CREDENTIAL_CACHE
   sl_wisun_clear_credential_cache();
   printfBothTime("Cleared credential cache\n");
+#endif /* AUTO_CLEAR_CREDENTIAL_CACHE */
 
 #ifdef    LIST_RF_CONFIGS
   list_rf_configs();

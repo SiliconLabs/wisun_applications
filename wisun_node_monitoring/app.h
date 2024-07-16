@@ -46,6 +46,13 @@
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
+#ifndef    SL_BOARD_NAME
+  /* For Custom boards:
+   *   We recommend setting this to the company-internal board name
+   */
+  #define  SL_BOARD_NAME "Custom_Board"
+#endif /*  SL_BOARD_NAME */
+
 #define DEFINE_string(s)   #s
 
 #define HISTORY

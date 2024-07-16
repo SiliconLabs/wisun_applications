@@ -46,7 +46,7 @@ if "ipv6" in nodes[0][1]:
 else:
     # D-BUS API >= 2.0
     topology = proxy.RoutingGraph
-    for node in topology:
+    for node in topology[1:]:
         ipv6 = bytes(node[0]).hex()
         print(prettyIPv6(ipv6))
 

@@ -32,6 +32,7 @@ do
         # New IPv6
         ipv6_=$(echo $ipv6  | sed -r "s/::/_0_/g")
         ipv6_=$(echo $ipv6_ | sed -r "s/:/_/g")
+        ipv6_=$(echo $ipv6_ | sed -r "s/_0_/__/g")
         device_path="${monitoring_path}/${ipv6_}"
         if [ ! -d "${device_path}" ]; then
           mkdir "${device_path}"
@@ -51,6 +52,7 @@ do
         # Lost IPv6
         ipv6_=$(echo $ipv6  | sed -r "s/::/_0_/g")
         ipv6_=$(echo $ipv6_ | sed -r "s/:/_/g")
+        ipv6_=$(echo $ipv6_ | sed -r "s/_0_/__/g")
         device_path="${monitoring_path}/${ipv6_}"
         if [ ! -d "${device_path}" ]; then
           mkdir "${device_path}"
@@ -61,7 +63,7 @@ do
     done
 
   else
-    echo -n -e "\r[${now_string}] no change"
+    echo -n -e "\r[${now_string}] no change\r"
   fi
 
   previous_ipv6s=${current_ipv6s}

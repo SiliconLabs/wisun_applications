@@ -34,7 +34,16 @@
 *
 ******************************************************************************/
 #include "app_rtt_traces.h"
+
+#include "sl_wisun_version.h"
+
 #include "sl_memory_manager.h"
+#if (SL_WISUN_VERSION_MAJOR >= 2)
+         // API_ABOVE_2_0
+  #include "sl_memory_manager.h"
+#else  /* API_ABOVE_1_8 */
+    #include "malloc.h"
+#endif /* API_ABOVE_1_8 */
 
 sl_status_t app_set_all_traces(uint8_t trace_level, bool verbose) {
   sl_status_t ret;
