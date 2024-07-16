@@ -132,7 +132,11 @@ To be used as documented below:
 
 | Name | Language | Usage | Call | Result |
 |------|----------|-------|------|--------|
-| `coap_all` | bash | `coap_all <coap_uri> [-e <coap_payload>]` example:  `coap_all /status/all` | Sending a CoAP request (default `/.well-known/core`) to all connected devices | Recursive response to `coap-client -m get -N -B 3 coap://[${ipv6}]:5683${coap_uri} ${coap_payload}` |
+| `coap_all`                             | bash | `coap_all <coap_uri>` example:  `coap_all /status/all`     | Sending a CoAP **GET** request (default `/.well-known/core`) to all connected devices | Recursive response to `coap-client -m get -N -B 3 coap://[${ipv6}]:5683${coap_uri}`|
+| `coap_all -e <single_argument>`        | bash | `coap_all <coap_uri> -e <arg>` example:  `coap_all /ota/dfu -e gbl` | Sending a CoAP **GET** request to all connected devices for the `<single_argument_payload>` | Recursive response to `coap-client -m get -N -B 3 coap://[${ipv6}]:5683${coap_uri} -e <single_argument> |
+| `coap_all -e <first_arg> <second_arg>` | bash | `coap_all <coap_uri> -e <arg1> <arg2>` example:  `coap_all /ota/dfu -e gbl version_2.gbl` | Sending a CoAP **POST** request to all connected devices to set the `<first_arg>` to `<second_arg>` | Recursive response to `coap-client -m get -N -B 3 coap://[${ipv6}]:5683${coap_uri} -e <first_argument> <second_arg>` |
+
+> NB: `coap_all` traces all individual commands, such that the user can copy/paste them and execute a single command if need be.
 
 ## Testing
 
