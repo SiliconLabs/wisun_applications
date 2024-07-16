@@ -14,6 +14,9 @@ rcv_port = int(sys.argv[1])
 
 newline = " "
 
+now = datetime.datetime.now()
+now_str = str(now.strftime('%Y-%m-%d %H:%M:%S'))
+
 if (len(sys.argv) > 2):
   newline = sys.argv[2]
   space = ""
@@ -23,15 +26,24 @@ if (len(sys.argv) > 3):
 else:
   monitoring_path = False
 
+if (len(sys.argv) > 4):
+  logfile = sys.argv[4]
+  # Redirect sys.stdout to the file
+  print(f"[{now_str}] Logging to {logfile}")
+  sys.stdout = open(logfile, 'w')
+  print(f"[{now_str}] Logging to {logfile}")
+else:
+  logfile = None
+
 PORT = rcv_port # Port used by the peer
 
 sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
 sock.bind((HOST_IP, PORT))
 
-print(f"Receiving on {HOST_IP}/{PORT}...")
+print(f"[{now_str}] Receiving on {HOST_IP}/{PORT}...", flush=True)
 
 if monitoring_path:
-  print(f"monitoring path '{monitoring_path}'")
+  print(f"[{now_str}] monitoring path '{monitoring_path}'", flush=True)
   if not os.path.isdir(monitoring_path):
     os.mkdir(monitoring_path)
 
@@ -44,9 +56,9 @@ while True:
   try:
     message_string = data.decode("utf-8").replace(" ", space).replace("\n", newline)
   except Exception as e:
-    print(f"Exception {e} (from {addr})")
+    print(f"Exception {e} (from {addr})", flush=True)
 
-  print (f"[{now_str}] Rx {PORT}: {newline}", message_string)
+  print (f"[{now_str}] Rx {PORT}: {newline}", message_string, flush=True)
 
   if monitoring_path:
     try:

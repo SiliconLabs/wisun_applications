@@ -4,7 +4,7 @@ The following bash and Python scripts are convenient to more easily manage `wsbr
 To be used as documented below:
 
 - Make sure they are all set as executable using `chmod a+x *.*`
-- Accessible from anywhere by adding `export PATH=$PATH:~/wisun_applications_staging/wisun_node_monitoring/linux_border_router_wsbrd/` at the end of ` ~/.bashrc`
+- Accessible from anywhere by adding `export PATH=$PATH:~/wisun_applications/wisun_node_monitoring/linux_border_router_wsbrd/` at the end of ` ~/.bashrc`
 
 > Use the `--help` option or check the scripts code for more details.
 
@@ -45,10 +45,13 @@ To be used as documented below:
 
 | Name | Language | Usage | Call | Result |
 |------|----------|-------|------|--------|
-| `wsbrd_enable.sh`  | bash | Allow wsbrd as a service | `wsbrd_enable.sh` | Necessary to start wsbrd from the GUI || `wsbrd_restart.sh` | bash | Start/Restart wsbrd as a service | `~/wsbrd_restart.sh` | Useful to test wsbrd start/restart |
+| `wsbrd_enable.sh`  | bash | Allow wsbrd as a service | `wsbrd_enable.sh` | Necessary to start wsbrd from the GUI |
+| `wsbrd_restart.sh` | bash | Start/Restart wsbrd as a service | `~/wsbrd_restart.sh` | Useful to test wsbrd start/restart |
 | `wsbrd_disable.sh` | bash | Stop wsbrd (if started as a service) | `wsbrd_disable.sh` | Useful to test wsbrd restart |
 | `wsbrd_restart.sh` | bash | Start/Restart wsbrd as a service | `wsbrd_restart.sh` | wsbrd restart if access from D-Bus (which is the case using `wsbrd_cli` or the GUI)! |
 | `wsbrd_stop.sh`    | bash | Temporarily stop wsbrd as a service | `wsbrd_stop.sh` | wsbrd restarts if access from D-Bus (which is the case using `wsbrd_cli` or the GUI)! |
+| `wsbrd_status.sh`  | bash | Check status of wsbrd as a service | `wsbrd_status.sh` | wsbrd status is printed |
+| `wsbrd_manual_start.sh` | bash | Start wsbrd NOT as a service | `wsbrd_manual_start.sh` | wsbrd is started using the same command as in the service file. Convenient to check proper startup and get immediate access to traces. Requires stopping 'wsbrd as a service' first |
 
 ### `wsbrd` Storage/Cache check and cleanup
 
@@ -104,7 +107,6 @@ To be used as documented below:
 | `UDP_sender_client.py`   | Python | Use UDP to send a text message to the destination(s) | `UDP_sender_client.py <IPv6> <port> "<message>"` | Message send to Wi-SUN node (UDP = Multicast compatible) |
 | `UDP_notification_receiver.py`| Python | Listen to UDP incoming messages | `UDP_notification_receiver.py <port> <separator>` | Message sent to the UDP notification port are traced |
 
-
 ## TFTP control and checks
 
 | Name | Language | Usage | Call | Result |
@@ -130,7 +132,11 @@ To be used as documented below:
 
 | Name | Language | Usage | Call | Result |
 |------|----------|-------|------|--------|
-| `coap_all` | bash | `coap_all <coap_uri> [-e <coap_payload>]` example:  `coap_all /status/all` | Sending a CoAP request (default `/.well-known/core`) to all connected devices | Recursive response to `coap-client -m get -N -B 3 coap://[${ipv6}]:5683${coap_uri} ${coap_payload}` |
+| `coap_all`                             | bash | `coap_all <coap_uri>` example:  `coap_all /status/all`     | Sending a CoAP **GET** request (default `/.well-known/core`) to all connected devices | Recursive response to `coap-client -m get -N -B 3 coap://[${ipv6}]:5683${coap_uri}`|
+| `coap_all -e <single_argument>`        | bash | `coap_all <coap_uri> -e <arg>` example:  `coap_all /ota/dfu -e gbl` | Sending a CoAP **GET** request to all connected devices for the `<single_argument_payload>` | Recursive response to `coap-client -m get -N -B 3 coap://[${ipv6}]:5683${coap_uri} -e <single_argument> |
+| `coap_all -e <first_arg> <second_arg>` | bash | `coap_all <coap_uri> -e <arg1> <arg2>` example:  `coap_all /ota/dfu -e gbl version_2.gbl` | Sending a CoAP **POST** request to all connected devices to set the `<first_arg>` to `<second_arg>` | Recursive response to `coap-client -m get -N -B 3 coap://[${ipv6}]:5683${coap_uri} -e <first_argument> <second_arg>` |
+
+> NB: `coap_all` traces all individual commands, such that the user can copy/paste them and execute a single command if need be.
 
 ## Testing
 

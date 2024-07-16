@@ -29,7 +29,7 @@ def prettyIPv6(ipv6):
     ipv6 = re.sub("0000:", ":", ipv6)
     ipv6 = re.sub(":{2,}", "::", ipv6)
     return ipv6
-    
+
 if "ipv6" in nodes[0][1]:
     # D-BUS API < 2.0
     for node in nodes:
@@ -46,7 +46,8 @@ if "ipv6" in nodes[0][1]:
 else:
     # D-BUS API >= 2.0
     topology = proxy.RoutingGraph
-    for node in topology:
+    for node in topology[1:]:
+        # Skip over the first IPv6, which is the tun0 IPv6
         ipv6 = bytes(node[0]).hex()
         print(prettyIPv6(ipv6))
 
