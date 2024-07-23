@@ -1,9 +1,9 @@
-<table style="border: none; border-collapse: collapse;">
+<table style="border: none; border-collapse: collapse;" align="center">
   <tr>
     <td align="center" valign="middle" style="border: none;">
-      <h1>Wi-SUN - SoC CSMP Agent Projects</h1>
+      <h1>Wi-SUN - SoC CSMP Agent Skeleton</h1>
       <a href="https://www.silabs.com/wireless/wi-sun">
-        <img src="https://docs.silabs.com/dsc-assets/icons/docspace/icon-wisun-blue.svg"  title="Wi-SUN" alt="Wi-SUN Logo" width="100" />
+        <img src="https://silabs.scene7.com/is/image/siliconlabs/wi-sun-color?$TransparentPNG$"  title="Wi-SUN" alt="Wi-SUN Logo" width="250" />
       </a>
     </td>
     <td align="center" valign="middle" style="border: none;">
@@ -17,7 +17,7 @@
 
 # Summary
 
-This readme covers the steps needed to get started using the two projects **Wi-SUN - SoC CSMP Agent Sample Application** that can be built using Simplicity Studio and the **Wi-SUN - SoC CSMP Agent Skeleton** that can be built using the [csmp-agent-lib](https://github.com/CiscoDevNet/csmp-agent-lib) build system to allow a Wi-SUN node to connect to FND.
+This readme covers the steps needed to get started using the project the **Wi-SUN - SoC CSMP Agent Skeleton** that can be built using the [csmp-agent-lib](https://github.com/CiscoDevNet/csmp-agent-lib) build system to allow a Wi-SUN node to connect to FND.
 
 # Requirements
 
@@ -43,11 +43,6 @@ To install the Simplicity SDK Suit follow this [**procedure**](https://docs.sila
 If this step is not done already, follow the steps listed under [Add the Wi-SUN applications repository to Simplicity Studio 5](../README.md#add-the-wi-sun-applications-repository-to-simplicity-studio-5) section to add the projects to Simplicity Studio.
 
 # Start the Example
-
-## Wi-SUN - SoC CSMP Agent Sample Application
-
-1. Create the project by following the steps listed under [Create the Wi-SUN applications example projects](../README.md#create-the-wi-sun-applications-example-projects) section.
-2. Refer to the folder **Vendors/Silabs** on the [CSMP Agent library](https://github.com/CiscoDevNet/csmp-agent-lib) to complete your setup and connect to FND.
 
 ## Wi-SUN - SoC CSMP Agent Skeleton
 
