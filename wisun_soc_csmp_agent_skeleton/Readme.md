@@ -42,9 +42,7 @@ To install the Simplicity SDK Suit follow this [**procedure**](https://docs.sila
 
 If this step is not done already, follow the steps listed under [Add the Wi-SUN applications repository to Simplicity Studio 5](../README.md#add-the-wi-sun-applications-repository-to-simplicity-studio-5) section to add the projects to Simplicity Studio.
 
-# Start the Example
-
-## Wi-SUN - SoC CSMP Agent Skeleton
+# Project creation
 
 1. Create the project by following the steps listed under [Create the Wi-SUN applications example projects](../README.md#create-the-wi-sun-applications-example-projects) section. 
 2. In the **project configuration** perspective, select the **Copy Contents** option and click **Finish**. This step is very important to build the project successfully. 
