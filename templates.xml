@@ -2,16 +2,16 @@
 <model:MDescriptors xmlns:model="http://www.silabs.com/ss/Studio.ecore">
   <descriptors name="wisun_node_monitoring" label="Wi-SUN Node Monitoring Application" description="This node monitoring example project provides a CoAP application to monitor Wi-SUN devices and update them using OTA DFU. It can be expanded to retrieve sensor values and set actuators">
     <properties key="namespace" value="template.uc"/>
+    <properties key="solutionReferenceId" value="app.wisun.example.wisun_node_monitoring.wisun_node_monitoring.slcp"/>
     <properties key="projectFilePaths" value="wisun_node_monitoring/wisun_node_monitoring.slcp"/>
     <properties key="readmeFiles" value="wisun_node_monitoring/README.md"/>
-    <properties key="boardCompatibility" value="brd2705a brd4163a brd4164a brd4170a  brd4253a brd4254a brd4270b brd4271a brd4272a brd4400c brd4401a brd4401b brd4401c com.silabs.board.none"/>
-    <properties key="partCompatibility" value=".*efr32mg12.* .*efr32fg25.* .*efr32zg28.* "/>
-    <properties key="ideCompatibility" value="simplicity-ide"/>
+    <properties key="boardCompatibility" value="brd2705a brd4270a brd4163a brd4164a brd4170a brd4253a brd4254a brd4270b brd4271a brd4272a brd4400a brd4400b brd4400c brd4401a brd4401b brd4401c com.silabs.board.none"/>
+    <properties key="partCompatibility" value=".*efr32mg12.* .*efr32fg28.* .*efr32fg25.* .*efr32zg28.* "/>
+    <properties key="ideCompatibility" value="generic-template makefile-ide simplicity-ide visual-studio-code"/>
     <properties key="toolchainCompatibility" value="gcc"/>
-    <properties key="category" value="Example|Wi-SUN"/>
-    <properties key="quality" value="EXPERIMENTAL"/>
-    <properties key="deviceType" value="SoC"/>
-    <properties key="projectDifficulty" value="Beginner"/>
+    <properties key="category" value="Wi-SUN Examples"/>
+    <properties key="quality" value="PRODUCTION"/>
+    <properties key="filters" value="Device\ Type|SoC Project\ Difficulty|Beginner Wireless\ Technology|Wi-SUN"/>
   </descriptors>
   <descriptors name="wisun_soc_csmp_agent" label="Wi-SUN - SoC Csmp Agent Sample" description="The Wi-SUN Csmp Agent Sample application demonstrates Cisco CsmpAgent Library support by Wi-SUN Sample applications">
     <properties key="namespace" value="template.uc"/>
