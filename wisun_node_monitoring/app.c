@@ -42,6 +42,7 @@
 #include "sl_wisun_api.h"
 #include "sl_wisun_version.h"
 #include "sl_string.h"
+#include "sl_memory_manager.h"
 
 #ifdef    SL_CATALOG_WISUN_APP_CORE_PRESENT
   #include "sl_wisun_app_core_util.h"
@@ -554,13 +555,15 @@ sl_wisun_mac_address_t _get_parent_mac_address(void) {
   uint8_t i;
   sl_wisun_neighbor_info_t neighbor_info;
   sl_wisun_mac_address_t   mac_address;
+  sl_wisun_mac_address_t *neighbor_mac_addresses = NULL;
   for ( i = 0 ; i<  SL_WISUN_MAC_ADDRESS_SIZE ; i++) {
       mac_address.address[i] = 0;
   }
 
   ret = sl_wisun_get_neighbor_count(&neighbor_count);
   if (ret) printf("[Failed: sl_wisun_get_neighbor_count() returned 0x%04x]\n", (uint16_t)ret);
-  sl_wisun_mac_address_t neighbor_mac_addresses[neighbor_count];
+  neighbor_mac_addresses = sl_malloc(sizeof(sl_wisun_mac_address_t) * neighbor_count);
+  if (!neighbor_mac_addresses) return mac_address;
   ret = sl_wisun_get_neighbors(&neighbor_count, neighbor_mac_addresses);
   if (ret) printf("[Failed: sl_wisun_get_neighbors() returned 0x%04x]\n", (uint16_t)ret);
   for (i = 0 ; i < neighbor_count; i++) {
@@ -570,6 +573,7 @@ sl_wisun_mac_address_t _get_parent_mac_address(void) {
         break;
       }
   }
+  sl_free(neighbor_mac_addresses);
   return mac_address;
 }
 

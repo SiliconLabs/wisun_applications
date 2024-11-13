@@ -34,6 +34,7 @@
 * This code will not be maintained.
 *
 ******************************************************************************/
+#include "sl_memory_manager.h"
 #include "app_check_neighbors.h"
 
 extern char json_string[];
@@ -78,13 +79,15 @@ uint8_t app_get_neighbor_info(sl_wisun_neighbor_type_t neighbor_type,
   sl_status_t ret;
   uint8_t neighbor_count;
   uint8_t i;
+  sl_wisun_mac_address_t *neighbor_mac_addresses = NULL;
 
   ret = sl_wisun_get_neighbor_count(&neighbor_count);
   if (ret) printf("[Failed: sl_wisun_get_neighbor_count() returned 0x%04x]\n", (uint16_t)ret);
 
   if (neighbor_count == 0) return 0;
 
-  sl_wisun_mac_address_t neighbor_mac_addresses[neighbor_count];
+  neighbor_mac_addresses = sl_malloc(sizeof(sl_wisun_mac_address_t) * neighbor_count);
+  if (!neighbor_mac_addresses) return 0;
   ret = sl_wisun_get_neighbors(&neighbor_count, neighbor_mac_addresses);
   if (ret) printf("[Failed: sl_wisun_get_neighbors() returned 0x%04x]\n", (uint16_t)ret);
 
@@ -95,6 +98,7 @@ uint8_t app_get_neighbor_info(sl_wisun_neighbor_type_t neighbor_type,
         *index = i;
         sprintf(tag, "%02x%02x", neighbor_mac_addresses[i].address[6],
                                  neighbor_mac_addresses[i].address[7]);
+        sl_free(neighbor_mac_addresses);
         return 1;
       }
     }
@@ -103,9 +107,11 @@ uint8_t app_get_neighbor_info(sl_wisun_neighbor_type_t neighbor_type,
       sl_wisun_get_neighbor_info(&neighbor_mac_addresses[*index], neighbor_info);
       sprintf(tag, "%02x%02x", neighbor_mac_addresses[*index].address[6],
                                neighbor_mac_addresses[*index].address[7]);
+      sl_free(neighbor_mac_addresses);
       return 1;
     }
   }
+  sl_free(neighbor_mac_addresses);
   return 0;
 }
 
@@ -133,6 +139,7 @@ char * app_neighbor_info_str(uint8_t index) {
   sl_status_t ret;
   uint8_t neighbor_count;
   sl_wisun_neighbor_info_t neighbor_info;
+  sl_wisun_mac_address_t *neighbor_mac_addresses = NULL;
 
   ret = sl_wisun_get_neighbor_count(&neighbor_count);
   if (ret) printf("[Failed: sl_wisun_get_neighbor_count() returned 0x%04x]\n", (uint16_t)ret);
@@ -140,13 +147,15 @@ char * app_neighbor_info_str(uint8_t index) {
   if (neighbor_count == 0)     return "";
   if (index >= neighbor_count) return "";
 
-  sl_wisun_mac_address_t neighbor_mac_addresses[neighbor_count];
+  neighbor_mac_addresses = sl_malloc(sizeof(sl_wisun_mac_address_t) * neighbor_count);
+  if (!neighbor_mac_addresses) return "";
   ret = sl_wisun_get_neighbors(&neighbor_count, neighbor_mac_addresses);
   if (ret) printf("[Failed: sl_wisun_get_neighbors() returned 0x%04x]\n", (uint16_t)ret);
 
   ret = sl_wisun_get_neighbor_info(&neighbor_mac_addresses[index], &neighbor_info);
   sprintf(tag, "%02x%02x", neighbor_mac_addresses[index].address[6],
                            neighbor_mac_addresses[index].address[7]);
-
+  sl_free(neighbor_mac_addresses);
   return _neighbor_info_str(neighbor_info, index, tag);
 }
+;
