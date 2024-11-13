@@ -28,6 +28,7 @@ source:
 - {path: app_timestamp.c}
 - {path: app_udp_server.c}
 - {path: main.c}
+- {path: ../component/crash_handler/sl_wisun_crash_handler.c}
 include:
 - path: .
   file_list:
@@ -40,6 +41,9 @@ include:
   - {path: app_tcp_server.h}
   - {path: app_timestamp.h}
   - {path: app_udp_server.h}
+- path: ../component/crash_handler/
+  file_list:
+  - {path: sl_wisun_crash_handler.h}
 component:
 - {id: radio_config_brd_wisun_singlephy}
 - {id: slist}
@@ -63,6 +67,7 @@ component:
 - {id: sleeptimer}
 - {id: segger_rtt_printf}
 - {id: sl_wisun_app_core}
+- {id: emlib_rmu}
 configuration:
 - {name: SL_WISUN_COAP_RESOURCE_HND_MAX_RESOURCES, value: 30U}
 - {name: SL_WISUN_OTA_DFU_AUTO_INSTALL_ENABLED, value: 0U}
@@ -98,8 +103,13 @@ configuration:
 - condition: [sl_wisun_ota_dfu]
   name: SL_SOCKET_BUFFER_SIZE
   value: '532'
+- {name: SL_STACK_SIZE, value: '5120'}
 ui_hints:
   highlight:
   - {path: README.md, focus: true}
   - {path: config/wisun/wisun_settings.wisunconf}
-
+define:
+- {name: DEBUG_EFM_USER}
+toolchain_settings:
+  - option: gcc_linker_option
+    value: "-Wl,--wrap=__stack_chk_fail,--wrap=__assert_func"

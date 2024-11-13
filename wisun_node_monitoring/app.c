@@ -82,6 +82,7 @@
 #endif /* LIST_RF_CONFIGS */
 #include "sl_wisun_coap.h"
 #include "sl_wisun_coap_config.h"
+#include "sl_wisun_crash_handler.h"
 
 #include "app_coap.h"
 #include "app_check_neighbors.h"
@@ -279,11 +280,57 @@ void app_task(void *args)
   uint64_t now = 0;
   bool print_keep_alive = true;
   bool with_time, to_console, to_rtt, to_udp, to_coap;
+  const sl_wisun_crash_t *crash;
 
   app_timestamp_init();
 
   with_time = to_console = to_rtt = true;
   to_udp = to_coap = false;
+
+  crash = sl_wisun_crash_handler_read();
+  if (crash) {
+    printf("\n");
+    switch (crash->type) {
+      case SL_WISUN_CRASH_TYPE_ASSERT:
+        printf("[ASSERT in %s on line %u]\r\n", crash->u.assert.file,
+               crash->u.assert.line);
+        break;
+      case SL_WISUN_CRASH_TYPE_RAIL_ASSERT:
+        printf("[RAIL ASSERT %lu]\r\n", crash->u.rail_assert.error_code);
+        break;
+      case SL_WISUN_CRASH_TYPE_STACK_OVERFLOW:
+        printf("[STACK OVERFLOW failure in task \"%s\"]\r\n", crash->u.stack_overflow.task);
+        break;
+      case SL_WISUN_CRASH_TYPE_STACK_PROTECTOR:
+        printf("[STACK PROTECTOR failure in 0x%08lx]\r\n",
+               crash->u.stack_protector.lr);
+        break;
+      case SL_WISUN_CRASH_TYPE_FAULT:
+        printf("[FAULT CFSR: 0x%08lx\r\n", crash->u.fault.cfsr);
+        printf("R0: 0x%08lx, R1: 0x%08lx, R2: 0x%08lx, R3: 0x%08lx\r\n",
+               crash->u.fault.r0, crash->u.fault.r1,
+               crash->u.fault.r2, crash->u.fault.r3);
+        printf("R12: 0x%08lx, LR: 0x%08lx, RET: 0x%08lx, XPSR: 0x%08lx\r\n",
+               crash->u.fault.r12, crash->u.fault.lr,
+               crash->u.fault.return_address, crash->u.fault.xpsr);
+        printf("HFSR: 0x%08lx, MMFAR: 0x%08lx, BFAR: 0x%08lx, AFSR: 0x%08lx]\r\n",
+               crash->u.fault.hfsr, crash->u.fault.mmfar,
+               crash->u.fault.bfar, crash->u.fault.afsr);
+        break;
+      case SL_WISUN_CRASH_TYPE_CRUN_ERROR:
+        printf("[C-RUN error 0x%08lx]\r\n",
+               crash->u.crun_error.error_code);
+        break;
+      case SL_WISUN_CRASH_TYPE_EXIT:
+        printf("[EXIT status %d]\r\n",
+               crash->u.exit.status);
+        break;
+      default:
+        break;
+    }
+
+    sl_wisun_crash_handler_clear();
+  }
 
   printf("\n");
   sprintf(chip, "%s", CHIP);
