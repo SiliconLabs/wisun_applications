@@ -293,38 +293,38 @@ void app_task(void *args)
     printf("\n");
     switch (crash->type) {
       case SL_WISUN_CRASH_TYPE_ASSERT:
-        printf("[ASSERT in %s on line %u]\r\n", crash->u.assert.file,
-               crash->u.assert.line);
+        printfBoth("[ASSERT in %s on line %u]\r\n", crash->u.assert.file,
+                   crash->u.assert.line);
         break;
       case SL_WISUN_CRASH_TYPE_RAIL_ASSERT:
-        printf("[RAIL ASSERT %lu]\r\n", crash->u.rail_assert.error_code);
+        printfBoth("[RAIL ASSERT %lu]\r\n", crash->u.rail_assert.error_code);
         break;
       case SL_WISUN_CRASH_TYPE_STACK_OVERFLOW:
-        printf("[STACK OVERFLOW failure in task \"%s\"]\r\n", crash->u.stack_overflow.task);
+        printfBoth("[STACK OVERFLOW failure in task \"%s\"]\r\n", crash->u.stack_overflow.task);
         break;
       case SL_WISUN_CRASH_TYPE_STACK_PROTECTOR:
-        printf("[STACK PROTECTOR failure in 0x%08lx]\r\n",
-               crash->u.stack_protector.lr);
+        printfBoth("[STACK PROTECTOR failure in 0x%08lx]\r\n",
+                   crash->u.stack_protector.lr);
         break;
       case SL_WISUN_CRASH_TYPE_FAULT:
-        printf("[FAULT CFSR: 0x%08lx\r\n", crash->u.fault.cfsr);
-        printf("R0: 0x%08lx, R1: 0x%08lx, R2: 0x%08lx, R3: 0x%08lx\r\n",
-               crash->u.fault.r0, crash->u.fault.r1,
-               crash->u.fault.r2, crash->u.fault.r3);
-        printf("R12: 0x%08lx, LR: 0x%08lx, RET: 0x%08lx, XPSR: 0x%08lx\r\n",
-               crash->u.fault.r12, crash->u.fault.lr,
-               crash->u.fault.return_address, crash->u.fault.xpsr);
-        printf("HFSR: 0x%08lx, MMFAR: 0x%08lx, BFAR: 0x%08lx, AFSR: 0x%08lx]\r\n",
-               crash->u.fault.hfsr, crash->u.fault.mmfar,
-               crash->u.fault.bfar, crash->u.fault.afsr);
+        printfBoth("[FAULT CFSR: 0x%08lx\r\n", crash->u.fault.cfsr);
+        printfBoth("R0: 0x%08lx, R1: 0x%08lx, R2: 0x%08lx, R3: 0x%08lx\r\n",
+                   crash->u.fault.r0, crash->u.fault.r1,
+                   crash->u.fault.r2, crash->u.fault.r3);
+        printfBoth("R12: 0x%08lx, LR: 0x%08lx, RET: 0x%08lx, XPSR: 0x%08lx\r\n",
+                   crash->u.fault.r12, crash->u.fault.lr,
+                   crash->u.fault.return_address, crash->u.fault.xpsr);
+        printfBoth("HFSR: 0x%08lx, MMFAR: 0x%08lx, BFAR: 0x%08lx, AFSR: 0x%08lx]\r\n",
+                   crash->u.fault.hfsr, crash->u.fault.mmfar,
+                   crash->u.fault.bfar, crash->u.fault.afsr);
         break;
       case SL_WISUN_CRASH_TYPE_CRUN_ERROR:
-        printf("[C-RUN error 0x%08lx]\r\n",
-               crash->u.crun_error.error_code);
+        printfBoth("[C-RUN error 0x%08lx]\r\n",
+                   crash->u.crun_error.error_code);
         break;
       case SL_WISUN_CRASH_TYPE_EXIT:
-        printf("[EXIT status %d]\r\n",
-               crash->u.exit.status);
+        printfBoth("[EXIT status %d]\r\n",
+                   crash->u.exit.status);
         break;
       default:
         break;
