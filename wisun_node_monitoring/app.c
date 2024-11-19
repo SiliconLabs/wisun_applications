@@ -43,6 +43,7 @@
 #include "sl_wisun_version.h"
 #include "sl_string.h"
 #include "sl_memory_manager.h"
+#include "sl_wisun_crash_handler.h"
 
 #ifdef    SL_CATALOG_WISUN_APP_CORE_PRESENT
   #include "sl_wisun_app_core_util.h"
@@ -288,49 +289,9 @@ void app_task(void *args)
   with_time = to_console = to_rtt = true;
   to_udp = to_coap = false;
 
-  crash = sl_wisun_crash_handler_read();
-  if (crash) {
-    printf("\n");
-    switch (crash->type) {
-      case SL_WISUN_CRASH_TYPE_ASSERT:
-        printfBoth("[ASSERT in %s on line %u]\r\n", crash->u.assert.file,
-                   crash->u.assert.line);
-        break;
-      case SL_WISUN_CRASH_TYPE_RAIL_ASSERT:
-        printfBoth("[RAIL ASSERT %lu]\r\n", crash->u.rail_assert.error_code);
-        break;
-      case SL_WISUN_CRASH_TYPE_STACK_OVERFLOW:
-        printfBoth("[STACK OVERFLOW failure in task \"%s\"]\r\n", crash->u.stack_overflow.task);
-        break;
-      case SL_WISUN_CRASH_TYPE_STACK_PROTECTOR:
-        printfBoth("[STACK PROTECTOR failure in 0x%08lx]\r\n",
-                   crash->u.stack_protector.lr);
-        break;
-      case SL_WISUN_CRASH_TYPE_FAULT:
-        printfBoth("[FAULT CFSR: 0x%08lx\r\n", crash->u.fault.cfsr);
-        printfBoth("R0: 0x%08lx, R1: 0x%08lx, R2: 0x%08lx, R3: 0x%08lx\r\n",
-                   crash->u.fault.r0, crash->u.fault.r1,
-                   crash->u.fault.r2, crash->u.fault.r3);
-        printfBoth("R12: 0x%08lx, LR: 0x%08lx, RET: 0x%08lx, XPSR: 0x%08lx\r\n",
-                   crash->u.fault.r12, crash->u.fault.lr,
-                   crash->u.fault.return_address, crash->u.fault.xpsr);
-        printfBoth("HFSR: 0x%08lx, MMFAR: 0x%08lx, BFAR: 0x%08lx, AFSR: 0x%08lx]\r\n",
-                   crash->u.fault.hfsr, crash->u.fault.mmfar,
-                   crash->u.fault.bfar, crash->u.fault.afsr);
-        break;
-      case SL_WISUN_CRASH_TYPE_CRUN_ERROR:
-        printfBoth("[C-RUN error 0x%08lx]\r\n",
-                   crash->u.crun_error.error_code);
-        break;
-      case SL_WISUN_CRASH_TYPE_EXIT:
-        printfBoth("[EXIT status %d]\r\n",
-                   crash->u.exit.status);
-        break;
-      default:
-        break;
-    }
-
-    sl_wisun_crash_handler_clear();
+  sl_wisun_check_previous_crash();
+  if (strlen(crash_info_string)) {
+      printfBothTime("Info on previous crash: %s\n", crash_info_string);
   }
 
   printf("\n");
