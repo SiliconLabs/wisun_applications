@@ -17,6 +17,7 @@
 
 #include <stdint.h>
 #include <string.h>
+#include "printf.h"
 #include "sl_common.h"
 #include "em_rmu.h"
 #include "rail.h"
@@ -70,9 +71,13 @@ typedef struct {
   uint32_t xpsr;
 } context_state_t;
 
-// Crash data, stored in the unitialized section to avoid initialization
+// Crash data, stored in the uninitialized section to avoid initialization
 // by the C library on boot.
 SL_ALIGN(4) sl_wisun_crash_t sl_wisun_crash_data SL_ATTRIBUTE_ALIGN(4) SL_ATTRIBUTE_SECTION(".noinit");
+
+// Crash info string, filled by sl_wisun_check_previous_crash()
+#define SL_CRASH_STR_MAX_LEN            300
+char crash_info_string[SL_CRASH_STR_MAX_LEN];
 
 #if defined(SL_CATALOG_MICRIUMOS_KERNEL_PRESENT) \
     && (OS_CFG_TASK_STK_REDZONE_EN == DEF_ENABLED) \
