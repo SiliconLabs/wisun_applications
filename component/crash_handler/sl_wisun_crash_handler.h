@@ -31,7 +31,7 @@ extern "C" {
 
 /// Enumeration for crash types
 typedef enum {
-  /// No crash has occured
+  /// No crash has occurred
   SL_WISUN_CRASH_TYPE_NONE = 0,
   /// Crash is an assert
   SL_WISUN_CRASH_TYPE_ASSERT,
@@ -164,6 +164,13 @@ void sl_wisun_crash_handler_clear();
  * @return NULL if no crash data available, a pointer to the data otherwise.
  *****************************************************************************/
 const sl_wisun_crash_t *sl_wisun_crash_handler_read();
+
+/**************************************************************************//**
+ * Fill the crash_info_string with WI-SUN crash data.
+ *
+ * @return NULL if no crash data available, a pointer to the data otherwise.
+ *****************************************************************************/
+bool sl_wisun_check_previous_crash(void);
 
 #ifdef __cplusplus
 }
