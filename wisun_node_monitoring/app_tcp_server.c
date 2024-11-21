@@ -196,7 +196,6 @@ void _tcp_custom_callback(sl_wisun_evt_t *evt) {
   #if       (WITH_TCP_SERVER == SO_EVENT_MODE)
     if (evt->header.id == SL_WISUN_MSG_SOCKET_CONNECTION_AVAILABLE_IND_ID) {
         tcp_client_sockid = accept(tcp_server_sockid, (struct sockaddr *)&tcp_client_addr, &tcp_addr_len);
-        tcp_ip_str = app_wisun_trace_util_get_ip_str((void *) &tcp_client_addr.sin6_addr);
     }
     if (evt->header.id == SL_WISUN_MSG_SOCKET_DATA_AVAILABLE_IND_ID) {
         tcp_received_sockid = evt->evt.socket_data_available.socket_id;
