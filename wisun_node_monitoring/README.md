@@ -28,9 +28,9 @@ The block diagram of this application is shown in the image below:
 
 - To learn code-level information on the node monitoring application, see [Add a Custom Application in the Wi-SUN Development Walkthrough](https://docs.silabs.com/wisun/latest/wisun-custom-application/)
 
-## Gecko SDK Version ##
+## Simplicity SDK Version ##
 
-GSDK v4.4.0
+SiSDK v2024.6.2
 
 ## Hardware Required ##
 
@@ -79,6 +79,12 @@ The demonstration uses a Wi-SUN network, supporting
 - OTA DFU (this requires using a bootloader with storage enabled and the selected compression mechanism installed)
 
 ## How it works ##
+
+### No CLI interface ###
+
+There is no CLI in the Wi-SUN Node Monitoring because it is intended to be as close as possible to a real-life application, where no CLI will be available.
+
+Network parameters are set during project development, then the device automatically connects to the Wi-SUN network. Control of the device is over UDP or COAP from the Border Router, over the Wi-SUN network.
 
 ### Wi-SUN Network Set Up ###
 

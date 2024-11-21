@@ -489,7 +489,7 @@ void app_task(void *args)
           print_keep_alive = false;
         }
     }
-    if (now % 60 == 1) {
+    if (now % auto_send_sec == 1) {
         if (print_keep_alive == false) {
             print_keep_alive = true;
         }
