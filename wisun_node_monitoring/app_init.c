@@ -41,6 +41,7 @@
 #include "app_init.h"
 #include "cmsis_os2.h"
 #include "sl_cmsis_os2_common.h"
+#include "sl_wisun_crash_handler.h"
 #include "app.h"
 #include "app_coap.h"
 
@@ -66,6 +67,8 @@
 // -----------------------------------------------------------------------------
 void app_init(void)
 {
+  sl_wisun_crash_handler_init();
+
   app_coap_resources_init();
   /* Creating App main thread */
   const osThreadAttr_t app_task_attr = {

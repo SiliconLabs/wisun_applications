@@ -42,6 +42,8 @@
 #include "sl_wisun_api.h"
 #include "sl_wisun_version.h"
 #include "sl_string.h"
+#include "sl_memory_manager.h"
+#include "sl_wisun_crash_handler.h"
 
 #ifdef    SL_CATALOG_WISUN_APP_CORE_PRESENT
   #include "sl_wisun_app_core_util.h"
@@ -82,6 +84,7 @@
 #endif /* LIST_RF_CONFIGS */
 #include "sl_wisun_coap.h"
 #include "sl_wisun_coap_config.h"
+#include "sl_wisun_crash_handler.h"
 
 #include "app_coap.h"
 #include "app_check_neighbors.h"
@@ -279,11 +282,17 @@ void app_task(void *args)
   uint64_t now = 0;
   bool print_keep_alive = true;
   bool with_time, to_console, to_rtt, to_udp, to_coap;
+  const sl_wisun_crash_t *crash;
 
   app_timestamp_init();
 
   with_time = to_console = to_rtt = true;
   to_udp = to_coap = false;
+
+  sl_wisun_check_previous_crash();
+  if (strlen(crash_info_string)) {
+      printfBothTime("Info on previous crash: %s\n", crash_info_string);
+  }
 
   printf("\n");
   sprintf(chip, "%s", CHIP);
@@ -507,13 +516,15 @@ sl_wisun_mac_address_t _get_parent_mac_address(void) {
   uint8_t i;
   sl_wisun_neighbor_info_t neighbor_info;
   sl_wisun_mac_address_t   mac_address;
+  sl_wisun_mac_address_t *neighbor_mac_addresses = NULL;
   for ( i = 0 ; i<  SL_WISUN_MAC_ADDRESS_SIZE ; i++) {
       mac_address.address[i] = 0;
   }
 
   ret = sl_wisun_get_neighbor_count(&neighbor_count);
   if (ret) printf("[Failed: sl_wisun_get_neighbor_count() returned 0x%04x]\n", (uint16_t)ret);
-  sl_wisun_mac_address_t neighbor_mac_addresses[neighbor_count];
+  neighbor_mac_addresses = sl_malloc(sizeof(sl_wisun_mac_address_t) * neighbor_count);
+  if (!neighbor_mac_addresses) return mac_address;
   ret = sl_wisun_get_neighbors(&neighbor_count, neighbor_mac_addresses);
   if (ret) printf("[Failed: sl_wisun_get_neighbors() returned 0x%04x]\n", (uint16_t)ret);
   for (i = 0 ; i < neighbor_count; i++) {
@@ -523,6 +534,7 @@ sl_wisun_mac_address_t _get_parent_mac_address(void) {
         break;
       }
   }
+  sl_free(neighbor_mac_addresses);
   return mac_address;
 }
 

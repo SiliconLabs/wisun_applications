@@ -192,6 +192,15 @@ sl_wisun_coap_packet_t * coap_callback_all_statuses (
   return app_coap_reply(coap_response, req_packet);
 }
 
+sl_wisun_coap_packet_t * coap_callback_crash_report (
+    const  sl_wisun_coap_packet_t *const req_packet)  {
+  if (strlen(crash_info_string)) {
+      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", crash_info_string);
+  } else {
+      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "No previous crash info");
+  }
+  return app_coap_reply(coap_response, req_packet); }
+
 sl_wisun_coap_packet_t * coap_callback_device (
       const  sl_wisun_coap_packet_t *const req_packet)  {
   snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", device_tag);
@@ -622,15 +631,24 @@ return app_coap_reply(coap_response, req_packet); }
 sl_wisun_coap_packet_t * coap_callback_trace_level (
       const  sl_wisun_coap_packet_t *const req_packet)  {
   int level = 0;
+  int group = 0;
   int res;
   if (req_packet->payload_len) {
     // Make sure payload last char is NULL
     req_packet->payload_ptr[req_packet->payload_len] = 0x00;
+    res = sscanf((char *)req_packet->payload_ptr, "%d %d", &group, &level);
+    if (res) {
+        // Process /settings/trace_level -e "<group> <level>"
+        trace_level = (uint8_t)level;
+        app_set_trace(group, level, true);
+    } else {
+        // Process /settings/trace_level -e "<level>" (all groups)
     res = sscanf((char *)req_packet->payload_ptr, "%d", &level);
     if (res) {
         trace_level = (uint8_t)level;
         app_set_all_traces(level, true);
     }
+  }
   }
   snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", level);
 return app_coap_reply(coap_response, req_packet); }
@@ -865,6 +883,14 @@ uint8_t app_coap_resources_init() {
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
+
+  coap_resource.data.uri_path = "/reporter/crash";
+  coap_resource.data.resource_type = "text";
+  coap_resource.data.interface = "reporter";
+  coap_resource.auto_response = coap_callback_crash_report;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
   printf("  %d/%d CoAP resources added to CoAP Resource handler\n", count, SL_WISUN_COAP_RESOURCE_HND_MAX_RESOURCES);
   return count;
 }

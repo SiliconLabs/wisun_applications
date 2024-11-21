@@ -40,6 +40,46 @@ The Silicon Labs Wi-SUN stack allows for a wide variety applications to be built
 6. Under **Provider** (at the bottom of the list), select **wisun_applications** and click **[create]** on the desired project.
    1. If the project you are looking for is not listed in **wisun_applications**, it is possible that your debug adapter is not listed as compatible with the application. Try using a Silicon Labs debug adapter first, and check if it is listed in the project's **boardCompatibility** section of [templates.xml](templates.xml).
 
+## Using Wi-SUN Crash Handler in Another Project ##
+
+Wi-SUN Node Monitoring application contains a crash handler component that reports and recovers from application asserts and crashes.
+
+In order to utilize the component in another project:
+1. Copy **sl_wisun_crash_handler.c** and **sl_wisun_crash_handler.h** to the project, and add them to compilation.
+2. Add RMU (emlib_rmu) component to the project.
+3. Add linker flags below to the project. In Studio, go to **Project -> Properties -> C/C++ Build -> Settings -> GNU ARM C Linker -> Miscellaneous**. The component will work without them, but it will be unable to capture some asserts on GCC.
+```
+    -Wl,--wrap=__stack_chk_fail,--wrap=__assert_func
+```
+4. Call crash handler initialization in **app_init**.
+```
+  #include "sl_wisun_crash_handler.h"
+  ...
+  void app_init(void)
+  {
+    sl_wisun_crash_handler_init();
+  }
+```
+5. After initialization, read crash reason.
+```
+  #include "sl_wisun_crash_handler.h"
+  ...
+  const sl_wisun_crash_t *crash;
+  ...
+  crash = sl_wisun_crash_handler_read();
+  if (crash) {
+    switch (crash->type) {
+      case SL_WISUN_CRASH_TYPE_XXX:
+        break;
+      ...
+    }
+    sl_wisun_crash_handler_clear();
+  }
+```
+> [!WARNING]
+> If the project uses Gecko Bootloader, bootloader's bss section may overlap with application's noinit section, causing the crash handler to not function properly. In Wi-SUN Node Monitoring application this is avoided by increasing
+> the stack size **SL_STACK_SIZE**, which pushes application's noinit section further into RAM. Another possibility is to modify the generated linker script and swap the placement of application's bss and noinit sections.
+
 ## Documentation ##
 
 - Official Wi-SUN documentation can be found in [the Wi-SUN pages on docs.silabs.com](https://docs.silabs.com/wisun/latest/wisun-start/).
