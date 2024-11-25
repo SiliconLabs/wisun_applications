@@ -158,4 +158,3 @@ char * app_neighbor_info_str(uint8_t index) {
   sl_free(neighbor_mac_addresses);
   return _neighbor_info_str(neighbor_info, index, tag);
 }
-;

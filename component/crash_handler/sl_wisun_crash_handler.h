@@ -170,7 +170,7 @@ const sl_wisun_crash_t *sl_wisun_crash_handler_read();
  *
  * @return NULL if no crash data available, a pointer to the data otherwise.
  *****************************************************************************/
-bool sl_wisun_check_previous_crash(void);
+int sl_wisun_check_previous_crash(void);
 
 #ifdef __cplusplus
 }

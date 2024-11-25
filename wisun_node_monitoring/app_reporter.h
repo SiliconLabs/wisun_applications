@@ -1,7 +1,6 @@
 /***************************************************************************//**
-* @file app_init.h
-* @brief header file for application init
-* @version 1.0.0
+* @file app_reporter.h
+* @brief Header of pipe to report selected RTT traces to the UDP REPORTER_PORT
 *******************************************************************************
 * # License
 * <b>Copyright 2023 Silicon Laboratories Inc. www.silabs.com</b>
@@ -11,7 +10,7 @@
 *
 * The licensor of this software is Silicon Laboratories Inc.
 *
-* This software is provided \'as-is\', without any express or implied
+* This software is provided 'as-is', without any express or implied
 * warranty. In no event will the authors be held liable for any damages
 * arising from the use of this software.
 *
@@ -34,30 +33,17 @@
 * This code will not be maintained.
 *
 ******************************************************************************/
+#ifndef __APP_REPORTER_H__
+#define __APP_REPORTER_H__
 
-#ifndef APP_INIT_H
-#define APP_INIT_H
-
-// -----------------------------------------------------------------------------
-//                                   Includes
-// -----------------------------------------------------------------------------
+#define MAX_MATCH_STRING_LEN 40
 
 // -----------------------------------------------------------------------------
-//                              Macros and Typedefs
+//                          Public Function Definitions
 // -----------------------------------------------------------------------------
+void app_start_reporter_thread(char *report__dest_ipv6,
+                               uint32_t report_period_sec,
+                               char *match_string);
+void app_stop_reporter_thread(void);
 
-// -----------------------------------------------------------------------------
-//                                Global Variables
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
-//                          Public Function Declarations
-// -----------------------------------------------------------------------------
-/**************************************************************************//**
- * @brief Application init
- * @details This function initializes the application tasks, mutexes and
- *          register the custom callbacks
- *****************************************************************************/
-void app_init(void);
-
-#endif // APP_INIT_H
+#endif /* End app_reporter.h */

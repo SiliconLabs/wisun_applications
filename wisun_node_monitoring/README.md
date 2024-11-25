@@ -123,6 +123,7 @@ Once all devices are connected, the [`coap_all`](linux_border_router_wsbrd/coap_
 
 The following resources are available via CoAP, split in several groups. To reduce the initial code size, some are only conditionally compiled:
 
+- 'info' for values which will not change over time (these can be checked once only)
 - 'statistics' for values accumulated over time
   - 'statistics/app' for values coming from the application
     - 'statistics/app/all' returns all of the app statistics. This is the most commonly used URI
@@ -138,6 +139,7 @@ The URIs are
 |info/device                      | last 4 digits of device MAC/IPv6 (as in the [wisun-br-gui](https://github.com/SiliconLabs/wisun-br-gui)) | '%04x' ||
 |info/chip                        | Silicon Labs part                           | 'xGyy'         ||
 |info/board                       | Silicon Labs Radio Board                    | 'BRDxxxxx'     ||
+|info/device_type                 | Wi-SUN device type (FFN or LFN)             | '%s'           |'FFN with (no) LFN support' or 'LFN (\<profile\> profile) |
 |info/application                 | Application information string              | 'Wi-SUN Node Monitoring' ||
 |info/version                     | Application version string                  | 'Compiled on %s at %s' ||
 |info/all                         | all of the 'info' group above               | json           ||
@@ -158,12 +160,30 @@ The URIs are
 |statistics/stack/wisun           | statistics from [sl_wisun_statistics_wisun_t](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-statistics-wisun-t)           | json | '-e reset' resets these statistics |
 |statistics/stack/network         | statistics from [sl_wisun_statistics_network_t](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-statistics-network-t)       | json | '-e reset' resets these statistics |
 |statistics/stack/regulation      | statistics from [sl_wisun_statistics_regulation_t](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-statistics-regulation-t) | json | '-e reset' resets these statistics |
-|settings/auto_send               | the current `auto_send_sec` value           | '%d' | '-e s' sets auto_send_sec to s     |
-|settings/trace_level             | the current `trace_level` value             | '%d' | '-e [0-4]' sets trace_level [(0=None to 4=DEBUG)](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-types#sl-wisun-trace-level-t) |
+|settings/auto_send               | the current `auto_send_sec` value           | '%d' | '-e s' sets auto_send_sec to s seconds |
+|settings/trace_level             | the current `trace_level` value             | '%d' | '-e \<level\>' - '-e [0-4]' sets trace_level for all groups. '-e \<group\> \<level\>' sets trace level for a single group. Groups are [(0=None to 4=DEBUG)](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-types#sl-wisun-trace-level-t). Levels are [(0=MAC to 41=APP)](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-types#sl-wisun-trace-group-t) |
+|reporter/crash                   | Info on any previous crash, using `sl_wisun_crash_handler.c/.h` | '%s' | text info on crash (from `sl_wisun_crash_handler.h/sl_wisun_crash_type`) |
+|reporter/start                   | Start RTT trace filtering on \<str\> and report on `REPORTER_PORT`, using `app_reporter.c/.h`  | '%s'| '-e \<string_1\|string_2\|...\|string_n\>' sets the list of strings to look for in RTT traces. |
+|reporter/stop                    | Stop RTT trace reporting |||
 
 ## .slcp Project Used ##
 
 - [wisun_node_monitoring.slcp](https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/wisun_node_monitoring.slcp)
+
+## Selecting Notification Messages Items ##
+
+It is easy to customize the notification messages in [`app.c`](https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/app.c)
+
+- Device info
+  - Remove/Add/Order lines in the `DEVICE_CHIP_ITEMS` and `DEVICE_CHIP_JSON_FORMAT` macros to match your needs
+- Parent info
+  - Remove/Add/Order lines in the `PARENT_INFO_ITEMS` and `PARENT_JSON_FORMAT` macros to match your needs
+- Initial connection info
+  - Remove/Add/Order lines in the `CONNECTION_JSON_FORMAT_STR` macro and in the [_connection_json_string()/snprintf()](https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/app.c#L770) call to match your needs
+- Connected status info
+  - Remove/Add/Order lines in the `CONNECTED_JSON_FORMAT_STR` macro and in the [_status_json_string()/snprintf()](https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/app.c#814) calls (also change the [second call](https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/app.c#L842) ) to match your needs
+- Sensor info
+  - Add similar text to the `json_string` in [_status_json_string()](https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/app.c#L785) to track any sensor info. This may require making the information available to `app.c` by including the header file for you metering code.
 
 ## How to Port to Another Part ##
 
@@ -200,3 +220,32 @@ This box selects the value set for `WISUN_CONFIG_DEVICE_TYPE` in `autogen\sl_wis
 ## Access to RTT traces ##
 
 The project being based on Wi-SUN SoC Empty, which doesn't include the **wisun_stack_debug** component, this component is added to the `.slcp` file. This can be uninstalled for release versions of the application.
+When this component is uninstalled, the `app_reporter.c/.h` files need to be removed from the project and the `#include "app_reporter.h"` line commented in `app_coap.c`.
+
+## Debug Tools ##
+
+### Crash handler ###
+
+The [crash handler component](https://github.com/SiliconLabs/wisun_applications/tree/main/component/crash_handler) is used to retrieve information on any previous crash.
+This information is printed at boot to the console and RTT traces, then transmitted once to the UDP notification server upon the first connection.
+It is also available using the '/reporter/crash' CoAP request.
+
+- It allows getting useful information on previous crashes from the Border Router over the Wi-SUN network, even with no RTT trace active at the time of the crash.
+  - In case of [SL_WISUN_CRASH_TYPE_FAULT](https://github.com/SiliconLabs/wisun_applications/blob/main/component/crash_handler/sl_wisun_crash_handler.c#L383), look for LR in the .map file as the source of the fault (look for the function where the LR value belongs to).
+- It also triggers a `NVIC_SystemReset()` call, to get the device out of the crash.
+  - In case of a systematic application crash (a common situation during development when components are not started in the correct order), this will result in a never ending reboot loop, which is easy to detect during development when looking at RTT traces.
+
+### RTT reporter ###
+
+The [RTT reporter code](https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/app_reporter.c) is used to filter RTT traces for a set of text strings and report these to the Border Router.
+
+Among other uses, it can be useful in
+
+- Checking if other devices receive any frame from a missing device
+- Checking if a given device still receives frames from one of its children
+- Gathering any interesting RTT trace from a device
+
+The RTT reporter can be removed from the application by:
+
+- Removing the `app_reporter.c/.h` files from the project
+- Commenting the ['#include "app_reporter.h"'](https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/app_coap.c#L81) line in `https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/app_coap.c`

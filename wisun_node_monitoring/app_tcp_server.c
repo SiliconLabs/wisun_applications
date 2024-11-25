@@ -48,7 +48,7 @@
 #include "sl_string.h"
 #include "sl_wisun_app_core_util.h"
 #include "sl_wisun_trace_util.h"
-
+#include "sl_memory_manager.h"
 #include "app_timestamp.h"
 #include "app_rtt_traces.h"
 
@@ -148,9 +148,10 @@ void check_tcp_server_messages(void) {
       // Make sure the last byte is 0x00 (end of string).
       tcp_buff[tcp_data_length] = 0;
       tcp_ip_str = app_wisun_trace_util_get_ip_str((void *) &tcp_client_addr.sin6_addr);
-      // Print the received message
-      printfBothTime("TCP Rx %2ld from %s (%d bytes): %s\n", count_tcp_rx, tcp_ip_str, tcp_data_length, tcp_buff);
       app_wisun_trace_util_destroy_ip_str(tcp_ip_str);
+      // Print the received message
+      printfBothTime("TCP Rx %2ld from %s (%d bytes): %s\n",
+                     count_tcp_rx, tcp_ip_str, tcp_data_length, tcp_buff);
       tcp_socket_data_received = false;
     }
   #endif /* (WITH_TCP_SERVER == SO_EVENT_MODE) */
@@ -226,7 +227,7 @@ void _tcp_custom_callback(sl_wisun_evt_t *evt) {
   #endif /* (WITH_TCP_SERVER == SO_NONBLOCK) */
 
   // Un-managed Indications for which the callback is registered
-  printfBothTime("_tcp_data_received_custom_callback() indication id 0x%02x (not managed)\n", evt->header.id);
+  printfBothTime("_tcp_data_received_custom_callback() header.id 0x%02x (not managed)\n", evt->header.id);
 }
 
 #endif /* WITH_TCP_SERVER */
