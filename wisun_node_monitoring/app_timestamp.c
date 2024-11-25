@@ -36,7 +36,6 @@
 // -----------------------------------------------------------------------------
 //                                   Includes
 // -----------------------------------------------------------------------------
-#include <assert.h>
 #include "app_timestamp.h"
 #include "cmsis_os2.h"
 
@@ -161,7 +160,7 @@ char*        dhms         (sl_sleeptimer_timestamp_64_t timestamp_secs) {
 
   d_h_m_s(timestamp_secs, &days, &hours, &mins, &secs);
 
-  snprintf(time_str, TIME_STRING_LEN, "%3d-%02d:%02d:%02d", days, hours, mins, secs);
+  snprintf(time_str, TIME_STRING_LEN, "%d-%02d:%02d:%02d", days, hours, mins, secs);
 
   return time_str;
 }

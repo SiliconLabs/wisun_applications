@@ -38,22 +38,51 @@
 // -----------------------------------------------------------------------------
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
+#include <stdlib.h>
+
+#include "os.h"
+#include "printf.h"
 #include "app.h"
+
+#include "socket/socket.h"
+
 #include "sl_wisun_api.h"
 #include "sl_wisun_version.h"
 #include "sl_string.h"
-#include "sl_memory_manager.h"
+#include "sl_wisun_trace_util.h"
 #include "sl_wisun_crash_handler.h"
+#include "sl_wisun_event_mgr.h"
+#include "sl_wisun_config.h"
+#include "sl_wisun_coap.h"
+#include "sl_wisun_coap_config.h"
+
+#include "app_coap.h"
+#include "app_check_neighbors.h"
+
+#define   APP_TRACK_HEAP
+#define   APP_CHECK_PREVIOUS_CRASH
+
+#ifdef    APP_CHECK_PREVIOUS_CRASH
+  #define PREVIOUS_CRASH_FORMAT_STRING ""
+#else  /* APP_CHECK_PREVIOUS_CRASH */
+  #define PREVIOUS_CRASH_FORMAT_STRING ""
+#endif /* APP_CHECK_PREVIOUS_CRASH */
+
+#ifdef    APP_TRACK_HEAP
+  #define TRACK_HEAP_FORMAT_STRING "\"heap_used\":\"%.2f\",\n"
+  #define TRACK_HEAP_VALUE         1.0*app_heap_info.used_size / (app_heap_info.total_size / 100),
+#else  /* APP_TRACK_HEAP */
+  #define TRACK_HEAP_FORMAT_STRING /* */
+  #define TRACK_HEAP_VALUE         /* */
+#endif /* APP_TRACK_HEAP */
+
+#define UDP_RECEIVER_BUFFER_SIZE 2048
+#define UDP_NOTIFICATION_PORT_RX 5003
+#define INET6_ADDRSTRLEN 46 // Maximum length of an IPv6 address string
 
 #ifdef    SL_CATALOG_WISUN_APP_CORE_PRESENT
   #include "sl_wisun_app_core_util.h"
-  #if (SL_WISUN_VERSION_MAJOR >= 2) || ((SL_WISUN_VERSION_MAJOR == 1) && (SL_WISUN_VERSION_MINOR > 8))
-         // API_ABOVE_1_8
-    #include "sl_wisun_trace_util.h"
-  #else  /* API_ABOVE_1_8 */
-    #include "sl_wisun_app_core_util_config.h"
-    #define  sl_wisun_app_core_util_connect_and_wait   app_wisun_connect_and_wait
-  #endif /* API_ABOVE_1_8 */
 #endif /* SL_CATALOG_WISUN_APP_CORE_PRESENT */
 
 #ifdef    SL_CATALOG_WISUN_APP_OS_STAT_PRESENT
@@ -72,22 +101,13 @@
   #include "app_udp_server.h"
 #endif /* WITH_UDP_SERVER */
 
-#include "sl_wisun_event_mgr.h"
-#include "printf.h"
-#include "socket/socket.h"
-#include "sl_wisun_config.h"
-
 #include "app_timestamp.h"
 #include "app_rtt_traces.h"
+
+#define   LIST_RF_CONFIGS
 #ifdef    LIST_RF_CONFIGS
   #include "app_list_configs.h"
 #endif /* LIST_RF_CONFIGS */
-#include "sl_wisun_coap.h"
-#include "sl_wisun_coap_config.h"
-#include "sl_wisun_crash_handler.h"
-
-#include "app_coap.h"
-#include "app_check_neighbors.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -97,7 +117,6 @@
 #define IF_ERROR(ret, ...)                   if (ret != SL_STATUS_OK) {printfBothTime("\n"); printfBoth(__VA_ARGS__);}
 #define IF_ERROR_RETURN(ret, ...)            if (ret != SL_STATUS_OK) {printfBothTime("\n"); printfBoth(__VA_ARGS__); return ret;}
 #define IF_ERROR_INCR(ret, error_count, ...) if (ret != SL_STATUS_OK) {printfBothTime("\n"); printfBoth(__VA_ARGS__); error_count++;}
-#define HERE printf("%d\n", __LINE__);
 
 #ifdef    HISTORY
 #define APPEND_TO_HISTORY(...) { \
@@ -113,10 +132,45 @@
 
 #define END_JSON   "}\n"
 
-#define DEVICE_PARENT_RUNNING_JSON \
+#define DEVICE_CHIP_ITEMS \
+  device_global_ipv6_string, \
+  device_tag, \
+  CHIP, \
+  device_type
+
+#define DEVICE_CHIP_JSON_FORMAT \
+  "\"ipv6\":\"%s\",\n"   \
   "\"device\":\"%s\",\n"           \
   "\"chip\":  \"%s\",\n"           \
+  "\"type\":\"%s\",\n"   \
+
+// List below the items from parent_info you want to return
+// Update PARENT_JSON to match (in the same order, with the proper display format)
+#define PARENT_INFO_ITEMS \
+  parent_tag,               \
+  parent_info.rpl_rank,     \
+  parent_info.etx,          \
+  parent_info.routing_cost, \
+  parent_info.rsl_in,       \
+  parent_info.rsl_out,      \
+  parent_info.lifetime,     \
+  secondary_tag,            \
+  secondary_info.rsl_in,    \
+  secondary_info.rsl_out    \
+
+#define PARENT_JSON_FORMAT \
   "\"parent\":\"%s\",\n"           \
+  "\"rpl_rank\":\"%d\",\n"     \
+  "\"etx\":\"%d\",\n"          \
+  "\"routing_cost\":\"%d\",\n" \
+  "\"rsl_in\":\"%d\",\n"       \
+  "\"rsl_out\":\"%d\",\n"      \
+  "\"lifetime\":\"%ld\",\n"    \
+  "\"secondary\":\"%s\",\n"    \
+  "\"sec_rsl_in\":\"%d\",\n"   \
+  "\"sec_rsl_out\":\"%d\",\n"  \
+
+#define RUNNING_JSON_FORMAT \
   "\"running\":     \"%s\",\n"
 
 #ifdef  _SILICON_LABS_32B_SERIES_1             /** Product Series Identifier */
@@ -145,7 +199,7 @@ void        _join_state_custom_callback(sl_wisun_evt_t *evt);
 void        _check_neighbors(void);
 char*       _connection_json_string();
 char*       _status_json_string (char * start_text);
-sl_wisun_mac_address_t _get_parent_mac_address(void);
+sl_wisun_mac_address_t _get_parent_mac_address_and_update_parent_info(void);
 sl_status_t _select_destinations(void);
 sl_status_t _open_udp_sockets(void);
 sl_status_t _coap_notify(char* json_string);
@@ -161,13 +215,28 @@ uint64_t connection_time_sec;        // last connection time stamp
 uint64_t disconnection_time_sec;     // last disconnection time stamp
 uint64_t connected_total_sec = 0;    // total time connected
 uint64_t disconnected_total_sec = 0; // total time disconnected
+sl_wisun_neighbor_info_t parent_info;   // local storage of the parent info
+sl_wisun_neighbor_info_t secondary_info;// local storage of the secondary parent info
+
+#ifdef    APP_TRACK_HEAP
+sl_memory_heap_info_t app_heap_info;
+size_t app_previous_heap_free;
+bool   refresh_heap;
+#endif /* APP_TRACK_HEAP */
+
+uint16_t auto_send_sec = 60; // Notification period in seconds
+
+bool print_keep_alive = true;
 
 char chip[8];
 char device_tag[8];
 char parent_tag[8];
+char secondary_tag[8];
 char application[100];
-char version[50];
+char version[80];
 char device_type[25];
+uint32_t parent_rsl_in  = 0;
+uint32_t parent_rsl_out = 0;
 
 bool just_disconnected = false;
 #ifdef    HISTORY
@@ -187,12 +256,11 @@ char history_string[SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE];
 #endif /* HISTORY */
 sl_wisun_mac_address_t device_mac;
 sl_wisun_mac_address_t parent_mac;
+sl_wisun_mac_address_t secondary_mac;
 
 // IPv6 address structures
 in6_addr_t device_global_ipv6;
 in6_addr_t border_router_ipv6;
-in6_addr_t udp_notification_ipv6;
-in6_addr_t coap_notification_ipv6;
 
 sockaddr_in6_t udp_notification_sockaddr_in6;
 sockaddr_in6_t coap_notification_sockaddr_in6;
@@ -211,7 +279,6 @@ char udp_msg[1024];
 char coap_msg[1024];
 
 uint16_t msg_len;
-uint16_t auto_send_sec = 60; // Notification period in seconds
 uint8_t  trace_level = SL_WISUN_TRACE_LEVEL_DEBUG;    // Trace level for all trace groups
 
 // UDP ports
@@ -219,7 +286,7 @@ uint8_t  trace_level = SL_WISUN_TRACE_LEVEL_DEBUG;    // Trace level for all tra
 #define COAP_NOTIFICATION_PORT 5685
 
 #define SL_WISUN_STATUS_CONNECTION_URI_PATH  "/status/connection"
-#define SL_WISUN_STATUS_JSON_STR_MAX_LEN 280
+#define SL_WISUN_STATUS_JSON_STR_MAX_LEN 512
 
 // Notifications destinations (UDP and CoAP)
 // Set to fixed IPv6 strings
@@ -280,29 +347,46 @@ void app_task(void *args)
 {
   (void) args;
   uint64_t now = 0;
+  uint64_t connection_timestamp;
+  uint64_t connected_delay_sec;
   bool print_keep_alive = true;
   bool with_time, to_console, to_rtt, to_udp, to_coap;
-  const sl_wisun_crash_t *crash;
 
   app_timestamp_init();
 
   with_time = to_console = to_rtt = true;
   to_udp = to_coap = false;
 
+#ifdef    APP_CHECK_PREVIOUS_CRASH
   sl_wisun_check_previous_crash();
   if (strlen(crash_info_string)) {
       printfBothTime("Info on previous crash: %s\n", crash_info_string);
   }
+#endif /* APP_CHECK_PREVIOUS_CRASH */
 
   printf("\n");
   sprintf(chip, "%s", CHIP);
-  snprintf(application, 100, "%s", "Wi-SUN Node Monitoring V2.0.0");
+  snprintf(application, 100, "%s", "Wi-SUN Node Monitoring V3.0.0");
   printfBothTime("%s/%s %s\n", chip, SL_BOARD_NAME, application);
-  snprintf(version, 50, "Compiled on %s at %s", __DATE__, __TIME__);
+  snprintf(version, 80, "Compiled on %s at %s", __DATE__, __TIME__);
   printfBothTime("%s\n", chip);
   printfBothTime("%s\n", SL_BOARD_NAME);
   printfBothTime("%s\n", application);
   printfBothTime("%s\n", version);
+  printfBothTime("Network %s\n", WISUN_CONFIG_NETWORK_NAME);
+#ifdef    SL_CATALOG_APP_OS_STAT_PRESENT
+#ifdef APP_OS_STAT_UPDATE_PERIOD_TIME_MS
+printfBothTime("with app_os_stat every %d ms\n", APP_OS_STAT_UPDATE_PERIOD_TIME_MS);
+#endif /* APP_OS_STAT_UPDATE_PERIOD_TIME_MS */
+#endif /* SL_CATALOG_APP_OS_STAT_PRESENT */
+printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CONFIG_NETWORK_SIZE));
+
+#ifdef    WISUN_CONFIG_TX_POWER
+  printfBothTime("Tx Power %d dBm\n", WISUN_CONFIG_TX_POWER);
+#endif /* WISUN_CONFIG_TX_POWER */
+#ifdef    WISUN_CONFIG_BROADCAST_RETRIES
+  printfBothTime("Broadcast Retries %d\n", WISUN_CONFIG_BROADCAST_RETRIES);
+#endif /* WISUN_CONFIG_BROADCAST_RETRIES */
   TRACES_WHILE_CONNECTING;
 
 #ifdef    HISTORY
@@ -322,7 +406,7 @@ void app_task(void *args)
   #endif /* WITH_TCP_SERVER */
 
   #ifdef WITH_UDP_SERVER
-    printfBothTime("With     UDP Server %s\n", DEFINE_string(WITH_TCP_SERVER));
+    printfBothTime("With     UDP Server %s\n", DEFINE_string(WITH_UDP_SERVER));
   #endif /* WITH_UDP_SERVER */
 
   // Set device_tag to last 2 bytes of MAC address
@@ -385,7 +469,7 @@ void app_task(void *args)
   /*******************************************
   /  We only reach this part once connected  /
   *******************************************/
-
+  connection_timestamp = now_sec();
   // Once connected for the first time, reduce RTT traces to the minimum
   TRACES_WHEN_CONNECTED;
 
@@ -447,9 +531,23 @@ void app_task(void *args)
   print_coap_help(device_global_ipv6_string, border_router_ipv6_string);
 
   // Print and send initial connection message
-  to_udp = to_coap = true;
+  to_udp  = true;
+  to_coap = false;
   _print_and_send_messages (_connection_json_string(""),
               with_time, to_console, to_rtt, to_udp, to_coap);
+
+#ifdef    APP_CHECK_PREVIOUS_CRASH
+  if (strlen(crash_info_string)) {
+      _print_and_send_messages (crash_info_string,
+                  with_time, to_console, to_rtt, to_udp, to_coap);
+  }
+#endif /* APP_CHECK_PREVIOUS_CRASH */
+
+#ifdef    APP_TRACK_HEAP
+  sl_memory_get_heap_info(&app_heap_info);
+  app_previous_heap_free = app_heap_info.free_size;
+  refresh_heap = true;
+#endif /* APP_TRACK_HEAP */
 
   while (1) {
     ///////////////////////////////////////////////////////////////////////////
@@ -458,7 +556,8 @@ void app_task(void *args)
 
     // We can only send messages outside if connected
     if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
-      to_udp = to_coap = true;
+      to_udp  = true;
+      to_coap = false;
 
       #ifdef    WITH_TCP_SERVER
         check_tcp_server_messages();
@@ -482,18 +581,36 @@ void app_task(void *args)
 
     // Print status message every auto_send_sec seconds
     now = now_sec();
-    if (now % auto_send_sec == 0) {
+    connected_delay_sec = now - connection_timestamp;
+    if (connected_delay_sec % auto_send_sec == 0) {
         if (print_keep_alive == true) {
           _print_and_send_messages (_status_json_string(""),
                     with_time, to_console, to_rtt, to_udp, to_coap);
           print_keep_alive = false;
         }
     }
-    if (now % auto_send_sec == 1) {
+    if (connected_delay_sec % auto_send_sec == 1) {
         if (print_keep_alive == false) {
             print_keep_alive = true;
         }
     }
+
+#ifdef    APP_TRACK_HEAP
+    if (connected_delay_sec % 5 == 0) {
+        if (refresh_heap) {
+          sl_memory_get_heap_info(&app_heap_info);
+          if (app_previous_heap_free == 0) { app_previous_heap_free = app_heap_info.free_size; }
+          printfBothTime("heap free %d (diff %d) used %d %6.2f%%\n",
+                         app_heap_info.free_size, app_heap_info.free_size - app_previous_heap_free,
+                         app_heap_info.used_size,
+                         1.0*app_heap_info.used_size / (app_heap_info.total_size / 100) );
+          app_previous_heap_free = app_heap_info.free_size;
+          refresh_heap = false;
+        }
+    }
+    if (connected_delay_sec % 6 == 0) { refresh_heap = true; }
+#endif /* APP_TRACK_HEAP */
+
     sl_wisun_app_core_util_dispatch_thread();
   }
 }
@@ -509,38 +626,39 @@ void app_reset_statistics(void) {
 // -----------------------------------------------------------------------------
 //                          Static Function Definitions
 // -----------------------------------------------------------------------------
-
-sl_wisun_mac_address_t _get_parent_mac_address(void) {
+sl_wisun_mac_address_t _get_parent_mac_address_and_update_parent_info(void) {
   sl_status_t ret;
   uint8_t neighbor_count;
   uint8_t i;
   sl_wisun_neighbor_info_t neighbor_info;
-  sl_wisun_mac_address_t   mac_address;
-  sl_wisun_mac_address_t *neighbor_mac_addresses = NULL;
   for ( i = 0 ; i<  SL_WISUN_MAC_ADDRESS_SIZE ; i++) {
-      mac_address.address[i] = 0;
+      parent_mac.address[i] = 0;
+      secondary_mac.address[i] = 0;
   }
 
   ret = sl_wisun_get_neighbor_count(&neighbor_count);
   if (ret) printf("[Failed: sl_wisun_get_neighbor_count() returned 0x%04x]\n", (uint16_t)ret);
-  neighbor_mac_addresses = sl_malloc(sizeof(sl_wisun_mac_address_t) * neighbor_count);
-  if (!neighbor_mac_addresses) return mac_address;
+  sl_wisun_mac_address_t neighbor_mac_addresses[neighbor_count];
   ret = sl_wisun_get_neighbors(&neighbor_count, neighbor_mac_addresses);
   if (ret) printf("[Failed: sl_wisun_get_neighbors() returned 0x%04x]\n", (uint16_t)ret);
   for (i = 0 ; i < neighbor_count; i++) {
       sl_wisun_get_neighbor_info(&neighbor_mac_addresses[i], &neighbor_info);
       if (neighbor_info.type == SL_WISUN_NEIGHBOR_TYPE_PRIMARY_PARENT) {
-        mac_address = neighbor_mac_addresses[i];
-        break;
+        sl_wisun_get_neighbor_info(&neighbor_mac_addresses[i], &parent_info);
+        parent_mac = neighbor_mac_addresses[i];
+      }
+      if (neighbor_info.type == SL_WISUN_NEIGHBOR_TYPE_SECONDARY_PARENT) {
+        sl_wisun_get_neighbor_info(&neighbor_mac_addresses[i], &secondary_info);
+        secondary_mac = neighbor_mac_addresses[i];
       }
   }
-  sl_free(neighbor_mac_addresses);
-  return mac_address;
+  return parent_mac;
 }
 
 void refresh_parent_tag(void) {
-  parent_mac = _get_parent_mac_address();
+  _get_parent_mac_address_and_update_parent_info();
   sprintf(parent_tag, "%02x%02x", parent_mac.address[6], parent_mac.address[7]);
+  sprintf(secondary_tag, "%02x%02x", secondary_mac.address[6], secondary_mac.address[7]);
 };
 
 void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
@@ -584,7 +702,7 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
 #ifdef    HISTORY
       APPEND_TO_HISTORY(" (%d) %s |", join_state , now_str());
 #endif /* HISTORY */
-      parent_mac = _get_parent_mac_address();
+      parent_mac = _get_parent_mac_address_and_update_parent_info();
       sprintf(parent_tag, "%02x%02x", parent_mac.address[6], parent_mac.address[7]);
       // if sockets are opened, print and send connection message
       // This will occur in case of a reconnection
@@ -635,22 +753,24 @@ void  _check_neighbors(void) {
 char* _connection_json_string () {
   #define CONNECTION_JSON_FORMAT_STR                   \
     START_JSON                                         \
-    DEVICE_PARENT_RUNNING_JSON                         \
+    DEVICE_CHIP_JSON_FORMAT                            \
+    PARENT_JSON_FORMAT                                 \
+    RUNNING_JSON_FORMAT                                \
     "\"PAN_ID\": \"0x%04x (%d)\",\n"                   \
-    "\"join_states_sec\":[%llu,%llu,%llu,%llu,%llu]\n" \
+    "\"join_states_sec\": \"%llu %llu %llu %llu %llu\"\n"\
     END_JSON
 
   char sec_string[20];
   sl_wisun_network_info_t network_info;
+
   sl_wisun_get_network_info(&network_info);
   sprintf(sec_string, "%s", now_str());
   refresh_parent_tag();
 
   snprintf(json_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE,
     CONNECTION_JSON_FORMAT_STR,
-    device_tag,
-    CHIP,
-    parent_tag,
+    DEVICE_CHIP_ITEMS,
+    PARENT_INFO_ITEMS,
     sec_string,
     network_info.pan_id, network_info.pan_id,
     app_join_state_delay_sec[1],
@@ -666,13 +786,16 @@ char* _status_json_string (char * start_text) {
   #define CONNECTED_JSON_FORMAT_STR        \
     "%s"                                   \
     START_JSON                             \
-    DEVICE_PARENT_RUNNING_JSON             \
+    DEVICE_CHIP_JSON_FORMAT                \
+    PARENT_JSON_FORMAT                     \
+    RUNNING_JSON_FORMAT                    \
+    TRACK_HEAP_FORMAT_STRING               \
     "\"connected\":   \"%s\",\n"           \
     "\"disconnected\":\"%s\",\n"           \
     "\"connections\": \"%d\",\n"           \
     "\"availability\":\"%6.2f\",\n"        \
     "\"connected_total\":   \"%s\",\n"     \
-    "\"disconnected_total\":\"%s\"\n"      \
+    "\"disconnected_total\":\"%s\",\n"     \
     END_JSON
 
   char running_sec_string[20];
@@ -685,6 +808,8 @@ char* _status_json_string (char * start_text) {
 
   sprintf(running_sec_string, "%s", now_str());
   refresh_parent_tag();
+  // Make sure of the join state
+  sl_wisun_get_join_state(&join_state);
 
   if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
     current_state_sec = now_sec() - connection_time_sec;
@@ -694,10 +819,10 @@ char* _status_json_string (char * start_text) {
     snprintf(json_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE,
       CONNECTED_JSON_FORMAT_STR,
       start_text,
-      device_tag,
-      CHIP,
-      parent_tag,
+      DEVICE_CHIP_ITEMS,
+      PARENT_INFO_ITEMS,
       running_sec_string,
+      TRACK_HEAP_VALUE
       current_sec_string,
       "no",
       connection_count,
@@ -707,6 +832,9 @@ char* _status_json_string (char * start_text) {
     );
   } else {
     current_state_sec = now_sec() - disconnection_time_sec;
+    // Make sure of the join state
+    sl_wisun_get_join_state(&join_state);
+
     sprintf(current_join_state_string, " no (join_state %d)", join_state);
     sprintf(current_sec_string,     "%s", dhms(current_state_sec));
     sprintf(connected_sec_string,   "%s", dhms(connected_total_sec));
@@ -714,10 +842,10 @@ char* _status_json_string (char * start_text) {
     snprintf(json_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE,
       CONNECTED_JSON_FORMAT_STR,
       start_text,
-      device_tag,
-      CHIP,
-      parent_tag,
+      DEVICE_CHIP_ITEMS,
+      PARENT_INFO_ITEMS,
       running_sec_string,
+      TRACK_HEAP_VALUE
       current_join_state_string,
       current_sec_string,
       connection_count,

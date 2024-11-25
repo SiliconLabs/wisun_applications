@@ -24,6 +24,7 @@ source:
 - {path: app_init.c}
 - {path: app_list_configs.c}
 - {path: app_rtt_traces.c}
+- {path: app_reporter.c}
 - {path: app_tcp_server.c}
 - {path: app_timestamp.c}
 - {path: app_udp_server.c}
@@ -37,6 +38,7 @@ include:
   - {path: app.h}
   - {path: app_init.h}
   - {path: app_list_configs.h}
+  - {path: app_reporter.h}
   - {path: app_rtt_traces.h}
   - {path: app_tcp_server.h}
   - {path: app_timestamp.h}

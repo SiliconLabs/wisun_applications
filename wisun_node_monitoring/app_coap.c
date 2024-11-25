@@ -8,18 +8,19 @@
 * "/info/device"                        Tag made of last 2 bytes of device's MAC address
 * "/info/chip"                          Text matching the part number
 * "/info/board"                         Text matching the board name
+* "/info/device_type"                   'FFN' or 'LFN' + details on LFN support (for FFNs) or LFN profile (for LFNs)
 * "/info/version"                       Version 'info'
 * "/info/application"                   Application 'info'
 * "/info/all"                           All 'info'
 * "/status/running"                     How much time the application has been running
 * "/status/parent"                      Tag made of last 2 bytes of parent's MAC address
 * "/status/neighbor"                    Neighbor info (per index required by '-e <payload>')
-* "/status/connections"                 How many times the device connected
 * "/status/connected"                   How much time the device has been connected for the current connection
 * "/status/all"                         All 'status'
 * "/statistics/app/join_state_secs"     How much seconds to jump to each join state
-* "/statistics/app/connected_total"     How much time the device has been connected since the first connection
 * "/statistics/app/disconnected_total"  How much time the device has been disconnected since the first connection
+* "/statistics/app/connections"         How many times the device connected
+* "/statistics/app/connected_total"     How much time the device has been connected since the first connection
 * "/statistics/app/availability"        connected_total / (connected_total + disconnected_total) ratio
 * "/statistics/app/all"                 All 'app' statistics
 * "/statistics/stack/phy"               PHY statistics stored in sl_wisun_statistics_phy_t
@@ -28,9 +29,11 @@
 * "/statistics/stack/wisun"             WISUN statistics stored in sl_wisun_statistics_wisun_t
 * "/statistics/stack/network"           NETWORK statistics stored in sl_wisun_statistics_network_t
 * "/statistics/stack/regulation"        REGULATION statistics stored in sl_wisun_statistics_regulation_t
-* "/sensor/temp"                        Current Temperature
-* "/sensor/humidity"                    Current Humidity
-* "/sensor/light"                       Current light level
+* "/settings/auto_send"                 Set auto_Send_sec period to send UDP notifications
+* "/settings/trace_level"               Control RTT traces
+* "/reporter/crash"                     Report info on previous crash (if any)
+* "/reporter/start"                     Start filtering RTT traces for selected strings and reporting then to REPORTER_PORT
+* "/reporter/stop"                      Stop filtering RTT traces
 *
 *******************************************************************************
 * # License
@@ -69,23 +72,17 @@
 // -----------------------------------------------------------------------------
 #include "app.h"
 #include "app_coap.h"
+#include "sl_string.h"
 #include "sl_wisun_api.h"
 #include "sl_wisun_config.h"
 #include "sl_wisun_trace_util.h"
-#include "app_check_neighbors.h"
 #include "sl_wisun_app_core.h"
 #include "sl_wisun_version.h"
 #include "sl_wisun_app_core_util.h"
-#include "sl_string.h"
-#include "app_rtt_traces.h"
-
-#if (SL_WISUN_VERSION_MAJOR >= 2) || ((SL_WISUN_VERSION_MAJOR == 1) && (SL_WISUN_VERSION_MINOR > 8))
-       // API_ABOVE_1_8
 #include "sl_wisun_trace_util.h"
-#else  /* API_ABOVE_1_8 */
-  #include "sl_wisun_app_core_util_config.h"
-  #define  sl_wisun_app_core_util_connect_and_wait   app_wisun_connect_and_wait
-#endif /* API_ABOVE_1_8 */
+#include "app_check_neighbors.h"
+#include "app_rtt_traces.h"
+#include "app_reporter.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -650,8 +647,32 @@ sl_wisun_coap_packet_t * coap_callback_trace_level (
     }
   }
   }
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", level);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", trace_level);
 return app_coap_reply(coap_response, req_packet); }
+
+
+#ifdef    __APP_REPORTER_H__
+sl_wisun_coap_packet_t * coap_callback_reporter_start (
+    const  sl_wisun_coap_packet_t *const req_packet)  {
+  if (req_packet->payload_len) {
+      // Make sure payload last char is NULL
+      req_packet->payload_ptr[req_packet->payload_len] = 0x00;
+      app_start_reporter_thread("fd00:6172:6d00::1", 2, (char *)req_packet->payload_ptr);
+    } else {
+        // if no payload, accept all lines
+      app_start_reporter_thread("fd00:6172:6d00::1", 2, (char *)"*");
+    }
+    snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "started");
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_reporter_stop (
+    const  sl_wisun_coap_packet_t *const req_packet)  {
+    app_stop_reporter_thread();
+    snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "stopped");
+  return app_coap_reply(coap_response, req_packet); }
+
+  #endif /* __APP_REPORTER_H__ */
+
 
 // CoAP resources init in resource handler (one block per URI)
 uint8_t app_coap_resources_init() {
@@ -891,6 +912,25 @@ uint8_t app_coap_resources_init() {
   coap_resource.discoverable = true;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
+
+#ifdef    __APP_REPORTER_H__
+  coap_resource.data.uri_path = "/reporter/start";
+  coap_resource.data.resource_type = "text";
+  coap_resource.data.interface = "test";
+  coap_resource.auto_response = coap_callback_reporter_start;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/reporter/stop";
+  coap_resource.data.resource_type = "text";
+  coap_resource.data.interface = "test";
+  coap_resource.auto_response = coap_callback_reporter_stop;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+#endif /* __APP_REPORTER_H__ */
+
   printf("  %d/%d CoAP resources added to CoAP Resource handler\n", count, SL_WISUN_COAP_RESOURCE_HND_MAX_RESOURCES);
   return count;
 }
