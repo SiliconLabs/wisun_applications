@@ -45,6 +45,7 @@ The Silicon Labs Wi-SUN stack allows for a wide variety applications to be built
 Wi-SUN Node Monitoring application contains a crash handler component that reports and recovers from application asserts and crashes.
 
 In order to utilize the component in another project:
+
 1. Copy **sl_wisun_crash_handler.c** and **sl_wisun_crash_handler.h** to the project, and add them to compilation.
 2. Add RMU (emlib_rmu) component to the project.
 3. Add linker flags below to the project. In Studio, go to **Project -> Properties -> C/C++ Build -> Settings -> GNU ARM C Linker -> Miscellaneous**. The component will work without them, but it will be unable to capture some asserts on GCC.
