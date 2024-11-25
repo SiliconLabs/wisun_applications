@@ -48,11 +48,14 @@ In order to utilize the component in another project:
 1. Copy **sl_wisun_crash_handler.c** and **sl_wisun_crash_handler.h** to the project, and add them to compilation.
 2. Add RMU (emlib_rmu) component to the project.
 3. Add linker flags below to the project. In Studio, go to **Project -> Properties -> C/C++ Build -> Settings -> GNU ARM C Linker -> Miscellaneous**. The component will work without them, but it will be unable to capture some asserts on GCC.
-```
+
+```text
     -Wl,--wrap=__stack_chk_fail,--wrap=__assert_func
 ```
+
 4. Call crash handler initialization in **app_init**.
-```
+
+```C
   #include "sl_wisun_crash_handler.h"
   ...
   void app_init(void)
@@ -60,8 +63,10 @@ In order to utilize the component in another project:
     sl_wisun_crash_handler_init();
   }
 ```
+
 5. After initialization, read crash reason.
-```
+
+```C
   #include "sl_wisun_crash_handler.h"
   ...
   const sl_wisun_crash_t *crash;
@@ -76,6 +81,20 @@ In order to utilize the component in another project:
     sl_wisun_crash_handler_clear();
   }
 ```
+
+6. Alternatively, call `sl_wisun_check_previous_crash()` to fill the `crash_info_string` then print the string. This string will be available during the entire application runtime (the Wi-SUN Node Monitoring application makes it available via a CoAP request).
+
+```C
+  #include "sl_wisun_crash_handler.h"
+  ...
+  int crash_type;
+  ...
+  crash_type = sl_wisun_check_previous_crash();
+  if (crash_type) {
+    printf("%s\n", crash_info_string);
+  }
+```
+
 > [!WARNING]
 > If the project uses Gecko Bootloader, bootloader's bss section may overlap with application's noinit section, causing the crash handler to not function properly. In Wi-SUN Node Monitoring application this is avoided by increasing
 > the stack size **SL_STACK_SIZE**, which pushes application's noinit section further into RAM. Another possibility is to modify the generated linker script and swap the placement of application's bss and noinit sections.
