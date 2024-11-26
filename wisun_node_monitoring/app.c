@@ -601,9 +601,9 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
           sl_memory_get_heap_info(&app_heap_info);
           if (app_previous_heap_free == 0) { app_previous_heap_free = app_heap_info.free_size; }
           printfBothTime("heap free %d (diff %d) used %d %6.2f%%\n",
-                         app_heap_info.free_size, app_heap_info.free_size - app_previous_heap_free,
-                         app_heap_info.used_size,
-                         1.0*app_heap_info.used_size / (app_heap_info.total_size / 100) );
+                        app_heap_info.free_size, app_heap_info.free_size - app_previous_heap_free,
+                        app_heap_info.used_size,
+                        1.0*app_heap_info.used_size / (app_heap_info.total_size / 100) );
           app_previous_heap_free = app_heap_info.free_size;
           refresh_heap = false;
         }
