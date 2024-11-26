@@ -203,11 +203,11 @@ It is easy to customize the notification messages in [`app.c`](https://github.co
 
 (Refer to [LFN in Silicon Labs Wi-SUN Stack](https://docs.silabs.com/wisun/latest/wisun-lfn/#lfn-in-silicon-labs-wi-sun-stack) for details on Wi-SUN LFN, including power management aspects)
 
-Adding the **Wi-SUN Stack LFN Support Plugin** is required to turn the device into a LFN.
+Adding the **Wi-SUN Stack LFN Support** component is required to turn the device into a LFN.
 
-With GSDK 4.4.0, the 'Wi-SUN Stack LFN Support Plugin' is listed with 'Evaluation' quality in Simplicity Studio, so it is found in the 'SOFTWARE COMPONENTS' once the 'Evaluation' level has been selected in the 'Quality' drop down list.
+With SiSDK 2024-6, the 'Wi-SUN Stack LFN Support' component is listed with 'Evaluation' quality in Simplicity Studio, so it is found in the 'SOFTWARE COMPONENTS' once the 'Evaluation' level has been selected in the 'Quality' drop down list.
 
-![LFN Plugin Component](image/LFN_plugin.png)
+![LFN Support Component](image/LFN_component.png)
 
 Install this component to get access to the 'Device Type' Drop down box in the Wi-SUN Configurator.
 
