@@ -11,18 +11,22 @@ To be used as documented below:
 ---
 
 - [Linux Border Router Scripts](#linux-border-router-scripts)
+  - [`CPC` control](#cpc-control)
+    - [`CPC` Configuration](#cpc-configuration)
+    - [`CPC` Start \& Stop](#cpc-start--stop)
   - [`wsbrd` control and monitoring](#wsbrd-control-and-monitoring)
     - [`wsbrd` Configuration](#wsbrd-configuration)
-    - [`wsbrd` Start \&  Stop](#wsbrd-start---stop)
+    - [`wsbrd` Start \& Stop](#wsbrd-start--stop)
     - [`wsbrd` Storage/Cache check and cleanup](#wsbrd-storagecache-check-and-cleanup)
     - [`wsbrd` Monitoring](#wsbrd-monitoring)
   - [IPv6 networking](#ipv6-networking)
-    - [`tun0` IPv6 addresses addition (for UDP/CoAP/OTA)](#tun0-ipv6-addresses-addition-for-udpcoapota)
+    - [`eth0` IPv6 addresses addition (for UDP/CoAP/OTA)](#eth0-ipv6-addresses-addition-for-udpcoapota)
     - [`tun0` multicast](#tun0-multicast)
     - [Network checks](#network-checks)
   - [UDP \& TCP](#udp--tcp)
   - [TFTP control and checks](#tftp-control-and-checks)
   - [OTA control and monitoring](#ota-control-and-monitoring)
+  - [Wi-SUN Node Monitoring companion scripts](#wi-sun-node-monitoring-companion-scripts)
   - [CoAP](#coap)
   - [Testing](#testing)
     - [Throughput testing between Wi-SUN nodes](#throughput-testing-between-wi-sun-nodes)
@@ -30,6 +34,26 @@ To be used as documented below:
     - [IPv6 from Wi-SUN Node Nickname](#ipv6-from-wi-sun-node-nickname)
 
 ---
+
+## `CPC` control
+
+### `CPC` Configuration
+
+| Name | Language | Usage | Call | Result |
+|------|----------|-------|------|--------|
+| `cpc_conf.sh`    | bash | Show current `cpcd` config file (`/usr/local/etc/cpcd.conf`) | `wsbrd_conf.sh` | All active lines of `/etc/wsbrd.conf` |
+| `cpc_service.sh` | bash | Show current `cpcd` service file | `cpc_service.sh` | cat of ` /usr/local/lib/systemd/system/cpcd.service` |
+| `cpc_reload.sh`  | bash | Restart `systemd` daemon after changing settings | `cpc_reload.sh` | `sudo systemctl daemon-reload` |
+
+### `CPC` Start & Stop
+
+| Name | Language | Usage | Call | Result |
+|------|----------|-------|------|--------|
+| `cpc_enable.sh`  | bash | Allow cpcd as a service | `cpc_enable.sh` | CPC Daemon running, waiting for RCP connection (the RCP binary needs to be set for CPC use) |
+| `cpc_disable.sh` | bash | Stop cpcd (if started as a service) | `cpc_disable.sh` | Useful to test cpcd restart |
+| `cpc_restart.sh` | bash | Start/Restart cpcd as a service | `cpc_restart.sh` | wsbrd restart if access from D-Bus (which is the case using `wsbrd_cli` or the GUI)! |
+| `cpc_stop.sh`    | bash | Temporarily stop wsbrd as a service | `cpc_stop.sh` | wsbrd restarts if access from D-Bus (which is the case using `wsbrd_cli` or the GUI)! |
+| `cpc_status.sh`  | bash | Display wsbrd service status | `cpc_status.sh` | `sudo systemctl status cpcd.service` |
 
 ## `wsbrd` control and monitoring
 
@@ -73,11 +97,11 @@ To be used as documented below:
 
 ## IPv6 networking
 
-### `tun0` IPv6 addresses addition (for UDP/CoAP/OTA)
+### `eth0` IPv6 addresses addition (for UDP/CoAP/OTA)
 
 | Name | Language | Usage | Call | Result |
 |------|----------|-------|------|--------|
-| `wsbrd_add.sh`     | bash | Add fixed IPv6 Addresses to `tun0` | `wsbrd_add.sh` | `ip address show tun0` shows `fd00:6172:6d00::1/64` and `fd00:6172:6d00::2/64` |
+| `wsbrd_add.sh`     | bash | Add fixed IPv6 Addresses to `eth0` | `wsbrd_add.sh` | `ip address show eth0` shows `fd00:6172:6d00::1/64` and `fd00:6172:6d00::2/64` |
 
 ### `tun0` multicast
 

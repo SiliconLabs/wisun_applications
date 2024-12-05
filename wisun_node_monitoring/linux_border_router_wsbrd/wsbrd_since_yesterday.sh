@@ -5,7 +5,7 @@
 # wsbrd_since_yesterday.sh            08:30:00
 # wsbrd_since_yesterday.sh 2024-04-05 08:30:00
 
-if [ -z ${1} ]
+if [ -z "${1}" ]
 then
   time="yesterday"
 else

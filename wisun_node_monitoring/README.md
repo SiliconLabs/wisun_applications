@@ -74,9 +74,10 @@ To test this application, you can
 
 The demonstration uses a Wi-SUN network, supporting
 
-- UDP (natively)
-- CoAP (using the Wi-SUN CoAP Service)
 - OTA DFU (this requires using a bootloader with storage enabled and the selected compression mechanism installed)
+- CoAP (using the Wi-SUN CoAP Service), because OTA DFU requires CoAP
+- UDP client and server (optional), because CoAP is on top of UDP
+- TCP client and server (optional)
 
 ## How it works ##
 
@@ -165,6 +166,26 @@ The URIs are
 |reporter/crash                   | Info on any previous crash, using `sl_wisun_crash_handler.c/.h` | '%s' | text info on crash (from `sl_wisun_crash_handler.h/sl_wisun_crash_type`) |
 |reporter/start                   | Start RTT trace filtering on \<str\> and report on `REPORTER_PORT`, using `app_reporter.c/.h`  | '%s'| '-e \<string_1\|string_2\|...\|string_n\>' sets the list of strings to look for in RTT traces. |
 |reporter/stop                    | Stop RTT trace reporting |||
+
+### CoAP request examples ###
+
+- Get auto_send duration: GET method
+
+```bash
+coap-client -m get -N -B 10 -t text coap://[fd12:3456::62a4:23ff:fe37:aec3]:5683/settings/auto_send
+```
+
+- Set auto_send duration: POST method
+
+```bash
+coap-client -m post -N -B 10 -t text coap://[fd12:3456::62a4:23ff:fe37:aec3]:5683/settings/auto_send -e 60
+```
+
+- Set trace group [SL_WISUN_TRACE_GROUP_RF](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-trace-group-config-t#group-id) to trace_level [SL_WISUN_TRACE_LEVEL_DEBUG](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-trace-group-config-t#trace-level)
+
+```bash
+coap-client -m post -N -B 10 -t text coap://[fd12:3456::62a4:23ff:fe37:aec3]:5683/settings/trace_level -e "34 4"
+```
 
 ## .slcp Project Used ##
 

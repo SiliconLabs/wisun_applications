@@ -74,6 +74,7 @@
 #include "app_coap.h"
 #include "sl_string.h"
 #include "sl_wisun_api.h"
+#include "sl_wisun_types.h"
 #include "sl_wisun_config.h"
 #include "sl_wisun_trace_util.h"
 #include "sl_wisun_app_core.h"

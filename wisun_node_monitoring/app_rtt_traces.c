@@ -51,7 +51,7 @@ sl_status_t app_set_all_traces(uint8_t trace_level, bool verbose) {
   uint8_t group_count;
   uint8_t i;
   trace_config = sl_malloc(SL_WISUN_TRACE_GROUP_COUNT * sizeof(sl_wisun_trace_group_config_t));
-  group_count = SL_WISUN_TRACE_GROUP_RF+1;
+  group_count = SL_WISUN_TRACE_GROUP_APP+1;
 
   for (i = 0; i < group_count; i++) {
       trace_config[i].group_id = i;
@@ -71,6 +71,10 @@ sl_status_t app_set_trace(uint8_t group_id, uint8_t trace_level, bool verbose)
   trace_config.group_id = group_id;
   trace_config.trace_level = trace_level;
   ret = sl_wisun_set_trace_level(1, &trace_config);
-  if (verbose) printf("Set trace group %u to level %u: %lu\n", group_id, trace_level, ret);
+  if (ret != SL_STATUS_OK) {
+      printf("Error setting trace group %u to level %u: status %lu (check sl_status.h)\n", group_id, trace_level, ret);
+  } else {
+      if (verbose) printf("Set trace group %u to level %u\n", group_id, trace_level);
+  }
   return ret;
 }

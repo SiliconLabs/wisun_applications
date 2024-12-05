@@ -3,7 +3,6 @@
 # coap_all coap_uri [-e <payload>]
 
 ipv6s=$(get_nodes_ipv6_address.py)
-monitoring_path="/home/pi/monitoring"
 
 # by default, perform discovery
 if [ -z "$1" ]; then
@@ -50,12 +49,6 @@ do
     ipv6_=$(echo $ipv6_ | sed -r "s/:/_/g")
     ipv6_=$(echo $ipv6_ | sed -r "s/_0_/__/g")
     if [ "${res}" != "" ]; then
-      device_path="${monitoring_path}/${ipv6_}"
-      if [ ! -d "${device_path}" ]; then
-        mkdir "${device_path}"
-      fi
-      echo "${res}"              > "${device_path}/last_coap_all"
-      echo "$(date +"%Y-%m-%d %H:%M:%S")" > "${device_path}/last_coap_all_date"
       responded=$(($responded+1))
     fi
 done

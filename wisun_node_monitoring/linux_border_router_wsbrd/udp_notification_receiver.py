@@ -7,6 +7,7 @@ import socket
 import os
 import sys
 import datetime
+import traceback
 
 HOST_IP = "::" # Host own address (tun0 IPv6 address)
 
@@ -57,6 +58,7 @@ while True:
     message_string = data.decode("utf-8").replace(" ", space).replace("\n", newline)
   except Exception as e:
     print(f"Exception {e} (from {addr})", flush=True)
+    print(traceback.format_exc())
 
   print (f"[{now_str}] Rx {PORT}: {newline}", message_string, flush=True)
 
@@ -91,6 +93,7 @@ while True:
 
     except Exception as e:
       print(f"Exception in monitoring {e} (from {addr})")
+      print(traceback.format_exc())
       pass
 
 

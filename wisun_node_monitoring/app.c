@@ -37,19 +37,17 @@
 //                                   Includes
 // -----------------------------------------------------------------------------
 #include <stdio.h>
-#include <assert.h>
-#include <string.h>
 #include <stdlib.h>
 
 #include "os.h"
 #include "printf.h"
 #include "app.h"
 
-#include "socket/socket.h"
+#include "sl_assert.h"
+#include "sl_string.h"
 
 #include "sl_wisun_api.h"
 #include "sl_wisun_version.h"
-#include "sl_string.h"
 #include "sl_wisun_trace_util.h"
 #include "sl_wisun_crash_handler.h"
 #include "sl_wisun_event_mgr.h"
@@ -61,6 +59,7 @@
 #include "app_check_neighbors.h"
 
 #define   APP_TRACK_HEAP
+#define   APP_TRACK_HEAP_DIFF
 #define   APP_CHECK_PREVIOUS_CRASH
 
 #ifdef    APP_CHECK_PREVIOUS_CRASH
@@ -220,7 +219,9 @@ sl_wisun_neighbor_info_t secondary_info;// local storage of the secondary parent
 
 #ifdef    APP_TRACK_HEAP
 sl_memory_heap_info_t app_heap_info;
+ #ifdef    APP_TRACK_HEAP_DIFF
 size_t app_previous_heap_free;
+ #endif /* APP_TRACK_HEAP_DIFF */
 bool   refresh_heap;
 #endif /* APP_TRACK_HEAP */
 
@@ -415,7 +416,6 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
   printfBothTime("device_tag %s\n", device_tag);
 
   // Set device_type based on application settings
-#ifdef   SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
   if (WISUN_CONFIG_DEVICE_TYPE == SL_WISUN_LFN ) {
     #if !defined(WISUN_CONFIG_DEVICE_PROFILE)
       sprintf(device_type, "LFN (null profile)");
@@ -440,12 +440,13 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
       }
     #endif  /* WISUN_CONFIG_DEVICE_PROFILE */
   } else if (WISUN_CONFIG_DEVICE_TYPE == SL_WISUN_ROUTER ) {
+#ifdef   SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
       sprintf(device_type, "FFN with LFN support");
-  }
 #else /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
   sprintf(device_type, "FFN with No LFN support");
 #endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
-  printfBothTime("device_type %s\n", device_type);
+  }
+  printfBothTime("device_type %s (%d)\n", device_type, WISUN_CONFIG_DEVICE_TYPE);
 
   // Register our join state custom callback function with the event manager (aka 'em')
   app_wisun_em_custom_callback_register(SL_WISUN_MSG_JOIN_STATE_IND_ID, _join_state_custom_callback);
@@ -579,9 +580,10 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
       to_udp = to_coap = false;
     }
 
-    // Print status message every auto_send_sec seconds
     now = now_sec();
     connected_delay_sec = now - connection_timestamp;
+
+    // Print status message once then disable status
     if (connected_delay_sec % auto_send_sec == 0) {
         if (print_keep_alive == true) {
           _print_and_send_messages (_status_json_string(""),
@@ -589,6 +591,7 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
           print_keep_alive = false;
         }
     }
+    // Enable status for next time
     if (connected_delay_sec % auto_send_sec == 1) {
         if (print_keep_alive == false) {
             print_keep_alive = true;
@@ -596,19 +599,26 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
     }
 
 #ifdef    APP_TRACK_HEAP
+    // Refresh heap info once then disable the refresh
     if (connected_delay_sec % 5 == 0) {
         if (refresh_heap) {
           sl_memory_get_heap_info(&app_heap_info);
+#ifdef    APP_TRACK_HEAP_DIFF
           if (app_previous_heap_free == 0) { app_previous_heap_free = app_heap_info.free_size; }
-          printfBothTime("heap free %d (diff %d) used %d %6.2f%%\n",
-                        app_heap_info.free_size, app_heap_info.free_size - app_previous_heap_free,
+          if (app_previous_heap_free != app_heap_info.free_size) {
+            printfBothTime("heap free %d (diff %d) used %d %6.2f%%\n",
+                        app_heap_info.free_size,
+                        app_heap_info.free_size - app_previous_heap_free,
                         app_heap_info.used_size,
                         1.0*app_heap_info.used_size / (app_heap_info.total_size / 100) );
+          }
           app_previous_heap_free = app_heap_info.free_size;
+#endif /* APP_TRACK_HEAP_DIFF */
           refresh_heap = false;
         }
     }
-    if (connected_delay_sec % 6 == 0) { refresh_heap = true; }
+    // Enable heap info refresh for next time
+    if (connected_delay_sec % 5 == 1) { refresh_heap = true; }
 #endif /* APP_TRACK_HEAP */
 
     sl_wisun_app_core_util_dispatch_thread();

@@ -1,0 +1,154 @@
+#!/bin/bash
+
+usage=" Sending a CoAP series of requests to a connect device to gather\
+#  all information on its neighbors"
+
+# coap_neighbors ipv6
+
+get_post='get'
+
+# by default, no payload
+if [ -z "$1" ]; then
+  ipv6s=$(get_nodes_ipv6_address.py)
+else
+  ipv6s=${1}
+fi
+
+dot_file="neighbors.dot"
+topology_file="neighbors_topology.dot"
+secondary_file="neighbors_secondary.dot"
+children_file="neighbors_children.dot"
+coap_uri="/status/neighbor"
+
+value_from_item ()
+{
+  item="$1"
+  x="$2"
+  match=$( echo ${item} | grep -o "${x}" )
+  if [ "${match}" != "" ]; then
+    val=$(echo ${item} | awk '{split($0,a,":"); print a[2]}' )
+  else
+    return 0
+  fi
+  echo "${val}"
+}
+
+save ()
+{
+  echo ${2} >> ${1}
+}
+
+hostname=$(hostname)
+network_name=$( wsbrd_cli status | grep network_name | awk '{split($0,a,":"); print a[2]}' )
+rcp_tag=$(      ip address show tun0 | grep global | tr '/' ':' | awk '{split($0,a,":"); print a[7]}')
+
+start_file ()
+{
+graph_header="digraph \"${1}\" {
+    rankdir=TB
+    node [shape=circle color=black fillcolor=\"#00CC00\" style=filled]
+    \"${hostname}\" [shape=rectangle fillcolor=grey label=\"${hostname}\n${network_name}\"]
+    \"${rcp_tag}\"  [fillcolor=gold] 
+    \"${hostname}\" -> \"${rcp_tag}\"
+    edge [dir=back]"
+  echo "${graph_header}" >  ${1}
+}
+
+start_file ${dot_file}
+start_file ${topology_file}
+start_file ${secondary_file}
+start_file ${children_file}
+
+#echo "${graph_header}" >  ${topology_file}
+#echo "${graph_header}" >  ${secondary_file}
+#echo "${graph_header}" >  ${children_file}
+echo "    edge [ fontcolor=grey50 color=grey50 penwidth=4 ]"     >> ${secondary_file}
+echo "    edge [ fontcolor=\"#0000aa\" color=cyan penwidth=3 ]"  >> ${children_file}
+
+for ipv6 in $ipv6s
+do
+  dev=$(echo ${ipv6} | cut -d ':' -f 7)
+  cmd="coap-client -m get -N -B 20 -t text coap://[${ipv6}]:5683${coap_uri}"
+  res=$(eval ${cmd} 2>&1)
+  echo ${cmd} : ${res}
+
+  test=$(echo ${res} | grep "unreachable")
+  if [ -z "$test" ]; then
+    if [ "${res}" != "" ]; then
+      neighbor_count=$( echo $res | grep -o "[0-9]*" )
+      #save ${dot_file} "   \"${dev}\" [label=\"${dev}\" tooltip=\"${neighbor_count} neighbors\"]"
+
+      for neighbor_index in $(seq 0 $(( $neighbor_count -1 )) );
+      do
+        cmd="coap-client -m get -N -B 10 -t text coap://[${ipv6}]:5683${coap_uri} -e ${neighbor_index}"
+        # res is without commas
+        res=$(eval ${cmd} 2>&1  | tr ',' ' ')
+        echo "  ${dev}'s neighbor" ${neighbor_index} : ${res}
+        tag=""
+        rsl_in=""
+        rsl_out=""
+        rpl_rank=""
+        etx=""
+        edgeplus=""
+        dir="back"
+
+        for item in ${res};
+        do
+          match=$(value_from_item ${item} "tag")
+          if [ "${match}" != "" ]; then
+            tag=${match}
+          fi
+
+          match=$(value_from_item ${item} "rpl_rank")
+          if [ "${match}" != "" ]; then
+            rpl_rank="rpl_rank ${match}\n"
+          fi
+
+          match=$(value_from_item ${item} "etx")
+          if [ "${match}" != "" ]; then
+            etx="etx ${match}\n"
+          fi
+
+          match=$(value_from_item ${item} "rsl_in")
+          if [ "${match}" != "" ]; then
+            rsl_in="rsl_in ${match}\n"
+          fi
+
+          match=$(value_from_item ${item} "rsl_out")
+          if [ "${match}" != "" ]; then
+            rsl_out="rsl_out ${match}\n"
+          fi
+
+          match=$(value_from_item ${item} "type")
+          if [ "${match}" != "" ]; then
+            type="type ${match}\n"
+            if [ "${match}" == "0" ]; then
+              edgeplus=" fontcolor=black       color=green  penwidth=5 style=solid tooltip=\"${tag} is primary parent of ${dev}\" "
+              save ${topology_file} "   \"${tag}\" -> \"${dev}\" [label=\"${tag}\nis parent of\n${dev}\"]"
+              if [ "${tag}" == "${rcp_tag}" ]; then
+                save ${children_file} "   \"${tag}\" -> \"${dev}\" [label=\"${tag}\nis parent of\n${dev}\"  fontcolor=black color=green  penwidth=5 style=solid] "
+              fi
+            fi
+            if [ "${match}" == "1" ]; then
+              edgeplus=" fontcolor=grey50      color=grey50 penwidth=4 style=solid tooltip=\"${tag} is the secondary parent of ${dev}\" "
+              save ${secondary_file} "   \"${tag}\" -> \"${dev}\" [label=\"${tag}\nis secondary parent of\n${dev}\"] "
+            fi
+            if [ "${match}" == "2" ]; then
+              edgeplus=" fontcolor=\"#0000aa\" color=cyan   penwidth=3 style=dashed tooltip=\"${tag} is a child of ${dev}\" "
+              save ${children_file} "   \"${dev}\" -> \"${tag}\" [label=\"${tag}\nis child of\n${dev}\"] "
+            fi
+          fi
+        done
+        save ${dot_file} "   \"${tag}\" -> \"${dev}\" [label=\"${type}${rsl_in}${rsl_out}${rpl_rank}${etx}\" $edgeplus] "
+      done
+    fi
+  fi
+done
+
+save ${dot_file}       "}"
+save ${topology_file}  "}"
+save ${secondary_file} "}"
+save ${children_file}  "}"
+
+cat  ${topology_file}
+
