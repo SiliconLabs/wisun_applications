@@ -1,0 +1,499 @@
+
+// Core generic registers
+__constant U32 DCRSR           = 0xE000EDF4;
+__constant U32 DCRDR           = 0xE000EDF8;
+__constant U32 HFSR            = 0xE000ED2C;
+
+// Application Interrupt and Reset Control Register
+__constant U32 AIRCR               = 0xE000ED0C;
+__constant U32 AIRCR_VECTKEY       = 0x05FA0000;
+__constant U32 AIRCR_VECTCLRACTIVE = (1<<1);
+__constant U32 AIRCR_SYSRESETREQ   = (1<<2);
+
+// Debug Halting Control and Status Register
+__constant U32 DHCSR           = 0xE000EDF0;
+__constant U32 DHCSR_DBGKEY    = 0xA05F0000;
+__constant U32 DHCSR_C_DEBUGEN = (1<<0);
+__constant U32 DHCSR_C_HALT    = (1<<1);
+__constant U32 DHCSR_S_REGRDY  = (1<<16);
+__constant U32 DHCSR_S_HALT    = (1<<17);
+__constant U32 DHCSR_S_LOCKUP  = (1<<19);
+
+// Flash Patch and Breakpoint (FPB) registers
+__constant U32 FP_CTRL         = 0xE0002000;
+__constant U32 FP_COMP0        = 0xE0002008;
+
+// DAP generic registers
+__constant U32 DP_CTRL_STAT_BIT_DBGPWRUPACK = (1 << 29);
+__constant U32 DP_CTRL_STAT_BIT_SYSPWRUPACK = (1 << 31);
+__constant U32 DP_CTRL_STAT_BIT_DBGPWRUPREQ = (1 << 28);
+__constant U32 DP_CTRL_STAT_BIT_SYSPWRUPREQ = (1 << 30);
+
+// MSC and CMU registers
+__constant U32 MSC_BASE_EFR32S2 = 0x40030000;
+__constant U32 MSC_LOCK         = MSC_BASE_EFR32S2 + 0x3C;
+__constant U32 MSC_MISCLOCK     = MSC_BASE_EFR32S2 + 0x40;
+
+__constant U32 MSC_MISCLOCK_MELOCK = (0x1 << 0);
+__constant U32 MSC_MISCLOCK_UDLOCK = (0x1 << 4);
+
+__constant U16 MSC_UNLOCK_CODE = 0x1B71;
+
+__constant U32 CMU_BASE_S2        = 0x40008000;
+__constant U32 CMU_CLKEN0_S2      = CMU_BASE_S2 + 0x64;
+__constant U32 CMU_CLKEN1_S2      = CMU_BASE_S2 + 0x68;
+__constant U32 CMU_CLKEN1_IMEM_S2 = 0x1 << 17;
+
+__constant U32 FLASH_BASE         = 0x08000000;
+
+// Global Result Variables
+
+// Read core register status (0: success, -1: timeout)
+int read_core_reg_result = 0;
+
+/*********************************************************************
+*
+*       ReadCoreRegister
+*
+*       This function attempts to read a CPU register
+*/
+U32 ReadCoreRegister(U32 reg_index)
+{
+  U32 v;
+  int start_time_ms, timeout_ms, current_time_ms;
+
+  // Default global status to fail
+  read_core_reg_result = -1;
+
+  // Init one second timeout
+  start_time_ms = JLINK_GetTime();
+  timeout_ms = start_time_ms + 1000;
+
+  JLINK_MEM_WriteU32(DCRSR, reg_index);
+  do {
+    v = JLINK_MEM_ReadU32(DHCSR);
+    if (v & DHCSR_S_REGRDY) {
+      v = JLINK_MEM_ReadU32(DCRDR);
+      current_time_ms = JLINK_GetTime();
+      read_core_reg_result = 0;
+      break;
+    }
+    current_time_ms = JLINK_GetTime();
+  } while (current_time_ms < timeout_ms);
+
+  JLINK_SYS_Report1("ReadCoreRegister duration (ms): ", current_time_ms-start_time_ms);
+  return v;
+}
+
+/*********************************************************************
+*
+*       HaltCore
+*
+*       This function attempts to halt the core
+*       Return values:
+*         *  0: Success
+*         * -2: Halt failed
+*/
+int HaltCore(void)
+{
+  U32 v;
+  int r;
+  int start_time_ms, timeout_ms, current_time_ms;
+
+  // Default return code to fail
+  r = -1;
+
+  // Init one second timeout
+  start_time_ms = JLINK_GetTime();
+  timeout_ms = start_time_ms + 1000;
+
+  // Halt core and poll until halted
+  do {
+    // Get Debug Halting Control and Status register
+    v = JLINK_MEM_ReadU32(DHCSR);
+
+    if (v != 0xFFFFFFFF) {
+      JLINK_SYS_Report1("H DHCSR: ", v);
+      // Read succeeded
+      if (v & DHCSR_S_HALT) {
+        // Halt succeeded
+        current_time_ms = JLINK_GetTime();
+        r = 0;
+        break;
+      }
+
+      // Enable debug and attempt halt
+      JLINK_MEM_WriteU32(DHCSR, DHCSR_DBGKEY | DHCSR_C_DEBUGEN | DHCSR_C_HALT);
+    }
+    current_time_ms = JLINK_GetTime();
+  } while (current_time_ms < timeout_ms);
+
+  JLINK_SYS_Report1("HaltCore duration (ms): ", current_time_ms-start_time_ms);
+  return r;
+}
+
+
+/*********************************************************************
+*
+*       WaitForHaltAtPC
+*
+*       This function waits for the CPU to halt at a specific PC
+*       Return values:
+*         *  0: Success
+*         * -1: Halted at wrong PC
+*         * -2: Halt failed
+*/
+int WaitForHaltAtPC ( U32 expected_pc )
+{
+  int r;
+  U32 v;
+  U32 pc;
+  int start_time_ms, timeout_ms, current_time_ms;
+
+  // Default return code to fail
+  r = -2;
+  // Init one second timeout
+  start_time_ms = JLINK_GetTime();
+  timeout_ms = start_time_ms + 1000;
+  // Poll core until halted
+  do {
+    // Get Debug Halting Control and Status register
+    v = JLINK_MEM_ReadU32(DHCSR);
+
+    if (v != 0xFFFFFFFF) {
+      JLINK_SYS_Report1("W DHCSR: ", v);
+      // Read succeeded
+      if (v & DHCSR_S_HALT) {
+        // Halt succeeded
+        current_time_ms = JLINK_GetTime();
+        r = 0;
+        break;
+      }
+    }
+
+    current_time_ms = JLINK_GetTime();
+  } while (current_time_ms < timeout_ms);
+  JLINK_SYS_Report1("WaitForHaltAtPC duration (ms): ", current_time_ms-start_time_ms);
+
+  // Check if halt successfull
+  if ( r != 0 ) {
+    JLINK_SYS_Report("Core failed to halt");
+    return r;
+  }
+
+  // Check that PC is what we expect it to be
+  pc = ReadCoreRegister(15);
+  JLINK_SYS_Report1("PC after halt: ", pc);
+  if ( pc == expected_pc ) {
+    return 0;
+  }
+  else {
+    JLINK_SYS_Report1("Expected PC: ", expected_pc );
+    return -1;
+  }
+
+}
+
+
+/*********************************************************************
+*
+*       WaitForDP
+*
+*       This function repeatedly tries to contact and setup the DP
+*       Return values:
+*         *  0: Success
+*         * -2: Not supported CPU + interface combo
+*         * -3: Readback of DP failed
+*         * -4: DBGPWRUP and SYSPWRUP not acknowledged
+*         * <0: Other error
+*/
+int WaitForDP(void)
+{
+  U32 v;
+  int r;
+  int start_time_ms, timeout_ms, current_time_ms;
+
+  // Init one second timeout
+  start_time_ms = JLINK_GetTime();
+  timeout_ms = start_time_ms + 1000;
+  r = -1;
+  do {
+
+    if (JLINK_ActiveTIF == JLINK_TIF_SWD) {
+      // >= 0 = OK, < 0 = Error, -2 = Not supported by the current CPU + interface combo
+      r = JLINK_CORESIGHT_Configure("");  // Perform JTAG->SWD switching
+    }
+    else {
+      r = JLINK_CORESIGHT_Configure("IRPre=0;DRPre=0;IRPost=0;DRPost=0;IRLenDevice=4");
+    }
+    JLINK_SYS_Report1("Configure result: ", r);
+
+    if ( r == -2 ) {
+      // CPU + interface combination not supported
+      current_time_ms = JLINK_GetTime();
+      break;
+    }
+    else if (r >= 0) {
+
+      JLINK_CORESIGHT_WriteDP(JLINK_CORESIGHT_DP_REG_ABORT, 0x1E); // Clear sticky error flags
+
+      // Power up debug interface
+      v = DP_CTRL_STAT_BIT_DBGPWRUPREQ | DP_CTRL_STAT_BIT_SYSPWRUPREQ;
+      JLINK_CORESIGHT_WriteDP(JLINK_CORESIGHT_DP_REG_CTRL_STAT, v);
+
+      // Read back acknowledgement bits
+      v = JLINK_CORESIGHT_ReadDP(JLINK_CORESIGHT_DP_REG_CTRL_STAT);
+      JLINK_SYS_Report1("DP CTRL/STAT: ", v);
+
+      if ( v == 0xFFFFFFFF ) {
+        // Readback failed
+        r = -3;
+        continue;
+      }
+      else if ( v & (DP_CTRL_STAT_BIT_DBGPWRUPACK | DP_CTRL_STAT_BIT_SYSPWRUPACK) ) {
+        // Powerup acknowledged
+	current_time_ms = JLINK_GetTime();
+        r = 0;
+        break;
+      }
+      else {
+        r = -4;
+      }
+
+    }
+    current_time_ms = JLINK_GetTime();
+  } while (current_time_ms < timeout_ms);
+  JLINK_SYS_Report1("WaitForDP duration (ms): ", current_time_ms-start_time_ms);
+
+  return r;
+}
+
+
+/*********************************************************************
+*
+*       AttemptConnectSysresetHalt
+*
+*       This function tries to contact the debug interface,
+*       issue a AIRCR.SYSRESETREQ and halt the
+*       Cortex-M33 at the reset vector.
+*       Return values:
+*         *  0: Success
+*         * <0: Error
+*/
+int AttemptConnectSysresetHalt ( void )
+{
+
+  int r;
+  U32 fp_ctrl, fp_comp0, break_addr;
+
+  // Wait for debug interface to become available
+  r = WaitForDP();
+  if (r < 0) {
+    return r;
+  }
+
+  // Wait for Secure Bootloader execution to complete
+  r = HaltCore();
+  if (r < 0) {
+    return r;
+  }
+
+  // Core is now reset and halted
+  JLINK_SYS_Report1("IsHalted: ", JLINK_TARGET_IsHalted());
+
+  // Dump current PC
+  JLINK_SYS_Report1("PC: ", ReadCoreRegister(15));
+  if (read_core_reg_result < 0) {
+      return -1;
+  }
+
+  // Get reset vector from flash memory vector table
+  break_addr = JLINK_MEM_ReadU32(FLASH_BASE + 4);
+  JLINK_SYS_Report1("Flash reset vector: ", break_addr);
+
+  if (break_addr != 0xFFFFFFFF) {
+    // VC_CORERESET does not work on xG22 parts. The closest viable alternative
+    // is to use the FPB, set a breakpoint at the reset vector and use
+    // AIRCR.SYSRESETREQ to reset.
+    // Setup FPB to break at APPLICATION reset vector entry
+
+    fp_ctrl  = JLINK_MEM_ReadU32(FP_CTRL);
+    fp_comp0 = JLINK_MEM_ReadU32(FP_COMP0);
+    JLINK_MEM_WriteU32(FP_CTRL, 3);
+    JLINK_MEM_WriteU32(FP_COMP0, break_addr | 1);
+
+    // Issue SYSRESETREQ
+    JLINK_SYS_Report("Resetting with AIRCR.SYSRESETREQ");
+    JLINK_MEM_WriteU32(AIRCR,
+                       AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
+
+    // Waiting for a halt at the reset vector.
+    // Clearing Thumb mode bit from expected PC
+    r = WaitForHaltAtPC(break_addr & 0xFFFFFFFE);
+
+    // Restore FPB
+    JLINK_MEM_WriteU32(FP_CTRL,  fp_ctrl | 2);
+    JLINK_MEM_WriteU32(FP_COMP0, fp_comp0);
+
+  }
+  else {
+    // Flash empty - halt wherever
+    r = HaltCore();
+  }
+
+  return r;
+
+}
+
+
+/*********************************************************************
+*
+*       ResetTarget
+*
+*       This function attempts to reset the target and return with the
+*       target in halted state.
+*       This function overrides the selected reset type
+*       Return values:
+*         *  0: Success
+*         * <0: Error
+*/
+int ResetTarget ( void )
+{
+
+  int r;
+
+  if (MAIN_ResetType == 2) {
+      // For consistent behavior with XG21 parts, where default Reset Type of 0
+      // uses AIRCR SYSRESET soft reset, require the user to perform an
+      // ExecCommand "SetResetType = 2" to select the pin hard reset.
+      JLINK_SYS_Report("Detected MAIN_ResetType value of 2.  Using reset pin.");
+      JLINK_TIF_ActivateTargetReset();      // Generate pin reset
+      JLINK_SYS_Sleep(100);                 // Give reset some time
+      JLINK_TIF_ReleaseTargetReset();
+      JLINK_SYS_Sleep(20);                  // Delay after de-assert
+  }
+  JLINK_SYS_Report1( "Using custom reset for xG22 parts with MAIN_ResetType of ", MAIN_ResetType);
+
+  // First connection attempt
+  r = AttemptConnectSysresetHalt();
+  if ( r == 0 ) {
+    // Success!
+    return 0;
+  }
+
+  // Did not succeed in connecting to target
+  // Attempting a pin reset.
+  JLINK_SYS_Report("First attempt failed. Using reset pin.");
+  JLINK_TIF_ActivateTargetReset();
+  JLINK_SYS_Sleep(10);
+  JLINK_TIF_ReleaseTargetReset();
+
+  if ( JLINK_ActiveTIF == JLINK_TIF_SWD ) {
+    // If using SWD we have to wait with connecting to the target.
+    // This is because attempting to connect to the target before
+    // it has exited reset can cause the target to enter JTAG mode
+    // and lock PA3 and PA4 for JTAG use until next full reset.
+    // Luckily, xG22 root code takes approximately 14ms, so we have
+    // some time after reset before user code starts.
+    JLINK_SYS_Report("Waiting 6ms to ensure chip is out of reset");
+    JLINK_SYS_Sleep( 6 );
+  }
+
+  // Second connection attempt
+  r = AttemptConnectSysresetHalt();
+  if ( r == 0 ) {
+    // Success!
+    return 0;
+  }
+
+  // Second attempt failed, halting core at least
+  JLINK_SYS_Report("Second attempt failed. Halting wherever and returning.");
+  r = HaltCore();
+  if ( r == 0 ) {
+    // We managed to halt!
+    return 0;
+  }
+
+  // Failure
+  JLINK_SYS_Report( "Error: Unable to reset & halt target device!" );
+  return -1;
+
+}
+
+
+/*********************************************************************
+*
+*       InitTarget
+*
+*       Setup target AP-layout.
+*/
+void InitTarget(void) {
+  Report("----------------------------------------------------------------\n");
+  Report("  EFR32XG22 family J-Link Script: InitTarget()\n");
+  Report("  Setting M33 AP[0] as default AHB-AP index\n");
+  Report("----------------------------------------------------------------\n");
+  JLINK_CORESIGHT_AddAP(0, CORESIGHT_AHB_AP);
+  JLINK_CORESIGHT_AddAP(1, CORESIGHT_CUSTOM_AP);
+  JLINK_CORESIGHT_AddAP(3, CORESIGHT_AHB_AP);  // For the sequencer CPU
+  //
+  // Use AP[0] as AHB-AP for target communication
+  //
+  CORESIGHT_IndexAHBAPToUse = 0;
+}
+
+
+/*********************************************************************
+*
+*       AfterResetTarget
+*
+*       Called after ResetTarget.
+*/
+int AfterResetTarget(void)
+{
+  Report("AfterResetTarget()\n");
+
+  // Set AIRCR.VECTCLRACTIVE to:
+  //   - IPSR cleared to zero
+  //   - clears active state of all non-secure exceptions
+  //   - if DHCSR.S_SDE == 1, clears active state for all secure exceptions
+  //   This is required because IAR IDE uses its own mechanism to reset CPU
+  //   after flash loader is downloaded to RAM.  This reset causes HardFault to
+  //   trigger because root mode executes but will ignore DEMCR.VC_CORERESET.
+  //   So we clear the HardFault exception after the flash loader has been
+  //   downloaded to RAM but before flash loader executes.
+
+  JLINK_MEM_WriteU32(HFSR, JLINK_MEM_ReadU32(HFSR));
+  JLINK_MEM_WriteU32(AIRCR,
+                     AIRCR_VECTKEY | AIRCR_VECTCLRACTIVE);
+  return 0;
+}
+
+int HandleBeforeFlashProg(void)
+{
+  U32 miscLock;
+  U32 clken;
+
+  clken = JLINK_MEM_ReadU32(CMU_CLKEN1_S2);
+  if ((clken & CMU_CLKEN1_IMEM_S2) == 0){
+    clken |= CMU_CLKEN1_IMEM_S2;
+    JLINK_MEM_WriteU32(CMU_CLKEN1_S2, clken);
+  }
+
+  // Unlock MSC
+  JLINK_MEM_WriteU32(MSC_LOCK, MSC_UNLOCK_CODE);
+
+  miscLock = JLINK_MEM_ReadU32(MSC_MISCLOCK);
+
+  JLINK_SYS_Report1("MISCLOCK_UDLOCK ", (miscLock & MSC_MISCLOCK_UDLOCK));
+
+  if (miscLock & MSC_MISCLOCK_UDLOCK) {
+    JLINK_SYS_Report("Unlocking userdata page...");
+
+    miscLock &= ~MSC_MISCLOCK_UDLOCK;
+
+    JLINK_MEM_WriteU32(MSC_MISCLOCK, miscLock);
+    miscLock = JLINK_MEM_ReadU32(MSC_MISCLOCK);
+    JLINK_SYS_Report1("MISCLOCK_UDLOCK ", (miscLock & MSC_MISCLOCK_UDLOCK));
+  }
+  return 0;
+}
