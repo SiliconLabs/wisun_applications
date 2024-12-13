@@ -1,0 +1,21 @@
+<DataBase>
+  <Device>
+    <ChipInfo Vendor="Silicon Labs" Name="EFR32XG25A000F1920" Core="JLINK_CORE_CORTEX_M33" WorkRAMAddr="0x20000000" WorkRAMSize="0x40000"  JLinkScriptFile="EFR32Series2/Series2.JLinkScript" Aliases="EFR32FG25AxxxF1920;EFR32XG25AxxxF1920;EFR32FG25BxxxF1920;EFR32XG25BxxxF1920;" />
+    <FlashBankInfo Name="Main Flash" BaseAddr="0x08000000" MaxSize="0x1E0000" Loader="EFR32XG25/EFR32XG25.elf" LoaderType="FLASH_ALGO_TYPE_OPEN" />
+    <FlashBankInfo Name="Userdata" BaseAddr="0x0fe00000" MaxSize="0x400" Loader="EFR32Series2/Series2UD.elf" LoaderType="FLASH_ALGO_TYPE_OPEN" />
+  </Device>
+  <Device>
+    <ChipInfo Vendor="Silicon Labs" Name="EFR32XG27C000F768" Core="JLINK_CORE_CORTEX_M33" WorkRAMAddr="0x20000000" WorkRAMSize="0x8000"  JLinkScriptFile="EFR32XG27/EFR32XG27.JLinkScript" Aliases="EFR32MG27C140F768IM40;EFR32MG27CxxxF768;EFR32BG27CxxxF768;EFR32XG27XxxxF768" />
+    <FlashBankInfo Name="Main Flash" BaseAddr="0x08000000" MaxSize="0xC0000" Loader="EFR32Series2/Series2.elf" LoaderType="FLASH_ALGO_TYPE_OPEN" />
+    <FlashBankInfo Name="Userdata" BaseAddr="0x0fe00000" MaxSize="0x400" Loader="EFR32Series2/Series2UD.elf" LoaderType="FLASH_ALGO_TYPE_OPEN" />
+  </Device>
+  <Device>
+    <ChipInfo Vendor="Silicon Labs" Name="EFR32XG28A000F1024" Core="JLINK_CORE_CORTEX_M33" WorkRAMAddr="0x20000000" WorkRAMSize="0x8000"  JLinkScriptFile="EFR32Series2/Series2.JLinkScript" Aliases="EFR32FG28AxxxF1024;EFR32ZG28AxxxF1024;EFR32XG28AxxxF1024;EFR32FG28BxxxF1024;EFR32ZG28BxxxF1024;EFR32XG28BxxxF1024;EFM32PG28BxxxF1024;EFM32PG28BxxxF512;" />
+    <FlashBankInfo Name="Main Flash" BaseAddr="0x08000000" MaxSize="0x100000" Loader="EFR32Series2/Series2.elf" LoaderType="FLASH_ALGO_TYPE_OPEN" />
+    <FlashBankInfo Name="Userdata" BaseAddr="0x0fe00000" MaxSize="0x400" Loader="EFR32Series2/Series2UD.elf" LoaderType="FLASH_ALGO_TYPE_OPEN" />
+  </Device>
+  <Device>
+   <ChipInfo Vendor="Silicon Labs" Name="Si917" Core="JLINK_CORE_CORTEX_M4" WorkRAMAddr="0x00000000" WorkRAMSize="0x00020000" />
+   <FlashBankInfo Name="QSPI Flash" BaseAddr="0x08000000" MaxSize="0x00400000" Loader="Si917/Si917_Flashloader.elf" LoaderType="FLASH_ALGO_TYPE_OPEN" />
+  </Device>
+</DataBase>
