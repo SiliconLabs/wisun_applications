@@ -74,9 +74,10 @@ To test this application, you can
 
 The demonstration uses a Wi-SUN network, supporting
 
-- UDP (natively)
-- CoAP (using the Wi-SUN CoAP Service)
 - OTA DFU (this requires using a bootloader with storage enabled and the selected compression mechanism installed)
+- CoAP (using the Wi-SUN CoAP Service), because OTA DFU requires CoAP
+- UDP client and server (optional), because CoAP is on top of UDP
+- TCP client and server (optional)
 
 ## How it works ##
 
@@ -104,6 +105,31 @@ Network parameters are set during project development, then the device automatic
 - **Node Initial Connection** – After the application firmware is installed, the devices connect automatically to the Wi-SUN network, selecting the best parent, using several hops if needed, as in any Wi-SUN network.
 
 - **Initial Connection Message** - Once connected, each node sends an initial UDP connection message to the Border Router's IPv6 address on port 1237.
+
+### Buttons and LEDs ###
+
+With version v3.1.0 Button and LEDs control has been added as an option.
+To use this, install the following components and create the first 2 instances with default naming:
+
+- `SIMPLE_BUTTON` for `sl_button_btn0` and `sl_button_btn1`
+- `SIMPLE_LED` for `sl_led_led0` and `sl_led_led1`
+
+By default, the pintool settings will match the Radio Board pin out.
+To allocate different pins to the buttons or LEDs, use the pintool.
+
+> If the above components are not installed, the corresponding code is not compiled.
+
+#### Buttons usage ####
+
+- At boot: The buttons can be pressed to select 4 startup options (options to be implemented)
+- While running: When buttons are pressed, a dedicated message is sent to the UDP notification server with the button states. This can be used to identify a device in a network graph.
+
+#### LEDS usage ####
+
+- At boot: A number of flashed (both leds flashing) is done at boot. This can be changed to allow identifying the application's version.
+- While connecting: The LEDs indicate the join state as `join_state & 0x03`
+- Once connected: The LEDS execute a worm pattern with a 1 sec period. This can be used to make sure the device is still connected and working.
+- When sending a message: The LEDS flash briefly
 
 ### Network Monitoring ###
 
@@ -166,6 +192,26 @@ The URIs are
 |reporter/start                   | Start RTT trace filtering on \<str\> and report on `REPORTER_PORT`, using `app_reporter.c/.h`  | '%s'| '-e \<string_1\|string_2\|...\|string_n\>' sets the list of strings to look for in RTT traces. |
 |reporter/stop                    | Stop RTT trace reporting |||
 
+### CoAP request examples ###
+
+- Get auto_send duration: GET method
+
+```bash
+coap-client -m get -N -B 10 -t text coap://[fd12:3456::62a4:23ff:fe37:aec3]:5683/settings/auto_send
+```
+
+- Set auto_send duration: POST method
+
+```bash
+coap-client -m post -N -B 10 -t text coap://[fd12:3456::62a4:23ff:fe37:aec3]:5683/settings/auto_send -e 60
+```
+
+- Set trace group [SL_WISUN_TRACE_GROUP_RF](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-trace-group-config-t#group-id) to trace_level [SL_WISUN_TRACE_LEVEL_DEBUG](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-trace-group-config-t#trace-level)
+
+```bash
+coap-client -m post -N -B 10 -t text coap://[fd12:3456::62a4:23ff:fe37:aec3]:5683/settings/trace_level -e "34 4"
+```
+
 ## .slcp Project Used ##
 
 - [wisun_node_monitoring.slcp](https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/wisun_node_monitoring.slcp)
@@ -203,11 +249,11 @@ It is easy to customize the notification messages in [`app.c`](https://github.co
 
 (Refer to [LFN in Silicon Labs Wi-SUN Stack](https://docs.silabs.com/wisun/latest/wisun-lfn/#lfn-in-silicon-labs-wi-sun-stack) for details on Wi-SUN LFN, including power management aspects)
 
-Adding the **Wi-SUN Stack LFN Support Plugin** is required to turn the device into a LFN.
+Adding the **Wi-SUN Stack LFN Support** component is required to turn the device into a LFN.
 
-With GSDK 4.4.0, the 'Wi-SUN Stack LFN Support Plugin' is listed with 'Evaluation' quality in Simplicity Studio, so it is found in the 'SOFTWARE COMPONENTS' once the 'Evaluation' level has been selected in the 'Quality' drop down list.
+With SiSDK 2024-6, the 'Wi-SUN Stack LFN Support' component is listed with 'Evaluation' quality in Simplicity Studio, so it is found in the 'SOFTWARE COMPONENTS' once the 'Evaluation' level has been selected in the 'Quality' drop down list.
 
-![LFN Plugin Component](image/LFN_plugin.png)
+![LFN Support Component](image/LFN_component.png)
 
 Install this component to get access to the 'Device Type' Drop down box in the Wi-SUN Configurator.
 

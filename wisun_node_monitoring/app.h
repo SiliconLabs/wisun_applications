@@ -76,6 +76,10 @@ extern char crash_info_string[];
  * @details This function is the main app task implementation
  * @param[in] args arguments
  *****************************************************************************/
+#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+  void leds_flash(uint16_t count, uint16_t delay_ms);
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+
 void app_task(void *args);
 void app_reset_statistics(void);
 void refresh_parent_tag(void);

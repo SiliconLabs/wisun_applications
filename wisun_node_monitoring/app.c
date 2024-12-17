@@ -37,19 +37,17 @@
 //                                   Includes
 // -----------------------------------------------------------------------------
 #include <stdio.h>
-#include <assert.h>
-#include <string.h>
 #include <stdlib.h>
 
 #include "os.h"
 #include "printf.h"
 #include "app.h"
 
-#include "socket/socket.h"
+#include "sl_assert.h"
+#include "sl_string.h"
 
 #include "sl_wisun_api.h"
 #include "sl_wisun_version.h"
-#include "sl_string.h"
 #include "sl_wisun_trace_util.h"
 #include "sl_wisun_crash_handler.h"
 #include "sl_wisun_event_mgr.h"
@@ -57,10 +55,21 @@
 #include "sl_wisun_coap.h"
 #include "sl_wisun_coap_config.h"
 
+#ifdef    SL_CATALOG_SIMPLE_BUTTON_PRESENT
+#include "sl_simple_button_instances.h"
+#endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
+
+#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+ #include "sl_simple_led_instances.h"
+ void *led0;
+ void *led1;
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+
 #include "app_coap.h"
 #include "app_check_neighbors.h"
 
 #define   APP_TRACK_HEAP
+//#define   APP_TRACK_HEAP_DIFF
 #define   APP_CHECK_PREVIOUS_CRASH
 
 #ifdef    APP_CHECK_PREVIOUS_CRASH
@@ -220,7 +229,9 @@ sl_wisun_neighbor_info_t secondary_info;// local storage of the secondary parent
 
 #ifdef    APP_TRACK_HEAP
 sl_memory_heap_info_t app_heap_info;
+ #ifdef    APP_TRACK_HEAP_DIFF
 size_t app_previous_heap_free;
+ #endif /* APP_TRACK_HEAP_DIFF */
 bool   refresh_heap;
 #endif /* APP_TRACK_HEAP */
 
@@ -288,6 +299,13 @@ uint8_t  trace_level = SL_WISUN_TRACE_LEVEL_DEBUG;    // Trace level for all tra
 #define SL_WISUN_STATUS_CONNECTION_URI_PATH  "/status/connection"
 #define SL_WISUN_STATUS_JSON_STR_MAX_LEN 512
 
+#ifdef    SL_SIMPLE_BUTTON_INSTANCES_H
+  bool B0;
+  bool B1;
+  bool check_buttons;
+  #define BUTTON_CHECK_DELAY 2
+#endif /* SL_SIMPLE_BUTTON_INSTANCES_H */
+
 // Notifications destinations (UDP and CoAP)
 // Set to fixed IPv6 strings
 #define UDP_NOTIFICATION_DEST  "fd00:6172:6d00::1" // fixed IPv6 string
@@ -333,14 +351,72 @@ void sl_wisun_on_event(sl_wisun_evt_t *evt)
     app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_ERROR, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_TIM_SRV, SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true);
+    app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_MAC    , SL_WISUN_TRACE_LEVEL_WARN , true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_FSM    , SL_WISUN_TRACE_LEVEL_WARN , true);
 
 #define TRACES_WHEN_CONNECTED \
     app_set_all_traces(SL_WISUN_TRACE_LEVEL_DEBUG, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_ERROR, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_TIM_SRV, SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true);
+    app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_MAC    , SL_WISUN_TRACE_LEVEL_WARN , true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_FSM    , SL_WISUN_TRACE_LEVEL_WARN , true);
+
+#ifdef    SL_CATALOG_SIMPLE_BUTTON_PRESENT
+char* _button_json_string (char * start_text) {
+  #define BUTTON_JSON_FORMAT_STR  \
+    "%s"                          \
+    START_JSON                    \
+    DEVICE_CHIP_JSON_FORMAT       \
+    PARENT_JSON_FORMAT            \
+    "\"BTN0\":\"%d\",\n"          \
+    "\"BTN1\":\"%d\",\n"          \
+    END_JSON
+
+  snprintf(json_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE,
+    BUTTON_JSON_FORMAT_STR,
+    start_text,
+    DEVICE_CHIP_ITEMS,
+    PARENT_INFO_ITEMS,
+    B0,
+    B1
+  );
+
+  return json_string;
+}
+#endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
+
+#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+void set_leds(uint8_t led1, uint8_t led0) {
+  if (led1 == 0) sl_led_turn_off(&sl_led_led1);
+  if (led1 == 1) sl_led_turn_on (&sl_led_led1);
+  if (led0 == 0) sl_led_turn_off(&sl_led_led0);
+  if (led0 == 1) sl_led_turn_on (&sl_led_led0);
+}
+
+void leds_f_join_state(sl_wisun_join_state_t join_state) {
+  // Led1/led0 represent (join_state & 0x11) in binary form, for easier interpretation
+  if (join_state == SL_WISUN_JOIN_STATE_SELECT_PAN        ) set_leds(0, 1); /* JS 1: '01' */
+  if (join_state == SL_WISUN_JOIN_STATE_AUTHENTICATE      ) set_leds(1, 0); /* JS 2: '10' */
+  if (join_state == SL_WISUN_JOIN_STATE_ACQUIRE_PAN_CONFIG) set_leds(1, 1); /* JS 3: '11' */
+  if (join_state == SL_WISUN_JOIN_STATE_CONFIGURE_ROUTING ) set_leds(0, 0); /* JS 4: '00' */
+}
+
+void leds_flash(uint16_t count, uint16_t delay_ms) {
+  uint16_t i;
+  uint32_t  ticks;
+  ticks = (uint32_t)1.0*delay_ms;
+  printfTime("leds_flash(%d, %d) ticks %ld\n", count, delay_ms, ticks);
+  for (i=0; i<count; i++) {
+      set_leds(0, 0);
+      osDelay(ticks);
+      set_leds(1, 1);
+      osDelay(ticks);
+  }
+}
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
 /* App task function*/
 void app_task(void *args)
@@ -350,6 +426,13 @@ void app_task(void *args)
   uint64_t connection_timestamp;
   uint64_t connected_delay_sec;
   bool print_keep_alive = true;
+#ifdef    SL_CATALOG_SIMPLE_BUTTON_PRESENT
+  uint8_t startup_option = 0;
+#endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
+#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+  uint8_t change_leds;
+  uint8_t previous_change_leds = 5;
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
   bool with_time, to_console, to_rtt, to_udp, to_coap;
 
   app_timestamp_init();
@@ -366,13 +449,15 @@ void app_task(void *args)
 
   printf("\n");
   sprintf(chip, "%s", CHIP);
-  snprintf(application, 100, "%s", "Wi-SUN Node Monitoring V3.0.0");
+  snprintf(application, 100, "%s", "Wi-SUN Node Monitoring V3.1.0");
   printfBothTime("%s/%s %s\n", chip, SL_BOARD_NAME, application);
   snprintf(version, 80, "Compiled on %s at %s", __DATE__, __TIME__);
+
   printfBothTime("%s\n", chip);
   printfBothTime("%s\n", SL_BOARD_NAME);
   printfBothTime("%s\n", application);
   printfBothTime("%s\n", version);
+
   printfBothTime("Network %s\n", WISUN_CONFIG_NETWORK_NAME);
 #ifdef    SL_CATALOG_APP_OS_STAT_PRESENT
 #ifdef APP_OS_STAT_UPDATE_PERIOD_TIME_MS
@@ -415,7 +500,7 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
   printfBothTime("device_tag %s\n", device_tag);
 
   // Set device_type based on application settings
-#ifdef   SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+#ifdef    WISUN_CONFIG_DEVICE_TYPE
   if (WISUN_CONFIG_DEVICE_TYPE == SL_WISUN_LFN ) {
     #if !defined(WISUN_CONFIG_DEVICE_PROFILE)
       sprintf(device_type, "LFN (null profile)");
@@ -440,13 +525,50 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
       }
     #endif  /* WISUN_CONFIG_DEVICE_PROFILE */
   } else if (WISUN_CONFIG_DEVICE_TYPE == SL_WISUN_ROUTER ) {
+#ifdef   SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
       sprintf(device_type, "FFN with LFN support");
+#else /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
+    sprintf(device_type, "FFN with No LFN support");
+#endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
   }
+  printfBothTime("device_type %s (%d)\n", device_type, WISUN_CONFIG_DEVICE_TYPE);
+#else  /* WISUN_CONFIG_DEVICE_TYPE */
+  #ifdef   SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+    sprintf(device_type, "FFN with LFN support");
 #else /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
   sprintf(device_type, "FFN with No LFN support");
 #endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
-  printfBothTime("device_type %s\n", device_type);
+#endif /* WISUN_CONFIG_DEVICE_TYPE */
 
+#ifdef    SL_CATALOG_SIMPLE_BUTTON_PRESENT
+  B0 = ( sl_button_get_state(&sl_button_btn0) == SL_SIMPLE_BUTTON_PRESSED );
+  B1 = ( sl_button_get_state(&sl_button_btn1) == SL_SIMPLE_BUTTON_PRESSED );
+  startup_option = B0 + (B1 << 1);
+  printfBothTime("Startup option %d ('%d%d')\n", startup_option, B1, B0);
+  check_buttons = true;
+  #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+  int i;
+  for (i=0; i<10; i++) {
+      if (i % 2 == 0) {
+          if (startup_option == 0) {
+              set_leds(1, 1);
+          } else {
+              set_leds(0, 0);
+          }
+      }
+      if (i % 2 == 1) set_leds(B1, B0);
+      osDelay(200);
+  }
+  osDelay(800);
+  set_leds(0, 0);
+  #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+  if (startup_option == 1) {
+    sl_wisun_clear_credential_cache();
+    printfBothTime("Cleared credential cache (startup option 3)\n");
+  }
+#endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
+
+  printfBothTime("device_type %s\n", device_type);
   // Register our join state custom callback function with the event manager (aka 'em')
   app_wisun_em_custom_callback_register(SL_WISUN_MSG_JOIN_STATE_IND_ID, _join_state_custom_callback);
 
@@ -545,7 +667,9 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
 
 #ifdef    APP_TRACK_HEAP
   sl_memory_get_heap_info(&app_heap_info);
+  #ifdef    APP_TRACK_HEAP_DIFF
   app_previous_heap_free = app_heap_info.free_size;
+  #endif /* APP_TRACK_HEAP_DIFF */
   refresh_heap = true;
 #endif /* APP_TRACK_HEAP */
 
@@ -553,6 +677,9 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
     ///////////////////////////////////////////////////////////////////////////
     // Put your application code here!                                       //
     ///////////////////////////////////////////////////////////////////////////
+
+      now = now_sec();
+      connected_delay_sec = now - connection_timestamp;
 
     // We can only send messages outside if connected
     if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
@@ -567,6 +694,17 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
         check_udp_server_messages();
       #endif /* WITH_UDP_SERVER */
 
+#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+      // 1 Sec join state 5 indicator
+      change_leds = connected_delay_sec % 4;
+      if (change_leds != previous_change_leds) {
+          if (change_leds == 0) set_leds(0, 1);
+          if (change_leds == 1) set_leds(1, 1);
+          if (change_leds == 2) set_leds(1, 0);
+          if (change_leds == 3) set_leds(0, 0);
+          previous_change_leds = change_leds;
+      }
+#endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
     } else {
 #ifdef    AUTO_CLEAR_CREDENTIAL_CACHE
       if (just_disconnected) {
@@ -577,18 +715,30 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
       }
 #endif /* AUTO_CLEAR_CREDENTIAL_CACHE */
       to_udp = to_coap = false;
+#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+      // 1 Sec non join state 5 indicator
+      change_leds = connected_delay_sec % 4;
+      if (change_leds != previous_change_leds) {
+          if (change_leds == 0         ) leds_f_join_state(join_state);
+          if (change_leds == join_state) set_leds(0, 0);
+          previous_change_leds = change_leds;
+      }
+#endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
     }
 
-    // Print status message every auto_send_sec seconds
-    now = now_sec();
-    connected_delay_sec = now - connection_timestamp;
+    // Print status message once then disable status
     if (connected_delay_sec % auto_send_sec == 0) {
         if (print_keep_alive == true) {
           _print_and_send_messages (_status_json_string(""),
                     with_time, to_console, to_rtt, to_udp, to_coap);
           print_keep_alive = false;
+          #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+          sl_led_toggle(&sl_led_led0);
+          sl_led_toggle(&sl_led_led1);
+          #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
         }
     }
+    // Enable status for next time
     if (connected_delay_sec % auto_send_sec == 1) {
         if (print_keep_alive == false) {
             print_keep_alive = true;
@@ -596,24 +746,61 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
     }
 
 #ifdef    APP_TRACK_HEAP
+    // Refresh heap info once then disable the refresh
     if (connected_delay_sec % 5 == 0) {
         if (refresh_heap) {
           sl_memory_get_heap_info(&app_heap_info);
+#ifdef    APP_TRACK_HEAP_DIFF
           if (app_previous_heap_free == 0) { app_previous_heap_free = app_heap_info.free_size; }
-          printfBothTime("heap free %d (diff %d) used %d %6.2f%%\n",
-                         app_heap_info.free_size, app_heap_info.free_size - app_previous_heap_free,
+          if (app_previous_heap_free != app_heap_info.free_size) {
+            printfBothTime("heap free %8d used %8d %6.2f%% (diff %5d)\n",
+                        app_heap_info.free_size,
                          app_heap_info.used_size,
-                         1.0*app_heap_info.used_size / (app_heap_info.total_size / 100) );
+                        1.0*app_heap_info.used_size / (app_heap_info.total_size / 100),
+                        app_heap_info.free_size - app_previous_heap_free
+            );
+          }
           app_previous_heap_free = app_heap_info.free_size;
+#endif /* APP_TRACK_HEAP_DIFF */
           refresh_heap = false;
         }
     }
-    if (connected_delay_sec % 6 == 0) { refresh_heap = true; }
+    // Enable heap info refresh for next time
+    if (connected_delay_sec % 5 == 1) { refresh_heap = true; }
 #endif /* APP_TRACK_HEAP */
+
+#ifdef    SL_CATALOG_SIMPLE_BUTTON_PRESENT
+    if (connected_delay_sec % BUTTON_CHECK_DELAY == 0) {
+      if (check_buttons == true) {
+        check_buttons = false;
+        B0 = ( sl_button_get_state(&sl_button_btn0) == SL_SIMPLE_BUTTON_PRESSED );
+        B1 = ( sl_button_get_state(&sl_button_btn1) == SL_SIMPLE_BUTTON_PRESSED );
+        #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+         if (B0) sl_led_turn_on(&sl_led_led0);
+         if (B1) sl_led_turn_on(&sl_led_led1);
+        #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
+        if (B0 + B1) {
+          _print_and_send_messages (_button_json_string(""),
+                    with_time, to_console, to_rtt, to_udp, to_coap);
+        #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+           sl_led_turn_off(&sl_led_led0);
+           sl_led_turn_off(&sl_led_led1);
+        #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
+        }
+      }
+    }
+    if (connected_delay_sec % BUTTON_CHECK_DELAY == 1) {
+      check_buttons = true;
+    }
+#endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
 
     sl_wisun_app_core_util_dispatch_thread();
   }
 }
+
+// -----------------------------------------------------------------------------
+//                          Static Function Definitions
+// -----------------------------------------------------------------------------
 
 void app_reset_statistics(void) {
   connection_time_sec = now_sec();
@@ -686,6 +873,7 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
       delay = app_join_state_delay_sec[join_state] = app_join_state_sec[join_state] - app_join_state_sec[join_state-1];
       printfBothTime("app_join_state_delay_sec[%d] = %llu sec\n", join_state, delay);
     }
+
     if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
       connection_time_sec = app_join_state_sec[join_state];
       connection_count ++;
@@ -732,6 +920,9 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
       TRACES_WHILE_CONNECTING;
     }
     previous_join_state = join_state;
+#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+    leds_f_join_state(join_state);
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
   }
 }
 
