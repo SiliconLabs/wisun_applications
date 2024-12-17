@@ -295,11 +295,11 @@ bool _check_app_statistics_reset  (
 sl_wisun_coap_packet_t * coap_callback_join_states_sec (
       const  sl_wisun_coap_packet_t *const req_packet)  {
   snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "[%llu,%llu,%llu,%llu,%llu]",
-           app_join_state_delay_sec[1],
-           app_join_state_delay_sec[2],
-           app_join_state_delay_sec[3],
-           app_join_state_delay_sec[4],
-           app_join_state_delay_sec[5]
+          app_join_state_delay_sec[1],
+          app_join_state_delay_sec[2],
+          app_join_state_delay_sec[3],
+          app_join_state_delay_sec[4],
+          app_join_state_delay_sec[5]
   );
   return app_coap_reply(coap_response, req_packet); }
 
@@ -332,6 +332,29 @@ sl_wisun_coap_packet_t * coap_callback_availability (
   snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%6.2f", 100.0*(connected_total_sec + now_sec() - connection_time_sec)/(connected_total_sec + now_sec() - connection_time_sec + disconnected_total_sec) );
   _check_app_statistics_reset(req_packet);
   return app_coap_reply(coap_response, req_packet); }
+
+#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+sl_wisun_coap_packet_t * coap_callback_leds_flash (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  // default: 30 sec at 2 per sec
+  #define DEFAULT_COUNT   30
+  #define DEFAULT_DELAY  250
+  uint16_t count;
+  uint16_t delay_ms;
+  int res = 0;
+  if (req_packet->payload_len) {
+    // Make sure payload last char is NULL
+    req_packet->payload_ptr[req_packet->payload_len] = 0x00;
+    res = sscanf((char *)req_packet->payload_ptr, "%hd %hd", &count, &delay_ms);
+  }
+  if (res != 2) {
+      count    = DEFAULT_COUNT;
+      delay_ms = DEFAULT_DELAY;
+  }
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "flashing leds %d times with %d ms delay", count, delay_ms);
+  leds_flash(count, delay_ms);
+return app_coap_reply(coap_response, req_packet); }
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
 #ifdef    HISTORY
 sl_wisun_coap_packet_t * coap_callback_history (
@@ -818,6 +841,16 @@ uint8_t app_coap_resources_init() {
   coap_resource.discoverable = true;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
+
+#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+  coap_resource.data.uri_path = "/leds/flash";
+  coap_resource.data.resource_type = "leds";
+  coap_resource.data.interface = "leds";
+  coap_resource.auto_response = coap_callback_leds_flash;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
 #ifdef    HISTORY
   coap_resource.data.uri_path = "/history";

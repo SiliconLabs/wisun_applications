@@ -106,6 +106,31 @@ Network parameters are set during project development, then the device automatic
 
 - **Initial Connection Message** - Once connected, each node sends an initial UDP connection message to the Border Router's IPv6 address on port 1237.
 
+### Buttons and LEDs ###
+
+With version v3.1.0 Button and LEDs control has been added as an option.
+To use this, install the following components and create the first 2 instances with default naming:
+
+- `SIMPLE_BUTTON` for `sl_button_btn0` and `sl_button_btn1`
+- `SIMPLE_LED` for `sl_led_led0` and `sl_led_led1`
+
+By default, the pintool settings will match the Radio Board pin out.
+To allocate different pins to the buttons or LEDs, use the pintool.
+
+> If the above components are not installed, the corresponding code is not compiled.
+
+#### Buttons usage ####
+
+- At boot: The buttons can be pressed to select 4 startup options (options to be implemented)
+- While running: When buttons are pressed, a dedicated message is sent to the UDP notification server with the button states. This can be used to identify a device in a network graph.
+
+#### LEDS usage ####
+
+- At boot: A number of flashed (both leds flashing) is done at boot. This can be changed to allow identifying the application's version.
+- While connecting: The LEDs indicate the join state as `join_state & 0x03`
+- Once connected: The LEDS execute a worm pattern with a 1 sec period. This can be used to make sure the device is still connected and working.
+- When sending a message: The LEDS flash briefly
+
 ### Network Monitoring ###
 
 - **Automatic Status Messages** – Every `auto_send` seconds (default 60), the connected devices send a status message to the Border Router's IPv6 address on port 1237.
