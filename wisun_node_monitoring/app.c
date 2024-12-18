@@ -45,8 +45,10 @@
 
 #include "sl_assert.h"
 #include "sl_string.h"
+#include "sl_memory_manager.h"
 
 #include "sl_wisun_api.h"
+#include "sl_wisun_types.h"
 #include "sl_wisun_version.h"
 #include "sl_wisun_trace_util.h"
 #include "sl_wisun_crash_handler.h"
@@ -63,6 +65,8 @@
  #include "sl_simple_led_instances.h"
  void *led0;
  void *led1;
+#define START_FLASHES_A 6
+#define START_FLASHES_B 2
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
 #include "app_coap.h"
@@ -547,24 +551,21 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
   printfBothTime("Startup option %d ('%d%d')\n", startup_option, B1, B0);
   check_buttons = true;
   #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-  int i;
-  for (i=0; i<10; i++) {
-      if (i % 2 == 0) {
-          if (startup_option == 0) {
-              set_leds(1, 1);
-          } else {
-              set_leds(0, 0);
-          }
-      }
-      if (i % 2 == 1) set_leds(B1, B0);
-      osDelay(200);
-  }
+  // LEDs indicate the 'version' in 2 steps
+  leds_flash(START_FLASHES_A, 200);
   osDelay(800);
+  leds_flash(START_FLASHES_B, 200);
+  osDelay(800);
+  // LEDs show startup option for 1 sec
+  set_leds(B1, B0);
+  osDelay(1000);
+  // LEDs cleared to follow the join state (must be 1 if no credentials, 3 otherwise)
+  // If LEDs stay at 0: check selected PHY vs Radio Config
   set_leds(0, 0);
   #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
   if (startup_option == 1) {
     sl_wisun_clear_credential_cache();
-    printfBothTime("Cleared credential cache (startup option 3)\n");
+    printfBothTime("Cleared credential cache (startup_option 1)\n");
   }
 #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
 
