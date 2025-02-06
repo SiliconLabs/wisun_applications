@@ -57,6 +57,9 @@
 #include "sl_wisun_coap.h"
 #include "sl_wisun_coap_config.h"
 
+ /* Increase SL_APPLICATION_VERSION in app_properties_config.h to use DELTA DFU */
+ #include "app_properties_config.h"
+
 #ifdef    SL_CATALOG_SIMPLE_BUTTON_PRESENT
 #include "sl_simple_button_instances.h"
 #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
@@ -149,13 +152,15 @@
   device_global_ipv6_string, \
   device_tag, \
   CHIP, \
-  device_type
+  device_type, \
+  device_mac_string
 
 #define DEVICE_CHIP_JSON_FORMAT \
   "\"ipv6\":\"%s\",\n"   \
   "\"device\":\"%s\",\n"           \
   "\"chip\":  \"%s\",\n"           \
   "\"type\":\"%s\",\n"   \
+  "\"MAC\":\"%s\",\n"    \
 
 // List below the items from parent_info you want to return
 // Update PARENT_JSON to match (in the same order, with the proper display format)
@@ -186,14 +191,17 @@
 #define RUNNING_JSON_FORMAT \
   "\"running\":     \"%s\",\n"
 
+#define MSG_COUNT_JSON_FORMAT \
+    "\"msg_count\":\"%lld\",\n"
+
 #ifdef  _SILICON_LABS_32B_SERIES_1             /** Product Series Identifier */
-  #ifdef _SILICON_LABS_32B_SERIES_1_CONFIG_2
+  #ifdef _SILICON_LABS_32B_SERIES_1_CONFIG_2   /** Product Config Identifier */
     #define CHIP "xG12"
   #endif
 #endif
 
 #ifdef  _SILICON_LABS_32B_SERIES_2             /** Product Series Identifier */
-  #ifdef _SILICON_LABS_32B_SERIES_2_CONFIG_5
+  #ifdef _SILICON_LABS_32B_SERIES_2_CONFIG_5   /** Product Config Identifier */
     #define CHIP "xG25"
   #endif
   #ifdef _SILICON_LABS_32B_SERIES_2_CONFIG_8                                                     /** Product Config Identifier */
@@ -212,6 +220,7 @@ void        _join_state_custom_callback(sl_wisun_evt_t *evt);
 void        _check_neighbors(void);
 char*       _connection_json_string();
 char*       _status_json_string (char * start_text);
+char        device_mac_string[40];
 sl_wisun_mac_address_t _get_parent_mac_address_and_update_parent_info(void);
 sl_status_t _select_destinations(void);
 sl_status_t _open_udp_sockets(void);
@@ -228,8 +237,11 @@ uint64_t connection_time_sec;        // last connection time stamp
 uint64_t disconnection_time_sec;     // last disconnection time stamp
 uint64_t connected_total_sec = 0;    // total time connected
 uint64_t disconnected_total_sec = 0; // total time disconnected
+uint64_t msg_count = 0;              // number of messages sent
 sl_wisun_neighbor_info_t parent_info;   // local storage of the parent info
 sl_wisun_neighbor_info_t secondary_info;// local storage of the secondary parent info
+uint8_t selected_device_type;
+uint16_t preferred_pan_id = 0xffff;  // Preferred PAN Id (0xffff for 'none')
 
 #ifdef    APP_TRACK_HEAP
 sl_memory_heap_info_t app_heap_info;
@@ -240,6 +252,8 @@ bool   refresh_heap;
 #endif /* APP_TRACK_HEAP */
 
 uint16_t auto_send_sec = 60; // Notification period in seconds
+uint8_t  neighbor_table_size = 22;  // Size of neighbor table (default 22 in Wi-SUN stack)
+                                    // Increase if case of high network density (if many devices are within range of others)
 
 bool print_keep_alive = true;
 
@@ -294,7 +308,7 @@ char udp_msg[1024];
 char coap_msg[1024];
 
 uint16_t msg_len;
-uint8_t  trace_level = SL_WISUN_TRACE_LEVEL_DEBUG;    // Trace level for all trace groups
+uint8_t  trace_level = SL_WISUN_TRACE_LEVEL_INFO;    // Trace level for all trace groups
 
 // UDP ports
 #define UDP_NOTIFICATION_PORT  1237
@@ -309,11 +323,6 @@ uint8_t  trace_level = SL_WISUN_TRACE_LEVEL_DEBUG;    // Trace level for all tra
   bool check_buttons;
   #define BUTTON_CHECK_DELAY 2
 #endif /* SL_SIMPLE_BUTTON_INSTANCES_H */
-
-// Notifications destinations (UDP and CoAP)
-// Set to fixed IPv6 strings
-#define UDP_NOTIFICATION_DEST  "fd00:6172:6d00::1" // fixed IPv6 string
-#define COAP_NOTIFICATION_DEST "fd00:6172:6d00::2" // fixed IPv6 string
 
 // CoAP Notification channel structure definition
 typedef struct sl_wisun_coap_notify_ch {
@@ -335,32 +344,20 @@ static sl_wisun_coap_notify_ch_t coap_notify_ch = {
 // -----------------------------------------------------------------------------
 //                          Public Function Definitions
 // -----------------------------------------------------------------------------
-#ifndef SL_CATALOG_WISUN_EVENT_MGR_PRESENT // Event Manager also defines this handler
-/*Wi-SUN event handler*/
-void sl_wisun_on_event(sl_wisun_evt_t *evt)
-{
-  (void) evt->header.id;
-
-  /////////////////////////////////////////////////////////////////////////////
-  // Put your Wi-SUN event handling here!                                    //
-  // This is called from Wi-SUN stack.                                       //
-  // Do not call blocking functions from here!                               //
-  // Protect your data during event handling!                                //
-  /////////////////////////////////////////////////////////////////////////////
-}
-#endif
 
 #define TRACES_WHILE_CONNECTING \
-    app_set_all_traces(SL_WISUN_TRACE_LEVEL_DEBUG, true); \
+    app_set_all_traces(SL_WISUN_TRACE_LEVEL_INFO, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_SOCK   , SL_WISUN_TRACE_LEVEL_INFO , true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_BOOT   , SL_WISUN_TRACE_LEVEL_DEBUG, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_ERROR, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_DEBUG, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_TIM_SRV, SL_WISUN_TRACE_LEVEL_ERROR, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_MAC    , SL_WISUN_TRACE_LEVEL_WARN , true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_FSM    , SL_WISUN_TRACE_LEVEL_WARN , true);
 
 #define TRACES_WHEN_CONNECTED \
-    app_set_all_traces(SL_WISUN_TRACE_LEVEL_DEBUG, true); \
+    app_set_all_traces(SL_WISUN_TRACE_LEVEL_INFO, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_ERROR, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_TIM_SRV, SL_WISUN_TRACE_LEVEL_ERROR, true); \
@@ -412,7 +409,7 @@ void leds_flash(uint16_t count, uint16_t delay_ms) {
   uint16_t i;
   uint32_t  ticks;
   ticks = (uint32_t)1.0*delay_ms;
-  printfTime("leds_flash(%d, %d) ticks %ld\n", count, delay_ms, ticks);
+  printfTime("leds_flash(%d, %d)\n", count, delay_ms);
   for (i=0; i<count; i++) {
       set_leds(0, 0);
       osDelay(ticks);
@@ -453,7 +450,11 @@ void app_task(void *args)
 
   printf("\n");
   sprintf(chip, "%s", CHIP);
-  snprintf(application, 100, "%s", "Wi-SUN Node Monitoring V3.1.0");
+#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+  snprintf(application, 100, "%s %d.%d", "Wi-SUN Node Monitoring V3.2.0", START_FLASHES_A, START_FLASHES_B);
+#else  /* SL_CATALOG_SIMPLE_LED_PRESENT */
+  snprintf(application, 100, "%s", "Wi-SUN Node Monitoring V3.2.0");
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
   printfBothTime("%s/%s %s\n", chip, SL_BOARD_NAME, application);
   snprintf(version, 80, "Compiled on %s at %s", __DATE__, __TIME__);
 
@@ -469,7 +470,6 @@ printfBothTime("with app_os_stat every %d ms\n", APP_OS_STAT_UPDATE_PERIOD_TIME_
 #endif /* APP_OS_STAT_UPDATE_PERIOD_TIME_MS */
 #endif /* SL_CATALOG_APP_OS_STAT_PRESENT */
 printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CONFIG_NETWORK_SIZE));
-
 #ifdef    WISUN_CONFIG_TX_POWER
   printfBothTime("Tx Power %d dBm\n", WISUN_CONFIG_TX_POWER);
 #endif /* WISUN_CONFIG_TX_POWER */
@@ -498,9 +498,15 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
     printfBothTime("With     UDP Server %s\n", DEFINE_string(WITH_UDP_SERVER));
   #endif /* WITH_UDP_SERVER */
 
+  #ifdef WITH_DIRECT_CONNECT
+    printfBothTime("With     Direct Connect\n");
+  #endif /* WITH_DIRECT_CONNECT */
+
   // Set device_tag to last 2 bytes of MAC address
   sl_wisun_get_mac_address(&device_mac);
+  sprintf(device_mac_string, "%s", app_wisun_mac_addr_to_str(&device_mac));
   sprintf(device_tag, "%02x%02x", device_mac.address[6], device_mac.address[7]);
+  printfBothTime("device MAC %s\n", device_mac_string);
   printfBothTime("device_tag %s\n", device_tag);
 
   // Set device_type based on application settings
@@ -570,11 +576,19 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
 #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
 
   printfBothTime("device_type %s\n", device_type);
+
+#ifdef    WITH_DIRECT_CONNECT
+  if (selected_device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
+    // Register our Direct Connect custom callback function with the event manager (aka 'em')
+    app_wisun_em_custom_callback_register(SL_WISUN_MSG_DIRECT_CONNECT_LINK_AVAILABLE_IND_ID, app_direct_connect_custom_callback);
+    app_wisun_em_custom_callback_register(SL_WISUN_MSG_DIRECT_CONNECT_LINK_STATUS_IND_ID   , app_direct_connect_custom_callback);
+    app_direct_connect(true);
+  }
+#endif /* WITH_DIRECT_CONNECT */
+
   // Register our join state custom callback function with the event manager (aka 'em')
   app_wisun_em_custom_callback_register(SL_WISUN_MSG_JOIN_STATE_IND_ID, _join_state_custom_callback);
 
-  // Store the time where we call app_wisun_connect_and_wait()
-  connect_time_sec = now_sec();
 #ifdef    AUTO_CLEAR_CREDENTIAL_CACHE
   sl_wisun_clear_credential_cache();
   printfBothTime("Cleared credential cache\n");
@@ -584,10 +598,58 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
   list_rf_configs();
 #endif /* LIST_RF_CONFIGS */
 
+  sl_wisun_set_neighbor_table_size(neighbor_table_size);
+  printfBothTime("Neighbor table size %d\n", neighbor_table_size);
+
+  printfBothTime("auto_send_sec %d\n", auto_send_sec);
+
+#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+  // LEDs indicate the 'version' in 2 steps
+  leds_flash(START_FLASHES_A, 200);
+  osDelay(800);
+  leds_flash(START_FLASHES_B, 200);
+  osDelay(800);
+  // LEDs show startup option for 1 sec
+  set_leds(B1, B0);
+  osDelay(1000);
+  // LEDs cleared to follow the join state (must be 1 if no credentials, 3 otherwise)
+  // If LEDs stay at 0: check selected PHY vs Radio Config
+  set_leds(0, 0);
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+
+  sl_wisun_set_preferred_pan(preferred_pan_id);
+  printfBothTime("preferred_pan_id 0x%04x\n", preferred_pan_id);
+
+#ifdef WITH_TCP_SERVER
+  init_tcp_server();
+#endif /* WITH_TCP_SERVER */
+
+#ifdef WITH_UDP_SERVER
+  init_udp_server();
+#endif /* WITH_UDP_SERVER */
+
+  // Store the time where we call app_wisun_connect_and_wait()
+  connect_time_sec = now_sec();
   #ifdef    SL_CATALOG_WISUN_APP_CORE_PRESENT
     // connect to the wisun network
-  sl_wisun_app_core_util_connect_and_wait();
+  sl_wisun_app_core_network_connect();
   #endif /* SL_CATALOG_WISUN_APP_CORE_PRESENT */
+
+  while (1) { // To allow a Direct Connect connection, regularly check UDP messages
+      now = now_sec();
+      sl_wisun_get_join_state(&join_state);
+      if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) break;
+      if (now % 60 == 0) {
+          printfTime("Waiting for connection to %s. join_state %d\n",
+                     WISUN_CONFIG_NETWORK_NAME, join_state);
+      }
+    #ifdef    WITH_DIRECT_CONNECT
+      #ifdef    WITH_UDP_SERVER
+      check_udp_server_messages();
+      #endif /* WITH_UDP_SERVER */
+    #endif /* WITH_DIRECT_CONNECT */
+      osDelay(1000);
+  }
 
   /*******************************************
   /  We only reach this part once connected  /
@@ -599,14 +661,6 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
   // Get ready to listen to and send notifications to the Border Router
   //  also get ready for CoAP communication
   _open_udp_sockets();
-
-#ifdef WITH_TCP_SERVER
-  init_tcp_server();
-#endif /* WITH_TCP_SERVER */
-
-#ifdef WITH_UDP_SERVER
-  init_udp_server();
-#endif /* WITH_UDP_SERVER */
 
 #ifdef    SL_CATALOG_WISUN_OTA_DFU_PRESENT
   in6_addr_t global_ipv6;
@@ -680,6 +734,8 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
     ///////////////////////////////////////////////////////////////////////////
 
       now = now_sec();
+      // Use the connection time as reference, in order to spread messages in time
+      // when several devices are powered on at the same time
       connected_delay_sec = now - connection_timestamp;
 
     // We can only send messages outside if connected
@@ -707,6 +763,14 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
       }
 #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
     } else {
+
+#ifdef    WITH_DIRECT_CONNECT
+  #ifdef    WITH_UDP_SERVER
+  // Direct Connect connection is possible even when not connected to the Wi-SUN network
+  check_udp_server_messages();
+  #endif /* WITH_UDP_SERVER */
+#endif /* WITH_DIRECT_CONNECT */
+
 #ifdef    AUTO_CLEAR_CREDENTIAL_CACHE
       if (just_disconnected) {
           just_disconnected = false;
@@ -948,7 +1012,9 @@ char* _connection_json_string () {
     DEVICE_CHIP_JSON_FORMAT                            \
     PARENT_JSON_FORMAT                                 \
     RUNNING_JSON_FORMAT                                \
+    MSG_COUNT_JSON_FORMAT                              \
     "\"PAN_ID\": \"0x%04x (%d)\",\n"                   \
+    "\"preferred_pan_id\": \"0x%04x (%d)\",\n"         \
     "\"join_states_sec\": \"%llu %llu %llu %llu %llu\"\n"\
     END_JSON
 
@@ -958,13 +1024,16 @@ char* _connection_json_string () {
   sl_wisun_get_network_info(&network_info);
   sprintf(sec_string, "%s", now_str());
   refresh_parent_tag();
+  msg_count++;
 
   snprintf(json_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE,
     CONNECTION_JSON_FORMAT_STR,
     DEVICE_CHIP_ITEMS,
     PARENT_INFO_ITEMS,
     sec_string,
+    msg_count,
     network_info.pan_id, network_info.pan_id,
+    preferred_pan_id, preferred_pan_id,
     app_join_state_delay_sec[1],
     app_join_state_delay_sec[2],
     app_join_state_delay_sec[3],
@@ -981,6 +1050,7 @@ char* _status_json_string (char * start_text) {
     DEVICE_CHIP_JSON_FORMAT                \
     PARENT_JSON_FORMAT                     \
     RUNNING_JSON_FORMAT                    \
+    MSG_COUNT_JSON_FORMAT                  \
     TRACK_HEAP_FORMAT_STRING               \
     "\"connected\":   \"%s\",\n"           \
     "\"disconnected\":\"%s\",\n"           \
@@ -1002,6 +1072,7 @@ char* _status_json_string (char * start_text) {
   refresh_parent_tag();
   // Make sure of the join state
   sl_wisun_get_join_state(&join_state);
+  msg_count++;
 
   if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
     current_state_sec = now_sec() - connection_time_sec;
@@ -1014,6 +1085,7 @@ char* _status_json_string (char * start_text) {
       DEVICE_CHIP_ITEMS,
       PARENT_INFO_ITEMS,
       running_sec_string,
+      msg_count,
       TRACK_HEAP_VALUE
       current_sec_string,
       "no",
@@ -1024,8 +1096,6 @@ char* _status_json_string (char * start_text) {
     );
   } else {
     current_state_sec = now_sec() - disconnection_time_sec;
-    // Make sure of the join state
-    sl_wisun_get_join_state(&join_state);
 
     sprintf(current_join_state_string, " no (join_state %d)", join_state);
     sprintf(current_sec_string,     "%s", dhms(current_state_sec));
@@ -1037,6 +1107,7 @@ char* _status_json_string (char * start_text) {
       DEVICE_CHIP_ITEMS,
       PARENT_INFO_ITEMS,
       running_sec_string,
+      msg_count,
       TRACK_HEAP_VALUE
       current_join_state_string,
       current_sec_string,

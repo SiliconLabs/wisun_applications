@@ -62,6 +62,21 @@
 #define WITH_UDP_SERVER    SO_NONBLOCK
 #define WITH_TCP_SERVER    SO_EVENT_MODE
 
+#define WITH_REPORTER
+#ifdef    WITH_REPORTER
+  #include "app_reporter.h"
+#endif /* WITH_REPORTER */
+
+#define WITH_DIRECT_CONNECT
+#ifdef    WITH_DIRECT_CONNECT
+  #include "app_direct_connect.h"
+#endif /* WITH_DIRECT_CONNECT */
+
+// Notifications destinations (UDP and CoAP)
+// Set to fixed IPv6 strings
+#define UDP_NOTIFICATION_DEST  "fd00:6172:6d00::1" // fixed IPv6 string
+#define COAP_NOTIFICATION_DEST "fd00:6172:6d00::2" // fixed IPv6 string
+
 // -----------------------------------------------------------------------------
 //                                Global Variables
 // -----------------------------------------------------------------------------

@@ -21,6 +21,7 @@ source:
 - {path: app_check_neighbors.c}
 - {path: app_coap.c}
 - {path: app.c}
+- {path: app_direct_connect.c}
 - {path: app_init.c}
 - {path: app_list_configs.c}
 - {path: app_rtt_traces.c}
@@ -35,6 +36,7 @@ include:
   file_list:
   - {path: app_check_neighbors.h}
   - {path: app_coap.h}
+  - {path: app_direct_connect.h}
   - {path: app.h}
   - {path: app_init.h}
   - {path: app_list_configs.h}

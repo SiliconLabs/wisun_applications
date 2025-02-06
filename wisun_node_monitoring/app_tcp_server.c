@@ -137,7 +137,7 @@ void init_tcp_server(void) {
   assert_res(tcp_r, "TCP server listen()");
   tcp_ip_str = app_wisun_trace_util_get_ip_str((void *) &tcp_server_addr.sin6_addr);
   printfBothTime("Waiting for TCP connection requests on %s port %d\n", tcp_ip_str, tcp_server_port);
-  app_wisun_trace_util_destroy_ip_str(tcp_ip_str);
+  app_wisun_free(tcp_ip_str);
 }
 
 void check_tcp_server_messages(void) {
@@ -148,10 +148,10 @@ void check_tcp_server_messages(void) {
       // Make sure the last byte is 0x00 (end of string).
       tcp_buff[tcp_data_length] = 0;
       tcp_ip_str = app_wisun_trace_util_get_ip_str((void *) &tcp_client_addr.sin6_addr);
-      app_wisun_trace_util_destroy_ip_str(tcp_ip_str);
       // Print the received message
       printfBothTime("TCP Rx %2ld from %s (%d bytes): %s\n",
                      count_tcp_rx, tcp_ip_str, tcp_data_length, tcp_buff);
+      app_wisun_free(tcp_ip_str);;
       tcp_socket_data_received = false;
     }
   #endif /* (WITH_TCP_SERVER == SO_EVENT_MODE) */
@@ -186,7 +186,7 @@ void check_tcp_server_messages(void) {
           tcp_ip_str = app_wisun_trace_util_get_ip_str((void *) &tcp_client_addr.sin6_addr);
           // Print the received message
           printfBothTime("TCP Rx %2ld from %s (%ld bytes on client socket %ld): %s\n", count_tcp_rx, tcp_ip_str, tcp_r, tcp_client_sockid, tcp_buff);
-          app_wisun_trace_util_destroy_ip_str(tcp_ip_str);
+          app_wisun_free(tcp_ip_str);
           break;
       }
     }

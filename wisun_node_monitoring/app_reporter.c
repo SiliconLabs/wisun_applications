@@ -58,9 +58,9 @@
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
-#define APP_REPORTER_TASK_STACK_SIZE 500 // in units of CPU_INT32U
+#define APP_REPORTER_TASK_STACK_SIZE 2500 // in units of CPU_INT32U
 #define REPORTER_PORT                        3770
-uint32_t reporter_period_sec;
+uint32_t reporter_period_ms;
 uint32_t reporter_started = 0;
 uint32_t reporter_active  = 0;
 
@@ -85,10 +85,10 @@ sl_sleeptimer_timer_handle_t app_reporter_timer;
 static uint32_t              rtt_report_task_flags;
 static osEventFlagsId_t      rtt_report_task_flag_group;
 static sl_wisun_socket_id_t  app_logs_socket_id = SOCKET_INVALID_ID;
-static in6_addr_t            report_to_ipv6;
 static char                  reporter_match_string[MAX_MATCH_STRING_LEN];
-static char                  lines_to_send[BUFFER_SIZE_UP+1];
-static char                  lines_to_send_copy[BUFFER_SIZE_UP+1];
+static char                  lines_to_send[BUFFER_SIZE_UP*2];
+static in6_addr_t            ipv6_dest;
+static char                  ipv6_dest_string[40];
 
 typedef struct reporter_match_struct reporter_match_struct_t;
 
@@ -102,6 +102,31 @@ reporter_match_struct_t reporter_matches;
 // -----------------------------------------------------------------------------
 //                          Static Function Definitions
 // -----------------------------------------------------------------------------
+// Application timestamp mutex
+static osMutexId_t _app_reporter_mutex = NULL;
+
+static const osMutexAttr_t _app_reporter_mutex_attr = {
+  .name      = "AppReporterMutex",
+  .attr_bits = osMutexRecursive,
+  .cb_mem    = NULL,
+  .cb_size   = 0U
+};
+
+// -----------------------------------------------------------------------------
+//                          Static Function Definitions
+// -----------------------------------------------------------------------------
+/* Mutex acquire */
+__STATIC_INLINE void _app_reporter_mutex_acquire(void)
+{
+  assert(osMutexAcquire(_app_reporter_mutex, osWaitForever) == osOK);
+}
+
+/* Mutex release */
+__STATIC_INLINE void _app_reporter_mutex_release(void)
+{
+  assert(osMutexRelease(_app_reporter_mutex) == osOK);
+}
+
 
 void app_reporter_callback(sl_sleeptimer_timer_handle_t *handle, void *data) {
   (void)handle;
@@ -229,18 +254,24 @@ uint8_t filter_log_lines(char* log_lines, char* lines_to_send) {
   uint8_t i;
   uint8_t line_count = 0;
 
+  // Clear the lines to send after filtering
+  sprintf(lines_to_send, "%s", "");
+
   // Get the first line
   line = strtok(log_lines, crlf);
 
   // Walk through other tokens
   while (line != NULL) {
       matches = 0;
-      // check if there is a match in the line
+      if (strcmp(reporter_matches.match[0], "*") == 0) {
+          matches++;
+      } else {
       for (i = 0; i < reporter_matches.nb_matches ; i++) {
           match_in_line = strstr(line, reporter_matches.match[i]);
           if (match_in_line != NULL) {
               matches++;
           }
+      }
       }
       if (matches) {
           line_count++;
@@ -249,13 +280,14 @@ uint8_t filter_log_lines(char* log_lines, char* lines_to_send) {
           }
           strcat(lines_to_send, line);
       }
-      // get next line
+      // Get the next line
       line = strtok(NULL, crlf);
   }
+
   return strlen(lines_to_send);
 }
 
-static void check_and_send_reporter_logs(char *log_buffer, in6_addr_t report_to_ipv6)
+static void check_and_send_reporter_logs(char *log_buffer)
 {
   /** Retrieve logs from SEGGER_RTT
    * SEGGER does not provide any API to read the content of its up buffers (target to host).
@@ -268,11 +300,14 @@ static void check_and_send_reporter_logs(char *log_buffer, in6_addr_t report_to_
   uint16_t read_bytes;
   uint16_t filtered_bytes;
 
+  memset(log_buffer, 0x00, BUFFER_SIZE_UP);
+  _app_reporter_mutex_acquire();
   SEGGER_RTT_LOCK();
   read_bytes = read_segger_up_buffer(0, log_buffer, BUFFER_SIZE_UP);
   SEGGER_RTT_UNLOCK();
 
   if (read_bytes == 0) {
+      _app_reporter_mutex_release();
       return;
   }
 
@@ -284,21 +319,24 @@ static void check_and_send_reporter_logs(char *log_buffer, in6_addr_t report_to_
       .sin6_family = AF_INET6,
       .sin6_port = htons(REPORTER_PORT),
       .sin6_flowinfo = 0,
-      .sin6_addr = report_to_ipv6,
+      .sin6_addr = ipv6_dest,
       .sin6_scope_id = 0,
     };
-    sprintf(lines_to_send_copy, "%s", lines_to_send);
     // sendto() needs to be outside of the RTT lock to be able to send data
-    socket_retval = sendto(app_logs_socket_id, (const void *)lines_to_send_copy, filtered_bytes, 0, (const struct sockaddr *)&dest_ipv6_addr,
+    socket_retval = sendto(app_logs_socket_id,
+                           (const void *)lines_to_send,
+                           strlen(lines_to_send),
+                           0,
+                           (const struct sockaddr *)&dest_ipv6_addr,
                             sizeof(dest_ipv6_addr));
 
     if (socket_retval == SOCKET_RETVAL_ERROR) {
-      printf("Could not send logs\n");
+      printf("Could not send log\n");
     } else {
-        printf("lines_to_send (%d bytes)\n%s\n", strlen(lines_to_send), lines_to_send_copy);
+      printf("%s\n", lines_to_send );
     }
-    sprintf(lines_to_send, "%s", "");
   }
+  _app_reporter_mutex_release();
 }
 
 void app_reporter_task(void *args)
@@ -352,7 +390,7 @@ void app_reporter_task(void *args)
   rtt_report_task_flag_group = osEventFlagsNew(&rtt_report_task_flags_attr);
   assert(rtt_report_task_flag_group != NULL);
   ret = sl_sleeptimer_start_periodic_timer_ms(&app_reporter_timer,
-                                        reporter_period_sec * 1000,
+                                        reporter_period_ms,
                                         reporter_timer_cb,
                                         NULL,
                                         0,
@@ -369,7 +407,7 @@ void app_reporter_task(void *args)
                                                osWaitForever);
       assert((rtt_report_task_flags & CMSIS_RTOS_ERROR_MASK) == 0);
       if (rtt_report_task_flags & RTT_REPORT_TASK_FLAG_SEND) {
-        check_and_send_reporter_logs(log_buffer, report_to_ipv6);
+        check_and_send_reporter_logs(log_buffer);
       } else if (rtt_report_task_flags & RTT_REPORT_TASK_FLAG_STOP) {
         goto cleanup;
       }
@@ -392,11 +430,13 @@ cleanup:
   osThreadExit();
 }
 
-void app_start_reporter_thread(char *report__dest_ipv6_str,
-                               uint32_t report_period_sec,
-                               char *match_string)
+void app_start_reporter_thread()
 {
   if (reporter_started == 0) {
+    // init mutex
+    _app_reporter_mutex = osMutexNew(&_app_reporter_mutex_attr);
+    assert(_app_reporter_mutex != NULL);
+
     const osThreadAttr_t rtt_report_attr = {
       .name = "rtt_report",
       .attr_bits = osThreadDetached,
@@ -407,12 +447,25 @@ void app_start_reporter_thread(char *report__dest_ipv6_str,
       .priority = osPriorityLow3,
       .tz_module = 0,
     };
+
     osThreadId_t rtt_thr_id = osThreadNew(app_reporter_task, NULL, &rtt_report_attr);
     assert(rtt_thr_id != NULL);
-    sl_wisun_stoip6(report__dest_ipv6_str, strlen(report__dest_ipv6_str), &report_to_ipv6);
+
     reporter_started = 1;
-    reporter_active  = 1;
   }
+}
+
+void app_start_reporter(char *report__dest_ipv6_str,
+                        uint32_t report_period_ms,
+                        char *match_string)
+{
+  if (reporter_started == 0) {
+    app_start_reporter_thread();
+  }
+
+    sprintf(ipv6_dest_string, report__dest_ipv6_str);
+    sl_wisun_stoip6(report__dest_ipv6_str, strlen(report__dest_ipv6_str), &ipv6_dest);
+
   strncpy((char*)reporter_match_string, match_string, MAX_MATCH_STRING_LEN);
 
   reporter_matches.nb_matches = 0;
@@ -427,18 +480,18 @@ void app_start_reporter_thread(char *report__dest_ipv6_str,
   // Walk through other matches
   while (match != NULL) {
       strncpy(reporter_matches.match[reporter_matches.nb_matches], match, MAX_MATCH_STRING_LEN);
-      //printf("match %d: '%s'\n", reporter_matches.nb_matches, reporter_matches.match[reporter_matches.nb_matches]);
       reporter_matches.nb_matches++;
       // get next match
       match = strtok(NULL, pipe);
   }
+  printf("Reporting RTT lines matching %d patterns: %d   %s\n",
+         reporter_matches.nb_matches, REPORTER_PORT, report__dest_ipv6_str);
 
-  reporter_period_sec = report_period_sec;
+  reporter_period_ms = report_period_ms;
+  reporter_active  = 1;
 }
 
-void app_stop_reporter_thread(void)
+void app_stop_reporter(void)
 {
   reporter_active  = 0;
-//  assert((osEventFlagsSet(rtt_report_task_flag_group,
-//                          RTT_REPORT_TASK_FLAG_STOP) & CMSIS_RTOS_ERROR_MASK) == 0);
 }

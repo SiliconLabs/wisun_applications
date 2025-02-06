@@ -30,7 +30,8 @@ The block diagram of this application is shown in the image below:
 
 ## Simplicity SDK Version ##
 
-SiSDK v2024.6.2
+SiSDK v2024.12.0
+(older SiSDK version will generate compilation issues due to unknown trace groups)
 
 ## Hardware Required ##
 
@@ -59,7 +60,7 @@ or
 
 ## The Application Requires a Bootloader ##
 
-This example application support OTA DFU, therefore you need to create and flash a **bootloader** to your devices before flashing the **Wi-SUN Node Monitoring** Application.
+This example application support OTA DFU, therefore you need to [create and flash a **bootloader**](https://docs.silabs.com/wisun/latest/wisun-ota-dfu/#bootloader-application) to your devices before flashing the **Wi-SUN Node Monitoring** Application.
 
 ## Setup ##
 
@@ -124,7 +125,7 @@ To allocate different pins to the buttons or LEDs, use the pintool.
 - At boot: The buttons can be pressed to select 4 startup options (options to be implemented)
 - While running: When buttons are pressed, a dedicated message is sent to the UDP notification server with the button states. This can be used to identify a device in a network graph.
 
-#### LEDS usage ####
+#### LEDs usage ####
 
 - At boot: A number of flashed (both leds flashing) is done at boot. This can be changed to allow identifying the application's version.
 - While connecting: The LEDs indicate the join state as `join_state & 0x03`
@@ -287,11 +288,98 @@ The [RTT reporter code](https://github.com/SiliconLabs/wisun_applications/blob/m
 
 Among other uses, it can be useful in
 
-- Checking if other devices receive any frame from a missing device
+- Checking if other devices receive any frame from missing devices:
+  - Send a multicast `/reporter/start -e ""` request with the last bytes of the missing devices MAC addresses
+  - `coap-client -m get -N -B 10 -t text coap://[ff03::1]:5683/reporter/start  -e  "26:cc,\|2c:37,\|2b:c4,"`
+  - (the pipe `|` character needs to be escaped to avoid its interpretation by the shell)
 - Checking if a given device still receives frames from one of its children
+  - Similar to above, with the (unicast) Ipv6 address of the parent device
 - Gathering any interesting RTT trace from a device
+  - Send a unicast `/reporter/start -e ""` request to the device with match string for the traces you want to check
+  - `coap-client -m get -N -B 10 -t text coap://[fd12:3456::2adb:a7ff:fe77:2c6b]:5683/reporter/start  -e  "Tx PA\|TX PC"`
+
+Search for `WITH_REPORTER` to locate the corresponding code blocks
 
 The RTT reporter can be removed from the application by:
 
-- Removing the `app_reporter.c/.h` files from the project
-- Commenting the ['#include "app_reporter.h"'](https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/app_coap.c#L81) line in `https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/app_coap.c`
+- Commenting the `#define WITH_REPORTER` line
+- (Optionally) Removing the `app_reporter.c/.h` files
+
+### Wi-SUN Direct Connect ###
+
+Wi-SUN Direct Connect allows connecting to a Wi-SUN device even when it's not connected to the normal Wi-SUN network in a secure manner
+
+See the [Silicon Labs Direct Connect Tool documentation](https://docs.silabs.com/wisun/latest/wisun-direct-connect/) for details.
+
+This repository contains an example implementation of Direct Connect with the following features:
+
+- Automatic connection to the Direct Connect host when receiving a Direct Connect 'Link Available'event.
+- Automatic transmission of RTT traces once connected (to the Direct Connect host, on REPORTER_PORT = 377e)
+  - The [direct_connect_receiver.py](linux_border_router_wsbrd/direct_connect_receiver.py) script can be used to monitor the traces.
+- Minimal Direct Connect CLI
+  - Sending commands via [direct_connect_cli.py](linux_border_router_wsbrd/direct_connect_cli.py)
+  - Receiving replies in the [direct_connect_receiver.py](linux_border_router_wsbrd/direct_connect_receiver.py)
+  - Automatic transmission of most console traces
+    - Because the Wi-SUN Node Monitoring application copies most of the console traces to RTT traces, these are also transmitted.
+  - Control of the RTT traces groups and trace levels
+    - The syntax is similar to the 'wisun set_trace_level'command of the Wi-SUN SoC CLI application
+  - Allows checking the crash handler result
+    - Send `wisun crash_report`
+
+In the Wi-SUN Node Monitoring application, Direct Connect is used to retrieve RTT traces (using the [reporter](https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/README.md#wi-sun-direct-connect)) over a wireless 1-on-1 connection with a device, based on:
+
+- A shared PMK, present [in the application](https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/app_direct_connect.c#L65) and in the [`direct_connect.conf`](https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/linux_border_router_wsbrd/direct_connect.conf) file.
+- The MAC(EUI64) of the device (now traced at startup and part of the notification messages)
+
+Search for `WITH_DIRECT_CONNECT` to locate the corresponding code blocks
+
+#### Direct Connect example ####
+
+1- Start the Direct Connect receiver
+
+```bash
+$ direct_connect_receiver.py 3770
+[2025-02-06 15:34:16] Receiving on ::/3770...
+```
+
+2- Initiate the Direct Connect connection
+
+```bash
+$ direct_connect.sh 28:db:a7:ff:fe:77:2c:ad
+Silicon Labs Wi-SUN Direct Connect v2.2
+Connected to RCP "2.3.0" (2.3.0), API 2.5.0
+Silicon Labs Wi-SUN Direct Connect successfully started
+```
+
+3- Wait for Direct Connect connection (timing out after 60 sec)
+
+```bash
+Direct Connection established with 28:db:a7:ff:fe:77:2c:ad
+28:db:a7:ff:fe:77:2c:ad reachable at fe80::2adb:a7ff:fe77:2cad
+```
+
+Once connected, you can retrieve the IPv6 address used for Direct Connect (`fe80::2adb:a7ff:fe77:2cad` above) to send UDP messages to the device:
+
+```bash
+ $ direct_connect_cli.py
+
+# Call with
+# Direct_Connect_CLI <Direct_Connect_Ipv6>  <7777>  "<message string>"
+# Direct_Connect_CLI  fe80::2adb:a7ff:fe77:2bc4  7777 "wisun set_trace_level 2"
+# Direct_Connect_CLI  fe80::2adb:a7ff:fe77:2bc4  7777 "wisun set_trace_level 16 3"
+```
+
+The [application CLI](https://github.com/SiliconLabs/wisun_applications/blob/main/wisun_node_monitoring/app_direct_connect.c#L174) can be used to control RTT traces, using [trace groups](https://github.com/SiliconLabs/simplicity_sdk/blob/sisdk-2024.12/protocol/wisun/stack/inc/sl_wisun_types.h#L877) and [trace levels](https://github.com/SiliconLabs/simplicity_sdk/blob/sisdk-2024.12/protocol/wisun/stack/inc/sl_wisun_types.h#L936) and can be extended at will.
+
+```bash
+direct_connect_cli.py fe80::2adb:a7ff:fe77:2cad 7777 "wisun set_trace_level 45"
+```
+
+>NB: The replies will be visible in the Direct Connect receiver console
+
+#### Locating the Direct Connect code ####
+
+The Direct Connect code can be removed from the application by:
+
+- Commenting the `#define WITH_DIRECT_CONNECT` line
+- (Optionally) Removing the `app_direct_connect.c/.h` files

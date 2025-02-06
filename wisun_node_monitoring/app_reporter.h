@@ -36,14 +36,14 @@
 #ifndef __APP_REPORTER_H__
 #define __APP_REPORTER_H__
 
-#define MAX_MATCH_STRING_LEN 40
+#define MAX_MATCH_STRING_LEN 100
 
 // -----------------------------------------------------------------------------
 //                          Public Function Definitions
 // -----------------------------------------------------------------------------
-void app_start_reporter_thread(char *report__dest_ipv6,
-                               uint32_t report_period_sec,
+void app_start_reporter(char *report__dest_ipv6,
+                               uint32_t report_period_ms,
                                char *match_string);
-void app_stop_reporter_thread(void);
+void app_stop_reporter(void);
 
 #endif /* End app_reporter.h */

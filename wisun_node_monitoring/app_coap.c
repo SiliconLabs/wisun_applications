@@ -80,10 +80,8 @@
 #include "sl_wisun_app_core.h"
 #include "sl_wisun_version.h"
 #include "sl_wisun_app_core_util.h"
-#include "sl_wisun_trace_util.h"
 #include "app_check_neighbors.h"
 #include "app_rtt_traces.h"
-#include "app_reporter.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -142,6 +140,7 @@ sl_wisun_coap_packet_t * app_coap_reply(char *response_string,
 // CoAP Callback functions definition (one callback function per URI)
 sl_wisun_coap_packet_t * coap_callback_all_infos (
       const  sl_wisun_coap_packet_t *const req_packet)  {
+  const char *buf;
   #define JSON_ALL_INFOS_FORMAT_STR  \
     "{\n"                          \
     "  \"device\": \"%s\",\n"      \
@@ -150,16 +149,21 @@ sl_wisun_coap_packet_t * coap_callback_all_infos (
     "  \"device_type\": \"%s\",\n" \
     "  \"application\": \"%s\",\n" \
     "  \"version\": \"%s\"\n"      \
+    "  \"MAC\": \"%s\"\n"          \
     "}\n"
-
+  sl_wisun_mac_address_t device_mac;
+  sl_wisun_get_mac_address(&device_mac);
+  buf = app_wisun_mac_addr_to_str(&device_mac);
   snprintf(coap_response, COAP_MAX_RESPONSE_LEN, JSON_ALL_INFOS_FORMAT_STR,
             device_tag,
             chip,
             SL_BOARD_NAME,
             device_type,
             application,
-            version
+            version,
+            buf
   );
+  app_wisun_free(buf);
   return app_coap_reply(coap_response, req_packet);
 }
 
@@ -658,14 +662,14 @@ sl_wisun_coap_packet_t * coap_callback_trace_level (
     // Make sure payload last char is NULL
     req_packet->payload_ptr[req_packet->payload_len] = 0x00;
     res = sscanf((char *)req_packet->payload_ptr, "%d %d", &group, &level);
-    if (res) {
+    if (res == 2) {
         // Process /settings/trace_level -e "<group> <level>"
         trace_level = (uint8_t)level;
         app_set_trace(group, level, true);
     } else {
         // Process /settings/trace_level -e "<level>" (all groups)
     res = sscanf((char *)req_packet->payload_ptr, "%d", &level);
-    if (res) {
+      if (res == 1) {
         trace_level = (uint8_t)level;
         app_set_all_traces(level, true);
     }
@@ -681,20 +685,19 @@ sl_wisun_coap_packet_t * coap_callback_reporter_start (
   if (req_packet->payload_len) {
       // Make sure payload last char is NULL
       req_packet->payload_ptr[req_packet->payload_len] = 0x00;
-      app_start_reporter_thread("fd00:6172:6d00::1", 2, (char *)req_packet->payload_ptr);
+      app_start_reporter(UDP_NOTIFICATION_DEST, 1000, (char *)req_packet->payload_ptr);
     } else {
         // if no payload, accept all lines
-      app_start_reporter_thread("fd00:6172:6d00::1", 2, (char *)"*");
+      app_start_reporter(UDP_NOTIFICATION_DEST, 1000, (char *)"*");
     }
     snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "started");
   return app_coap_reply(coap_response, req_packet); }
 
 sl_wisun_coap_packet_t * coap_callback_reporter_stop (
     const  sl_wisun_coap_packet_t *const req_packet)  {
-    app_stop_reporter_thread();
+    app_stop_reporter();
     snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "stopped");
   return app_coap_reply(coap_response, req_packet); }
-
   #endif /* __APP_REPORTER_H__ */
 
 
@@ -938,7 +941,7 @@ uint8_t app_coap_resources_init() {
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
-
+#ifdef    __APP_REPORTER_H__
   coap_resource.data.uri_path = "/reporter/crash";
   coap_resource.data.resource_type = "text";
   coap_resource.data.interface = "reporter";
@@ -947,7 +950,6 @@ uint8_t app_coap_resources_init() {
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
-#ifdef    __APP_REPORTER_H__
   coap_resource.data.uri_path = "/reporter/start";
   coap_resource.data.resource_type = "text";
   coap_resource.data.interface = "test";
