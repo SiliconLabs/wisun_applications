@@ -163,7 +163,7 @@ sl_wisun_coap_packet_t * coap_callback_all_infos (
             version,
             buf
   );
-  app_wisun_free(buf);
+  app_wisun_free((void*)buf);
   return app_coap_reply(coap_response, req_packet);
 }
 

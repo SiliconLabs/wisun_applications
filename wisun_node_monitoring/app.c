@@ -68,8 +68,9 @@
  #include "sl_simple_led_instances.h"
  void *led0;
  void *led1;
-#define START_FLASHES_A 6
-#define START_FLASHES_B 2
+
+ #define START_FLASHES_A 7
+ #define START_FLASHES_B  SL_APPLICATION_VERSION
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
 #include "app_coap.h"
@@ -252,7 +253,7 @@ bool   refresh_heap;
 #endif /* APP_TRACK_HEAP */
 
 uint16_t auto_send_sec = 60; // Notification period in seconds
-uint8_t  neighbor_table_size = 22;  // Size of neighbor table (default 22 in Wi-SUN stack)
+uint8_t  neighbor_table_size = 100; // Size of neighbor table (default 22 in Wi-SUN stack)
                                     // Increase if case of high network density (if many devices are within range of others)
 
 bool print_keep_alive = true;
@@ -344,6 +345,31 @@ static sl_wisun_coap_notify_ch_t coap_notify_ch = {
 // -----------------------------------------------------------------------------
 //                          Public Function Definitions
 // -----------------------------------------------------------------------------
+#ifndef SL_CATALOG_WISUN_EVENT_MGR_PRESENT // Event Manager also defines this handler
+/*Wi-SUN event handler*/
+void sl_wisun_on_event(sl_wisun_evt_t *evt)
+{
+  (void) evt->header.id;
+  /////////////////////////////////////////////////////////////////////////////
+  // Put your Wi-SUN event handling here!                                    //
+  // This is called from Wi-SUN stack.                                       //
+  // Do not call blocking functions from here!                               //
+  // Protect your data during event handling!                                //
+  /////////////////////////////////////////////////////////////////////////////
+  switch (evt->header.id) {
+#ifdef    APP_DIRECT_CONNECT_H
+    case SL_WISUN_MSG_DIRECT_CONNECT_LINK_AVAILABLE_IND_ID:
+      app_direct_connect_custom_callback(evt);
+      break;
+    case SL_WISUN_MSG_DIRECT_CONNECT_LINK_STATUS_IND_ID:
+      app_direct_connect_custom_callback(evt);
+      break;
+#endif /* APP_DIRECT_CONNECT_H */
+    default:
+      break;
+  }
+}
+#endif
 
 #define TRACES_WHILE_CONNECTING \
     app_set_all_traces(SL_WISUN_TRACE_LEVEL_INFO, true); \
@@ -556,22 +582,15 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
   startup_option = B0 + (B1 << 1);
   printfBothTime("Startup option %d ('%d%d')\n", startup_option, B1, B0);
   check_buttons = true;
-  #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-  // LEDs indicate the 'version' in 2 steps
-  leds_flash(START_FLASHES_A, 200);
-  osDelay(800);
-  leds_flash(START_FLASHES_B, 200);
-  osDelay(800);
-  // LEDs show startup option for 1 sec
-  set_leds(B1, B0);
-  osDelay(1000);
-  // LEDs cleared to follow the join state (must be 1 if no credentials, 3 otherwise)
-  // If LEDs stay at 0: check selected PHY vs Radio Config
-  set_leds(0, 0);
-  #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+  selected_device_type = SL_WISUN_ROUTER;
   if (startup_option == 1) {
     sl_wisun_clear_credential_cache();
     printfBothTime("Cleared credential cache (startup_option 1)\n");
+  }
+  if (startup_option == 2) {
+    selected_device_type = SL_WISUN_LFN;
+    printfBothTime("Starting as LFN (startup_option = 2)\n");
+    sprintf(device_type, "LFN by user choice");
   }
 #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
 
@@ -632,7 +651,7 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
   connect_time_sec = now_sec();
   #ifdef    SL_CATALOG_WISUN_APP_CORE_PRESENT
     // connect to the wisun network
-  sl_wisun_app_core_network_connect();
+  sl_wisun_app_core_network_connect(selected_device_type);
   #endif /* SL_CATALOG_WISUN_APP_CORE_PRESENT */
 
   while (1) { // To allow a Direct Connect connection, regularly check UDP messages

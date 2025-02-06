@@ -292,11 +292,18 @@ Among other uses, it can be useful in
   - Send a multicast `/reporter/start -e ""` request with the last bytes of the missing devices MAC addresses
   - `coap-client -m get -N -B 10 -t text coap://[ff03::1]:5683/reporter/start  -e  "26:cc,\|2c:37,\|2b:c4,"`
   - (the pipe `|` character needs to be escaped to avoid its interpretation by the shell)
+- Checking if other devices receive any frame from missing devices:
+  - Send a multicast `/reporter/start -e ""` request with the last bytes of the missing devices MAC addresses
+  - `coap-client -m get -N -B 10 -t text coap://[ff03::1]:5683/reporter/start  -e  "26:cc,\|2c:37,\|2b:c4,"`
+  - (the pipe `|` character needs to be escaped to avoid its interpretation by the shell)
 - Checking if a given device still receives frames from one of its children
+  - Similar to above, with the (unicast) Ipv6 address of the parent device
   - Similar to above, with the (unicast) Ipv6 address of the parent device
 - Gathering any interesting RTT trace from a device
   - Send a unicast `/reporter/start -e ""` request to the device with match string for the traces you want to check
   - `coap-client -m get -N -B 10 -t text coap://[fd12:3456::2adb:a7ff:fe77:2c6b]:5683/reporter/start  -e  "Tx PA\|TX PC"`
+
+#### Locating the Reporter Code ####
 
 Search for `WITH_REPORTER` to locate the corresponding code blocks
 
@@ -378,6 +385,8 @@ direct_connect_cli.py fe80::2adb:a7ff:fe77:2cad 7777 "wisun set_trace_level 45"
 >NB: The replies will be visible in the Direct Connect receiver console
 
 #### Locating the Direct Connect code ####
+
+Search for `WITH_DIRECT_CONNECT` to locate the corresponding code
 
 The Direct Connect code can be removed from the application by:
 
