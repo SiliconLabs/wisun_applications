@@ -651,7 +651,7 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
   connect_time_sec = now_sec();
   #ifdef    SL_CATALOG_WISUN_APP_CORE_PRESENT
     // connect to the wisun network
-  sl_wisun_app_core_network_connect(selected_device_type);
+  sl_wisun_app_core_network_connect();
   #endif /* SL_CATALOG_WISUN_APP_CORE_PRESENT */
 
   while (1) { // To allow a Direct Connect connection, regularly check UDP messages
