@@ -44,14 +44,15 @@ If this step is not done already, follow the steps listed under [Add the Wi-SUN 
 
 # Project creation
 
-1. Create the project by following the steps listed under [Create the Wi-SUN applications example projects](../README.md#create-the-wi-sun-applications-example-projects) section. 
-2. In the **project configuration** perspective, select the **Copy Contents** option and click **Finish**. This step is very important to build the project successfully. 
-3. Generate the project makefiles in Simplicity Studio by following these steps:
+1. Create the Bootloader project and the Skeleton Application by following the steps listed under [Create the Wi-SUN applications example projects](../README.md#create-the-wi-sun-applications-example-projects) section. 
+2. Build the Bootloader project and deploy it on the target SoC by using Simplicity Commander.
+3. In the Skeleton Application **project configuration** perspective, select the **Copy Contents** option and click **Finish**. This step is very important to build the project successfully. 
+4. Generate the project makefiles for the Skeleton Application in Simplicity Studio by following these steps:
     * Go to the **OVERVIEW** tab in the slcp file perspective.
     * Scroll down to the end of the *Target and Tool Settings* card and click **Change Target/SDK/Generators**.
     * In the *CHANGE PROJECT GENERATORS* list, select **GCC Makefile**.
     * Click Save and wait for Simplicity Studio to generate the project.
-4. Refer to the folder **Vendors/Silabs** on the [CSMP Agent library](https://github.com/CiscoDevNet/csmp-agent-lib) to complete your setup and connect to FND.
+5. Refer to the folder **Vendors/Silabs** on the [CSMP Agent library](https://github.com/CiscoDevNet/csmp-agent-lib) to complete your setup and connect to FND.
 
 
 > [!IMPORTANT]  
