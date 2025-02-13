@@ -44,6 +44,8 @@ requires:
   - name: "sl_wisun_mode_switch"
     condition:
       - "device_sdid_220" # only for these devices
+  - name: bootloader_interface
+  
 source:
   - path: "main.c"
   - path: "../component/ntp_timesync/sl_wisun_ntp_timesync.c"
