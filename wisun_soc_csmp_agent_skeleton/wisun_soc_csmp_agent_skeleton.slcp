@@ -31,7 +31,7 @@ component:
   - id: "sl_wisun_trace_util"
   - id: "sl_wisun_app_core"
   - id: "sl_wisun_app_setting"
-  - id: "sl_wisun_app_cli"
+  - id: "sl_wisun_cli"
   - id: "sl_wisun_ping"
   - id: "cli"
     instance:
