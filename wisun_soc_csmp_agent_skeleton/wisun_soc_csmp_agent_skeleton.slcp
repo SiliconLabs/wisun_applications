@@ -137,18 +137,8 @@ configuration:
     condition: [iostream_eusart,power_manager]
 
   # SDK memory configuration
-  - name: "SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE"
-    value: "2048"
-  - name: "SL_WISUN_COAP_RESOURCE_HND_STACK_SIZE_WORD"
+  - name: "NVM3_DEFAULT_MAX_OBJECT_SIZE"
     value: "512"
-  - name: "SL_GUI_STACK_SIZE_WORD"
-    value: "256"
-  - name: "SL_DISPLAY_STACK_SIZE_WORD"
-    value: "384"
-  - name: "SL_WISUN_PING_STACK_SIZE_WORD"
-    value: "256"
-  - name: "SL_IPERF_STACK_SIZE_WORD"
-    value: "256"
 
 # SDK Application version
   - name: APP_PROJECT_INFO_APP_VERSION_MAJOR
