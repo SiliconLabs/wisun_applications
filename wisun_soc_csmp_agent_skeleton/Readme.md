@@ -71,14 +71,15 @@ If this step is not done already, follow the steps listed under [Add the Wi-SUN 
     // <f .h>
     #define SLOT1_SIZE 524288
     ```
-3. Build and deploy the Bootloader project on the target SoC by using Simplicity Commander.
-4. In the Skeleton Application **project configuration** perspective, select the **Copy Contents** option and click **Finish**. This step is very important to build the project successfully. 
-5. Generate the project makefiles for the Skeleton Application in Simplicity Studio by following these steps:
+3. Add "GBL Compression (LZMA)" component to the bootloader projcet in Simplicity Studio to be able to decompress the GBL files. 
+4. Build and deploy the Bootloader project on the target SoC by using Simplicity Commander.
+5. In the Skeleton Application **project configuration** perspective, select the **Copy Contents** option and click **Finish**. This step is very important to build the project successfully. 
+6. Generate the project makefiles for the Skeleton Application in Simplicity Studio by following these steps:
     * Go to the **OVERVIEW** tab in the slcp file perspective.
     * Scroll down to the end of the *Target and Tool Settings* card and click **Change Target/SDK/Generators**.
     * In the *CHANGE PROJECT GENERATORS* list, select **GCC Makefile**.
     * Click Save and wait for Simplicity Studio to generate the project.
-6. Refer to the folder **Vendors/Silabs** on the [CSMP Agent library](https://github.com/CiscoDevNet/csmp-agent-lib) to complete your setup and connect to FND.
+7. Refer to the folder **Vendors/Silabs** on the [CSMP Agent library](https://github.com/CiscoDevNet/csmp-agent-lib) to complete your setup and connect to FND.
 
 
 > [!IMPORTANT]  
