@@ -75,27 +75,45 @@ if __name__ == '__main__':
             m = re.search(r'([\s+"]+)autogen', line)
             if m:
               line = line.replace(f"{m.group(1)}autogen", f"{m.group(1)}$(CSMP_AGENT_LIB_EFR32_WISUN_PATH)/autogen")
-
-
+              f.write(line)
+              continue
+            
             # Add CSMP_AGENT_LIB_EFR32_WISUN_PATH to component path
             m = re.search(r'([\s+"]+)component', line)
             if m:
               line = line.replace(f"{m.group(1)}component", f"{m.group(1)}$(CSMP_AGENT_LIB_EFR32_WISUN_PATH)/component")
+              f.write(line)
+              continue
             
             # Update include path with CSMP_AGENT_LIB_EFR32_WISUN_PATH
             m = re.search(r'(\-I\s*)autogen', line)
             if m:
               line = line.replace(f"{m.group(1)}autogen", f"{m.group(1)}$(CSMP_AGENT_LIB_EFR32_WISUN_PATH)/autogen")
+              f.write(line)
+              continue
             
             m = re.search(r'(\-I\s*)config', line)
             if m:
               line = line.replace(f"{m.group(1)}config", f"{m.group(1)}$(CSMP_AGENT_LIB_EFR32_WISUN_PATH)/config")
-             
+              f.write(line)
+              continue
+            
             m = re.search(r'(\-I\s*)component', line)
             if m:
               line = line.replace(f"{m.group(1)}component", f"{m.group(1)}$(CSMP_AGENT_LIB_EFR32_WISUN_PATH)/component")
+              f.write(line)
+              continue
             
-            # write line
+            # Handle any .c source file in the project route
+            m = re.search(r'\s+([\d\w_-]+\.c)', line)
+            if m:
+              print(f"Find source: {m.group(1)}")
+              line = line.replace(f"{m.group(1)}", f"$(CSMP_AGENT_LIB_EFR32_WISUN_PATH)/{m.group(1)}")
+              f.write(line)
+              continue
+            
+            
             f.write(line)
         
     print(f"Silabs - Cisco CsmpAgent make file created successfully:\n    {destination_file}")
+    
