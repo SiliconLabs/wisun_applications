@@ -131,7 +131,7 @@ void init_udp_server(void) {
 
   udp_ip_str = app_wisun_trace_util_get_ip_str((void *) &udp_server_addr.sin6_addr);
   printfBothTime("Waiting for UDP messages on %s port %d\n", udp_ip_str, udp_server_port);
-  app_wisun_free(udp_ip_str);
+  app_wisun_free((void*)udp_ip_str);
 }
 
 void check_udp_server_messages(void) {
@@ -145,7 +145,7 @@ void check_udp_server_messages(void) {
       udp_ip_str = app_wisun_trace_util_get_ip_str((void *) &udp_client_addr.sin6_addr);
       // Print the received message
       printfBothTime("UDP Rx %2ld from %s (%d bytes): %s\n", count_udp_rx, udp_ip_str, udp_data_length, udp_buff);
-      app_wisun_free(udp_ip_str);
+      app_wisun_free((void*)udp_ip_str);
       udp_socket_data_received = false;
     }
   #endif /* (WITH_UDP_SERVER == SO_EVENT_MODE) */
@@ -168,7 +168,7 @@ void check_udp_server_messages(void) {
             printfBothTime(app_direct_connect_cli(udp_buff));
         }
   #endif /* APP_DIRECT_CONNECT_H */
-        app_wisun_free(udp_ip_str);
+        app_wisun_free((void*)udp_ip_str);
     }
   #endif /* (WITH_UDP_SERVER == SO_NONBLOCK) */
 }

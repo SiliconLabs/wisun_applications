@@ -31,6 +31,7 @@
 * "/statistics/stack/regulation"        REGULATION statistics stored in sl_wisun_statistics_regulation_t
 * "/settings/auto_send"                 Set auto_Send_sec period to send UDP notifications
 * "/settings/trace_level"               Control RTT traces
+* "/settings/parameter"                 Control application parameters
 * "/reporter/crash"                     Report info on previous crash (if any)
 * "/reporter/start"                     Start filtering RTT traces for selected strings and reporting then to REPORTER_PORT
 * "/reporter/stop"                      Stop filtering RTT traces
@@ -70,8 +71,6 @@
 // -----------------------------------------------------------------------------
 //                                   Includes
 // -----------------------------------------------------------------------------
-#include "app.h"
-#include "app_coap.h"
 #include "sl_string.h"
 #include "sl_wisun_api.h"
 #include "sl_wisun_types.h"
@@ -80,6 +79,10 @@
 #include "sl_wisun_app_core.h"
 #include "sl_wisun_version.h"
 #include "sl_wisun_app_core_util.h"
+
+#include "app.h"
+#include "app_parameters.h"
+#include "app_coap.h"
 #include "app_check_neighbors.h"
 #include "app_rtt_traces.h"
 
@@ -112,6 +115,8 @@ void  print_coap_help (char* device_global_ipv6_string, char* border_router_ipv6
   sl_wisun_coap_rhnd_print_resources();
   printf("  '/settings/auto_send'         returns the current notification duration in seconds\n");
   printf("  '/settings/auto_send' -e <d>' changes the notification duration to d seconds\n");
+  printf("  '/settings/parameter' -e \"<name>\"' returns application parameter <name> current value\n");
+  printf("  '/settings/parameter' -e \"<name> <value>\"' changes application parameter <name> to <value>\n");
   printf("  '/status/neighbor'            returns the neighbor_count\n");
   printf("  '/status/neighbor -e <n>'     returns the neighbor information for neighbor at index n\n");
   printf("  '/statistics/stack/<group> -e reset' clears the Stack statistics for the selected group\n");
@@ -647,10 +652,10 @@ sl_wisun_coap_packet_t * coap_callback_auto_send (
     req_packet->payload_ptr[req_packet->payload_len] = 0x00;
     res = sscanf((char *)req_packet->payload_ptr, "%d", &sec);
     if (res) {
-        auto_send_sec = (uint16_t)sec;
+        app_parameters.auto_send_sec = (uint16_t)sec;
     }
   }
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", auto_send_sec);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", app_parameters.auto_send_sec);
 return app_coap_reply(coap_response, req_packet); }
 
 sl_wisun_coap_packet_t * coap_callback_trace_level (
@@ -676,6 +681,37 @@ sl_wisun_coap_packet_t * coap_callback_trace_level (
   }
   }
   snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", trace_level);
+return app_coap_reply(coap_response, req_packet); }
+
+
+sl_wisun_coap_packet_t * coap_callback_application_parameter (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  #define MAX_PARAMETER_NAME 20
+  char parameter_name[MAX_PARAMETER_NAME];
+  int value = 0;
+  int res;
+  sl_status_t set_get_res = SL_STATUS_NOT_SUPPORTED;
+  if (req_packet->payload_len) {
+    // Make sure payload last char is NULL
+    req_packet->payload_ptr[req_packet->payload_len] = 0x00;
+    res = sscanf((char *)req_packet->payload_ptr, "%s %d",
+                 parameter_name, &value);
+    if (res == 2) {
+        // Process /settings/parameter -e "<name> <value>"
+        set_get_res = set_app_parameter(parameter_name,  value);
+    } else {
+        res = sscanf((char *)req_packet->payload_ptr, "%s", parameter_name);
+      if (res == 1) {
+          // Process /settings/parameter -e "<name>"
+          set_get_res = get_app_parameter(parameter_name, &value);
+      }
+    }
+  }
+  if (set_get_res == SL_STATUS_OK) {
+      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", value);
+  } else {
+      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "NOT_SUPPORTED");
+  }
 return app_coap_reply(coap_response, req_packet); }
 
 
@@ -937,6 +973,14 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "level";
   coap_resource.data.interface = "settings";
   coap_resource.auto_response = coap_callback_trace_level;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/settings/parameter";
+  coap_resource.data.resource_type = "int";
+  coap_resource.data.interface = "settings";
+  coap_resource.auto_response = coap_callback_application_parameter;
   coap_resource.discoverable = true;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;

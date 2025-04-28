@@ -24,6 +24,7 @@ source:
 - {path: app_direct_connect.c}
 - {path: app_init.c}
 - {path: app_list_configs.c}
+- {path: app_parameters.c}
 - {path: app_rtt_traces.c}
 - {path: app_reporter.c}
 - {path: app_tcp_server.c}
@@ -41,6 +42,7 @@ include:
   - {path: app_init.h}
   - {path: app_list_configs.h}
   - {path: app_reporter.h}
+  - {path: app_parameters.h}
   - {path: app_rtt_traces.h}
   - {path: app_tcp_server.h}
   - {path: app_timestamp.h}

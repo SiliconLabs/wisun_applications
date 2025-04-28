@@ -255,7 +255,7 @@ uint8_t filter_log_lines(char* log_lines, char* lines_to_send) {
   uint8_t line_count = 0;
 
   // Clear the lines to send after filtering
-  sprintf(lines_to_send, "%s", "");
+  sprintf(lines_to_send, "%s ", device_mac_string);
 
   // Get the first line
   line = strtok(log_lines, crlf);
@@ -267,11 +267,13 @@ uint8_t filter_log_lines(char* log_lines, char* lines_to_send) {
           matches++;
       } else {
       for (i = 0; i < reporter_matches.nb_matches ; i++) {
-          match_in_line = strstr(line, reporter_matches.match[i]);
-          if (match_in_line != NULL) {
-              matches++;
+          if (strlen(reporter_matches.match[i]) > 1) {
+              match_in_line = strstr(line, reporter_matches.match[i]);
+              if (match_in_line != NULL) {
+                  matches++;
+              }
           }
-      }
+        }
       }
       if (matches) {
           line_count++;
@@ -284,7 +286,7 @@ uint8_t filter_log_lines(char* log_lines, char* lines_to_send) {
       line = strtok(NULL, crlf);
   }
 
-  return strlen(lines_to_send);
+  return strlen(lines_to_send) - strlen(device_mac_string) -1;
 }
 
 static void check_and_send_reporter_logs(char *log_buffer)
@@ -459,6 +461,7 @@ void app_start_reporter(char *report__dest_ipv6_str,
                         uint32_t report_period_ms,
                         char *match_string)
 {
+  int i;
   if (reporter_started == 0) {
     app_start_reporter_thread();
   }
@@ -484,8 +487,12 @@ void app_start_reporter(char *report__dest_ipv6_str,
       // get next match
       match = strtok(NULL, pipe);
   }
-  printf("Reporting RTT lines matching %d patterns: %d   %s\n",
+  printf("Reporting RTT lines matching %d patterns to UDP port %d on %s\n",
          reporter_matches.nb_matches, REPORTER_PORT, report__dest_ipv6_str);
+
+  for (i=0; i<reporter_matches.nb_matches ; i++) {
+      printf("reporter_matches.match[%d] %s\n", i, reporter_matches.match[i]);
+  }
 
   reporter_period_ms = report_period_ms;
   reporter_active  = 1;

@@ -57,6 +57,7 @@
 #include "sl_wisun_coap.h"
 #include "sl_wisun_coap_config.h"
 
+ #include "app_parameters.h"
  /* Increase SL_APPLICATION_VERSION in app_properties_config.h to use DELTA DFU */
  #include "app_properties_config.h"
 
@@ -118,9 +119,6 @@
   #include "app_udp_server.h"
 #endif /* WITH_UDP_SERVER */
 
-#include "app_timestamp.h"
-#include "app_rtt_traces.h"
-
 #define   LIST_RF_CONFIGS
 #ifdef    LIST_RF_CONFIGS
   #include "app_list_configs.h"
@@ -134,6 +132,26 @@
 #define IF_ERROR(ret, ...)                   if (ret != SL_STATUS_OK) {printfBothTime("\n"); printfBoth(__VA_ARGS__);}
 #define IF_ERROR_RETURN(ret, ...)            if (ret != SL_STATUS_OK) {printfBothTime("\n"); printfBoth(__VA_ARGS__); return ret;}
 #define IF_ERROR_INCR(ret, error_count, ...) if (ret != SL_STATUS_OK) {printfBothTime("\n"); printfBoth(__VA_ARGS__); error_count++;}
+
+ #define TRACES_WHILE_CONNECTING \
+    app_set_all_traces(SL_WISUN_TRACE_LEVEL_INFO, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_SOCK   , SL_WISUN_TRACE_LEVEL_INFO , true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_BOOT   , SL_WISUN_TRACE_LEVEL_DEBUG, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_DEBUG, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_TIM_SRV, SL_WISUN_TRACE_LEVEL_ERROR, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_MAC    , SL_WISUN_TRACE_LEVEL_WARN , true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_FSM    , SL_WISUN_TRACE_LEVEL_WARN , true);
+
+#define TRACES_WHEN_CONNECTED \
+    app_set_all_traces(SL_WISUN_TRACE_LEVEL_INFO, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_ERROR, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_TIM_SRV, SL_WISUN_TRACE_LEVEL_ERROR, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_MAC    , SL_WISUN_TRACE_LEVEL_WARN , true); \
+    app_set_trace(SL_WISUN_TRACE_GROUP_FSM    , SL_WISUN_TRACE_LEVEL_WARN , true);
 
 #ifdef    HISTORY
 #define APPEND_TO_HISTORY(...) { \
@@ -241,7 +259,6 @@ uint64_t disconnected_total_sec = 0; // total time disconnected
 uint64_t msg_count = 0;              // number of messages sent
 sl_wisun_neighbor_info_t parent_info;   // local storage of the parent info
 sl_wisun_neighbor_info_t secondary_info;// local storage of the secondary parent info
-uint8_t selected_device_type;
 uint16_t preferred_pan_id = 0xffff;  // Preferred PAN Id (0xffff for 'none')
 
 #ifdef    APP_TRACK_HEAP
@@ -251,10 +268,6 @@ size_t app_previous_heap_free;
  #endif /* APP_TRACK_HEAP_DIFF */
 bool   refresh_heap;
 #endif /* APP_TRACK_HEAP */
-
-uint16_t auto_send_sec = 60; // Notification period in seconds
-uint8_t  neighbor_table_size = 100; // Size of neighbor table (default 22 in Wi-SUN stack)
-                                    // Increase if case of high network density (if many devices are within range of others)
 
 bool print_keep_alive = true;
 
@@ -345,51 +358,6 @@ static sl_wisun_coap_notify_ch_t coap_notify_ch = {
 // -----------------------------------------------------------------------------
 //                          Public Function Definitions
 // -----------------------------------------------------------------------------
-#ifndef SL_CATALOG_WISUN_EVENT_MGR_PRESENT // Event Manager also defines this handler
-/*Wi-SUN event handler*/
-void sl_wisun_on_event(sl_wisun_evt_t *evt)
-{
-  (void) evt->header.id;
-  /////////////////////////////////////////////////////////////////////////////
-  // Put your Wi-SUN event handling here!                                    //
-  // This is called from Wi-SUN stack.                                       //
-  // Do not call blocking functions from here!                               //
-  // Protect your data during event handling!                                //
-  /////////////////////////////////////////////////////////////////////////////
-  switch (evt->header.id) {
-#ifdef    APP_DIRECT_CONNECT_H
-    case SL_WISUN_MSG_DIRECT_CONNECT_LINK_AVAILABLE_IND_ID:
-      app_direct_connect_custom_callback(evt);
-      break;
-    case SL_WISUN_MSG_DIRECT_CONNECT_LINK_STATUS_IND_ID:
-      app_direct_connect_custom_callback(evt);
-      break;
-#endif /* APP_DIRECT_CONNECT_H */
-    default:
-      break;
-  }
-}
-#endif
-
-#define TRACES_WHILE_CONNECTING \
-    app_set_all_traces(SL_WISUN_TRACE_LEVEL_INFO, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_SOCK   , SL_WISUN_TRACE_LEVEL_INFO , true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_BOOT   , SL_WISUN_TRACE_LEVEL_DEBUG, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_DEBUG, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_TIM_SRV, SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_MAC    , SL_WISUN_TRACE_LEVEL_WARN , true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_FSM    , SL_WISUN_TRACE_LEVEL_WARN , true);
-
-#define TRACES_WHEN_CONNECTED \
-    app_set_all_traces(SL_WISUN_TRACE_LEVEL_INFO, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_TIM_SRV, SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_MAC    , SL_WISUN_TRACE_LEVEL_WARN , true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_FSM    , SL_WISUN_TRACE_LEVEL_WARN , true);
 
 #ifdef    SL_CATALOG_SIMPLE_BUTTON_PRESENT
 char* _button_json_string (char * start_text) {
@@ -463,6 +431,7 @@ void app_task(void *args)
   bool with_time, to_console, to_rtt, to_udp, to_coap;
 
   app_timestamp_init();
+  init_app_parameters();
 
   with_time = to_console = to_rtt = true;
   to_udp = to_coap = false;
@@ -470,10 +439,13 @@ void app_task(void *args)
 #ifdef    APP_CHECK_PREVIOUS_CRASH
   sl_wisun_check_previous_crash();
   if (strlen(crash_info_string)) {
+      app_parameters.nb_crashes++;
+      save_app_parameters();
       printfBothTime("Info on previous crash: %s\n", crash_info_string);
   }
 #endif /* APP_CHECK_PREVIOUS_CRASH */
 
+  osDelay(1000);
   printf("\n");
   sprintf(chip, "%s", CHIP);
 #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
@@ -582,13 +554,13 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
   startup_option = B0 + (B1 << 1);
   printfBothTime("Startup option %d ('%d%d')\n", startup_option, B1, B0);
   check_buttons = true;
-  selected_device_type = SL_WISUN_ROUTER;
+  app_parameters.selected_device_type = SL_WISUN_ROUTER;
   if (startup_option == 1) {
     sl_wisun_clear_credential_cache();
     printfBothTime("Cleared credential cache (startup_option 1)\n");
   }
   if (startup_option == 2) {
-    selected_device_type = SL_WISUN_LFN;
+    app_parameters.selected_device_type = SL_WISUN_LFN;
     printfBothTime("Starting as LFN (startup_option = 2)\n");
     sprintf(device_type, "LFN by user choice");
   }
@@ -597,7 +569,7 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
   printfBothTime("device_type %s\n", device_type);
 
 #ifdef    WITH_DIRECT_CONNECT
-  if (selected_device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
+  if (app_parameters.selected_device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
     // Register our Direct Connect custom callback function with the event manager (aka 'em')
     app_wisun_em_custom_callback_register(SL_WISUN_MSG_DIRECT_CONNECT_LINK_AVAILABLE_IND_ID, app_direct_connect_custom_callback);
     app_wisun_em_custom_callback_register(SL_WISUN_MSG_DIRECT_CONNECT_LINK_STATUS_IND_ID   , app_direct_connect_custom_callback);
@@ -617,10 +589,18 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
   list_rf_configs();
 #endif /* LIST_RF_CONFIGS */
 
-  sl_wisun_set_neighbor_table_size(neighbor_table_size);
-  printfBothTime("Neighbor table size %d\n", neighbor_table_size);
-
-  printfBothTime("auto_send_sec %d\n", auto_send_sec);
+  sl_wisun_set_neighbor_table_size(app_parameters.neighbor_table_size);
+  printfBothTime("Neighbor table size %d\n", app_parameters.neighbor_table_size);
+  if (app_parameters.set_leaf) {
+      if (app_parameters.selected_device_type == SL_WISUN_ROUTER) {
+          sl_wisun_set_leaf(true);
+          printfBothTime("LEAF mode %d\n", app_parameters.set_leaf);
+      } else {
+          printfBothTime("LEAF mode %d is incompatible with device_type %d\n",
+                app_parameters.set_leaf, app_parameters.selected_device_type);
+      }
+  }
+  printfBothTime("app_parameters.auto_send_sec %d\n", app_parameters.auto_send_sec);
 
 #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
   // LEDs indicate the 'version' in 2 steps
@@ -636,8 +616,8 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
   set_leds(0, 0);
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
-  sl_wisun_set_preferred_pan(preferred_pan_id);
-  printfBothTime("preferred_pan_id 0x%04x\n", preferred_pan_id);
+  sl_wisun_set_preferred_pan(app_parameters.preferred_pan_id);
+  printfBothTime("preferred_pan_id 0x%04x\n", app_parameters.preferred_pan_id);
 
 #ifdef WITH_TCP_SERVER
   init_tcp_server();
@@ -811,7 +791,7 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
     }
 
     // Print status message once then disable status
-    if (connected_delay_sec % auto_send_sec == 0) {
+    if (connected_delay_sec % app_parameters.auto_send_sec == 0) {
         if (print_keep_alive == true) {
           _print_and_send_messages (_status_json_string(""),
                     with_time, to_console, to_rtt, to_udp, to_coap);
@@ -823,7 +803,7 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
         }
     }
     // Enable status for next time
-    if (connected_delay_sec % auto_send_sec == 1) {
+    if (connected_delay_sec % app_parameters.auto_send_sec == 1) {
         if (print_keep_alive == false) {
             print_keep_alive = true;
         }
@@ -1052,7 +1032,7 @@ char* _connection_json_string () {
     sec_string,
     msg_count,
     network_info.pan_id, network_info.pan_id,
-    preferred_pan_id, preferred_pan_id,
+    app_parameters.preferred_pan_id, app_parameters.preferred_pan_id,
     app_join_state_delay_sec[1],
     app_join_state_delay_sec[2],
     app_join_state_delay_sec[3],

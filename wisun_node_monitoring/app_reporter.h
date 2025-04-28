@@ -37,7 +37,7 @@
 #define __APP_REPORTER_H__
 
 #define MAX_MATCH_STRING_LEN 100
-
+extern char        device_mac_string[40];
 // -----------------------------------------------------------------------------
 //                          Public Function Definitions
 // -----------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 /***************************************************************************//**
-* @file app.h
-* @brief header file for application
+* @file app_parameters.h
+* @brief header file for application parameters (saved/retrieved from NVM)
 * @version 1.0.0
 *******************************************************************************
 * # License
@@ -35,81 +35,51 @@
 *
 ******************************************************************************/
 
-#ifndef APP_H
-#define APP_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
+#ifndef APP_PARAMETERS_H
+#define APP_PARAMETERS_H
 // -----------------------------------------------------------------------------
 //                                   Includes
 // -----------------------------------------------------------------------------
-#include "cmsis_os2.h"
-#include "sl_component_catalog.h"
+#include <stdio.h>
+#include <stdlib.h>
 
-#include "app_timestamp.h"
-#include "app_rtt_traces.h"
+#include "nvm3_default.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
-#ifndef    SL_BOARD_NAME
-  /* For Custom boards:
-   *   We recommend setting this to the company-internal board name
-   */
-  #define  SL_BOARD_NAME "Custom_Board"
-#endif /*  SL_BOARD_NAME */
-
-#define DEFINE_string(s)   #s
-
-#define HISTORY
-//#define LIST_RF_CONFIGS
-// UDP and TCP server need to be set to either SO_NONBLOCK or SO_EVENT_MODE, if defined
-// Comment the lines if the corresponding server is not required
-#define WITH_UDP_SERVER    SO_NONBLOCK
-#define WITH_TCP_SERVER    SO_EVENT_MODE
-
-#define WITH_REPORTER
-#ifdef    WITH_REPORTER
-  #include "app_reporter.h"
-#endif /* WITH_REPORTER */
-
-#define WITH_DIRECT_CONNECT
-#ifdef    WITH_DIRECT_CONNECT
-  #include "app_direct_connect.h"
-#endif /* WITH_DIRECT_CONNECT */
-
-// Notifications destinations (UDP and CoAP)
-// Set to fixed IPv6 strings
-#define UDP_NOTIFICATION_DEST  "fd00:6172:6d00::1" // fixed IPv6 string
-#define COAP_NOTIFICATION_DEST "fd00:6172:6d00::2" // fixed IPv6 string
-
 #define NVM3_APP_KEY   0xf012
+
+// Application parameters
+typedef struct {
+  uint16_t nb_boots;             // Number of reboots since last NVM clear
+  uint16_t nb_crashes;           // Number of crashes since last NVM clear
+  uint16_t auto_send_sec;        // Notification period in seconds
+  uint8_t  neighbor_table_size;  // Size of neighbor (RPL name for devices 'in range') table
+  uint16_t preferred_pan_id;     // Preferred PAN Id (0xffff for 'none')
+  uint8_t  selected_device_type; // SL_WISUN_ROUTER by default
+  uint8_t  set_leaf;             // LEAF mode flag
+  int16_t  tx_power_ddbm;        // TX Output power in deci-dBm
+} app_wisun_parameters_t;
 
 // -----------------------------------------------------------------------------
 //                                Global Variables
 // -----------------------------------------------------------------------------
-extern char crash_info_string[];
+extern app_wisun_parameters_t app_parameters;
 
 // -----------------------------------------------------------------------------
 //                          Public Function Declarations
 // -----------------------------------------------------------------------------
-/**************************************************************************//**
- * @brief Application task function
- * @details This function is the main app task implementation
- * @param[in] args arguments
- *****************************************************************************/
-#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-  void leds_flash(uint16_t count, uint16_t delay_ms);
-#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
-void app_task(void *args);
-void app_reset_statistics(void);
-void refresh_parent_tag(void);
+// NVM3 Init/Read/Write of key NVM3_APP_KEY
+sl_status_t init_app_parameters();
+sl_status_t read_app_parameters();
+sl_status_t save_app_parameters();
 
-#ifdef __cplusplus
-}
-#endif
+// Set and Print application parameters
+void        print_app_parameters();
+void        set_app_parameters_defaults();
+sl_status_t set_app_parameter(char* parameter_name, int  value);
+sl_status_t get_app_parameter(char* parameter_name, int* value);
 
-#endif  // APP_H
+#endif  // APP_PARAMETERS_H
