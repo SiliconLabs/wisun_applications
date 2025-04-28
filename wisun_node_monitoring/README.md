@@ -30,8 +30,7 @@ The block diagram of this application is shown in the image below:
 
 ## Simplicity SDK Version ##
 
-SiSDK v2024.12.0
-(older SiSDK version will generate compilation issues due to unknown trace groups)
+SiSDK v2024.12.2
 
 ## Hardware Required ##
 
@@ -142,6 +141,38 @@ To allocate different pins to the buttons or LEDs, use the pintool.
 
 - **Controlling Devices** – Some CoAP resources support a payload to control the application settings. The example used in the demo controls the `auto_send` period, which can be increased once the device has been connected for a while, reducing the amount of traffic on the network, which can be important to save power and support many devices.
 
+### Application Parameters ###
+
+The `app_parameters.c/.h` code allows
+
+- Initializing Application Parameters in NVM when no already set
+- Retrieving Application Parameters from NVM on boot
+- Changing Application Parameters (using CoAP)
+- Saving Application parameters to NVM
+- Rebooting
+
+It can be easily extended to support any additional application parameter.
+
+| `set/get` Application Parameter | Comments |
+|-----------------------------|----------|
+| `auto_send_sec`             | Delay between 2 notification messages |
+| `neighbor_table_size`       | Max Number of RPL neighbors in table (ín range'devices) |
+| `preferred_pan_id`          | Preferred PAN id to use if receiving PAs from this PAN ID. Default ('none') = `0x0000` |
+| `selected_device_type`      | Control of device type (if enabled by installed components) |
+| `set_leaf`                  | Control of FFN LEAF device |
+| `tx_power_ddbm`             | Tx Output Power |
+
+| `get` only Application Parameter | Comments |
+|----------------------------------|----------|
+| `nb_boots`                       | Number of times the device booted |
+| `nb_crashes`                     | Number of times the crash handler has been called |
+
+| Application Parameter controls | Comments |
+|--------------------------------|----------|
+| `defaults`                     | Reset all parameters to defaults from `set_app_parameters_defaults()`. Call with `<value>` > 0 to directly save once set |
+| `save`                         | Save current parameter set to NVM |
+| `reboot <delay>`               | Reboot in `delay`seconds. Convenient to reboot all devices using a multicast message while leaving enough time for the message to propagate |
+
 ### Normal Mode ###
 
 Once all devices are connected, the [`coap_all`](linux_border_router_wsbrd/coap_all) bash script allows sending the same CoAP request to all connected devices, allowing an easy monitoring of the entire network.
@@ -189,6 +220,7 @@ The URIs are
 |statistics/stack/regulation      | statistics from [sl_wisun_statistics_regulation_t](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-statistics-regulation-t) | json | '-e reset' resets these statistics |
 |settings/auto_send               | the current `auto_send_sec` value           | '%d' | '-e s' sets auto_send_sec to s seconds |
 |settings/trace_level             | the current `trace_level` value             | '%d' | '-e \<level\>' - '-e [0-4]' sets trace_level for all groups. '-e \<group\> \<level\>' sets trace level for a single group. Groups are [(0=None to 4=DEBUG)](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-types#sl-wisun-trace-level-t). Levels are [(0=MAC to 41=APP)](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-types#sl-wisun-trace-group-t) |
+|settings/parameter               | set/get application parameters to/from NVM  | '%d' | '-e \<name\>' returns current parameter value. '-e \<name\> \<value\>' changes application parameter value. See for details |
 |reporter/crash                   | Info on any previous crash, using `sl_wisun_crash_handler.c/.h` | '%s' | text info on crash (from `sl_wisun_crash_handler.h/sl_wisun_crash_type`) |
 |reporter/start                   | Start RTT trace filtering on \<str\> and report on `REPORTER_PORT`, using `app_reporter.c/.h`  | '%s'| '-e \<string_1\|string_2\|...\|string_n\>' sets the list of strings to look for in RTT traces. |
 |reporter/stop                    | Stop RTT trace reporting |||
