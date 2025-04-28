@@ -589,8 +589,6 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
   list_rf_configs();
 #endif /* LIST_RF_CONFIGS */
 
-  sl_wisun_set_neighbor_table_size(app_parameters.neighbor_table_size);
-  printfBothTime("Neighbor table size %d\n", app_parameters.neighbor_table_size);
   if (app_parameters.set_leaf) {
       if (app_parameters.selected_device_type == SL_WISUN_ROUTER) {
           sl_wisun_set_leaf(true);

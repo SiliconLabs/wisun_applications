@@ -55,7 +55,6 @@ typedef struct {
   uint16_t nb_boots;             // Number of reboots since last NVM clear
   uint16_t nb_crashes;           // Number of crashes since last NVM clear
   uint16_t auto_send_sec;        // Notification period in seconds
-  uint8_t  neighbor_table_size;  // Size of neighbor (RPL name for devices 'in range') table
   uint16_t preferred_pan_id;     // Preferred PAN Id (0xffff for 'none')
   uint8_t  selected_device_type; // SL_WISUN_ROUTER by default
   uint8_t  set_leaf;             // LEAF mode flag

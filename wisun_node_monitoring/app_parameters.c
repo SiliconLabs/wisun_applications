@@ -77,7 +77,6 @@ void print_app_parameters() {
   printfBothTime("app_parameters.nb_boots             %d\n", app_parameters.nb_boots);
   printfBothTime("app_parameters.nb_crashes           %d\n", app_parameters.nb_crashes);
   printfBothTime("app_parameters.auto_send_sec        %d\n", app_parameters.auto_send_sec);
-  printfBothTime("app_parameters.neighbor_table_size  %d\n", app_parameters.neighbor_table_size);
   printfBothTime("app_parameters.preferred_pan_id     %d\n", app_parameters.preferred_pan_id);
   printfBothTime("app_parameters.selected_device_type %d\n", app_parameters.selected_device_type);
   printfBothTime("app_parameters.set_leaf             %d\n", app_parameters.set_leaf);
@@ -86,7 +85,6 @@ void print_app_parameters() {
 
 void set_app_parameters_defaults() {
   app_parameters.auto_send_sec        = 60;
-  app_parameters.neighbor_table_size  = 22;
   app_parameters.preferred_pan_id     = 0xffff;
   app_parameters.selected_device_type = SL_WISUN_ROUTER;
   app_parameters.set_leaf             = 0;
@@ -134,13 +132,6 @@ sl_status_t set_app_parameter(char* parameter_name, int value) {
   bool match = false;
   if  (!match) { match = (sl_strcasecmp(parameter_name, "auto_send_sec") == 0);
     if (match) { app_parameters.auto_send_sec = (uint16_t)value; }
-  }
-  if  (!match) { match = (sl_strcasecmp(parameter_name, "neighbor_table_size") == 0);
-    if (match) {
-        app_parameters.neighbor_table_size = (uint8_t)value;
-        sl_wisun_set_neighbor_table_size(app_parameters.neighbor_table_size);
-        printfBothTime("Neighbor table size %d\n", app_parameters.neighbor_table_size);
-    }
   }
   if  (!match) { match = (sl_strcasecmp(parameter_name, "preferred_pan_id") == 0);
     if (match) {
@@ -223,9 +214,6 @@ sl_status_t get_app_parameter(char* parameter_name, int* value) {
   }
   if  (!match) { match = (sl_strcasecmp(parameter_name, "auto_send_sec") == 0);
     if (match) { *value = (uint16_t)app_parameters.auto_send_sec; }
-  }
-  if  (!match) { match = (sl_strcasecmp(parameter_name, "neighbor_table_size") == 0);
-    if (match) { *value = (uint16_t)app_parameters.neighbor_table_size; }
   }
   if  (!match) { match = (sl_strcasecmp(parameter_name, "preferred_pan_id") == 0);
     if (match) { *value = (uint16_t)app_parameters.preferred_pan_id; }
