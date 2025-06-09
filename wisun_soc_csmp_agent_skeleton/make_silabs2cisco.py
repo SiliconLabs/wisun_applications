@@ -107,7 +107,6 @@ if __name__ == '__main__':
             # Handle any .c source file in the project route
             m = re.search(r'\s+([\d\w_-]+\.c)', line)
             if m:
-              print(f"Find source: {m.group(1)}")
               line = line.replace(f"{m.group(1)}", f"$(CSMP_AGENT_LIB_EFR32_WISUN_PATH)/{m.group(1)}")
               f.write(line)
               continue

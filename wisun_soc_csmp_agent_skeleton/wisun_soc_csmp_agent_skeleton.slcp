@@ -12,7 +12,7 @@ component:
   - id: "wisun_stack_lfn"
   - id: "wisun_stack_ffn"
   - id: "wisun_stack_debug"
-  - id: "sl_system"
+  - id: "sl_main"
   - id: clock_manager
   - id: device_init
   - id: board_control
@@ -64,16 +64,18 @@ include:
 define:
   - name: "DEBUG_EFM"
 configuration:
+  - name: "SL_MAIN_START_TASK_STACK_SIZE_BYTES"
+    value: "2048"
   - name: "SL_BOARD_ENABLE_VCOM"
     value: "1"
   - name: "SL_IOSTREAM_USART_VCOM_FLOW_CONTROL_TYPE"
-    value: "usartHwFlowControlNone"
+    value: "usartHwFlowControlCtsAndRts"
   - name: "SL_IOSTREAM_USART_VCOM_CONVERT_BY_DEFAULT_LF_TO_CRLF"
     value: "1"
   - name: SL_CLI_LOCAL_ECHO
     value: "(1)"
   - name: "SL_IOSTREAM_EUSART_VCOM_FLOW_CONTROL_TYPE"
-    value: "eusartHwFlowControlNone"
+    value: "SL_IOSTREAM_EUSART_UART_FLOW_CTRL_CTS_RTS"
   - name: "SL_IOSTREAM_EUSART_VCOM_CONVERT_BY_DEFAULT_LF_TO_CRLF"
     value: "1"
   - name: "SL_IOSTREAM_USART_VCOM_RX_BUFFER_SIZE"
