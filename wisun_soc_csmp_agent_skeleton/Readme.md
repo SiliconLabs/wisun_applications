@@ -30,7 +30,8 @@ One of the supported platforms listed below is required to run the example:
 
 ## Software Prerequisites
 
-- Simplicity Studio v5 with the Simplicity SDK Suit 2024.6.0.
+- Simplicity Studio v5 with the Simplicity SDK Suit 2025.6.0.  
+Note: For using sisdk-2024.12 version, check the [platform-service-sl_system-to-sl_main-migration-guide](https://docs.silabs.com/gecko-platform/latest/platform-service-sl_system-to-sl_main-migration-guide/) to track the changes.
 
 ## Install Simplicity Studio 5 and the Gecko SDK
 
