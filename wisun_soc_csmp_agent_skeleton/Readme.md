@@ -81,8 +81,3 @@ If this step is not done already, follow the steps listed under [Add the Wi-SUN 
     * In the *CHANGE PROJECT GENERATORS* list, select **GCC Makefile**.
     * Click Save and wait for Simplicity Studio to generate the project.
 7. Refer to the folder **Vendors/Silabs** on the [CSMP Agent library](https://github.com/CiscoDevNet/csmp-agent-lib) to complete your setup and connect to FND.
-
-
-> [!IMPORTANT]  
->At the time of writing this guide, the Silicon Labs EFR32 Wi-SUN platforms support pull request on the [CSMP Agent library](https://github.com/CiscoDevNet/csmp-agent-lib) is still open and not yet approved. If you can't find the folder **Vendors/Silabs** on the main branch please check the open pull requests.
-
