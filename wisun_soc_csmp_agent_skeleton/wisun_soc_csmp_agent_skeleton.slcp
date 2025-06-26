@@ -12,7 +12,8 @@ component:
   - id: "wisun_stack_lfn"
   - id: "wisun_stack_ffn"
   - id: "wisun_stack_debug"
-  - id: "sl_system"
+  - id: "sl_main"
+  - id: "sl_main_custom_main"
   - id: clock_manager
   - id: device_init
   - id: board_control
@@ -26,12 +27,12 @@ component:
       - btn0
       - btn1
 # radio config
-  - id: "wisun_full_radioconf"
+  - id: "wisun_default_radioconf"
 # SDK components
   - id: "sl_wisun_trace_util"
   - id: "sl_wisun_app_core"
   - id: "sl_wisun_app_setting"
-  - id: "sl_wisun_app_cli"
+  - id: "sl_wisun_cli"
   - id: "sl_wisun_ping"
   - id: "cli"
     instance:
@@ -44,6 +45,8 @@ requires:
   - name: "sl_wisun_mode_switch"
     condition:
       - "device_sdid_220" # only for these devices
+  - name: bootloader_interface
+  
 source:
   - path: "main.c"
   - path: "../component/ntp_timesync/sl_wisun_ntp_timesync.c"
@@ -62,16 +65,18 @@ include:
 define:
   - name: "DEBUG_EFM"
 configuration:
+  - name: "SL_MAIN_START_TASK_STACK_SIZE_BYTES"
+    value: "2048"
   - name: "SL_BOARD_ENABLE_VCOM"
     value: "1"
   - name: "SL_IOSTREAM_USART_VCOM_FLOW_CONTROL_TYPE"
-    value: "usartHwFlowControlNone"
+    value: "usartHwFlowControlCtsAndRts"
   - name: "SL_IOSTREAM_USART_VCOM_CONVERT_BY_DEFAULT_LF_TO_CRLF"
     value: "1"
   - name: SL_CLI_LOCAL_ECHO
     value: "(1)"
   - name: "SL_IOSTREAM_EUSART_VCOM_FLOW_CONTROL_TYPE"
-    value: "eusartHwFlowControlNone"
+    value: "SL_IOSTREAM_EUSART_UART_FLOW_CTRL_CTS_RTS"
   - name: "SL_IOSTREAM_EUSART_VCOM_CONVERT_BY_DEFAULT_LF_TO_CRLF"
     value: "1"
   - name: "SL_IOSTREAM_USART_VCOM_RX_BUFFER_SIZE"
@@ -135,18 +140,8 @@ configuration:
     condition: [iostream_eusart,power_manager]
 
   # SDK memory configuration
-  - name: "SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE"
-    value: "2048"
-  - name: "SL_WISUN_COAP_RESOURCE_HND_STACK_SIZE_WORD"
+  - name: "NVM3_DEFAULT_MAX_OBJECT_SIZE"
     value: "512"
-  - name: "SL_GUI_STACK_SIZE_WORD"
-    value: "256"
-  - name: "SL_DISPLAY_STACK_SIZE_WORD"
-    value: "384"
-  - name: "SL_WISUN_PING_STACK_SIZE_WORD"
-    value: "256"
-  - name: "SL_IPERF_STACK_SIZE_WORD"
-    value: "256"
 
 # SDK Application version
   - name: APP_PROJECT_INFO_APP_VERSION_MAJOR
