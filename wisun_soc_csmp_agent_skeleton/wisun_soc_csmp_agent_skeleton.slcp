@@ -13,6 +13,7 @@ component:
   - id: "wisun_stack_ffn"
   - id: "wisun_stack_debug"
   - id: "sl_main"
+  - id: "sl_main_custom_main"
   - id: clock_manager
   - id: device_init
   - id: board_control
@@ -26,7 +27,7 @@ component:
       - btn0
       - btn1
 # radio config
-  - id: "wisun_full_radioconf"
+  - id: "wisun_default_radioconf"
 # SDK components
   - id: "sl_wisun_trace_util"
   - id: "sl_wisun_app_core"
