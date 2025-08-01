@@ -100,7 +100,7 @@ if __name__ == '__main__':
       logger.info("Device private key injected")
 
     if device_cert:
-      # Write device certificate to NVM3 Key ID 0x100
+      # Write device certificate to NVM3 Object ID 0x100
       logger.info("Saving device certificate to NVM")
       tx = ddp.command.WriteNvm(0x100, device_cert)
       sw.rtt_send(tx)
@@ -111,7 +111,7 @@ if __name__ == '__main__':
 
     key_id = 1
     for iter in trusted_certs:
-      # Write trusted CA certificate to NVM3 Key ID (0x100 + key_id)
+      # Write trusted CA certificate to NVM3 Object ID (0x100 + key_id)
       logger.info(f"Saving trusted CA certificate #{key_id} to NVM")
       tx = ddp.command.WriteNvm(0x100 + key_id, iter)
       sw.rtt_send(tx)
