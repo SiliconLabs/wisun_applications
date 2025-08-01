@@ -49,10 +49,11 @@ if __name__ == '__main__':
 
   if args.device_key:
     with open(args.device_key, 'rb') as f:
+      key_data = f.read()
       try:
-        device_key_data = serialization.load_pem_private_key(f.read(), None, default_backend())
+        device_key_data = serialization.load_pem_private_key(key_data, None, default_backend())
       except ValueError:
-        device_key_data = serialization.load_der_private_key(f.read(), None, default_backend())
+        device_key_data = serialization.load_der_private_key(key_data, None, default_backend())
       device_key = device_key_data.private_numbers().private_value.to_bytes(32, 'big')
   if args.device_cert:
     with open(args.device_cert, 'rb') as f:
