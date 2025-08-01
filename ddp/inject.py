@@ -105,7 +105,7 @@ if __name__ == '__main__':
       tx = ddp.command.WriteNvm(0x100, device_cert)
       sw.rtt_send(tx)
       rx = sw.rtt_receive()
-      rx = ddp.response.WriteNvm(rx)
+      resp = ddp.response.WriteNvm(rx)
       assert resp.status == 0, f"Failure saving device certificate to NVM ({resp.status})"
       logger.info("Device certificate saved")
 
@@ -116,7 +116,7 @@ if __name__ == '__main__':
       tx = ddp.command.WriteNvm(0x100 + key_id, iter)
       sw.rtt_send(tx)
       rx = sw.rtt_receive()
-      rx = ddp.response.WriteNvm(rx)
+      resp = ddp.response.WriteNvm(rx)
       assert resp.status == 0, f"Failure saving trusted CA certificate #{key_id} to NVM ({resp.status})"
       logger.info(f"Trusted CA certificate #{key_id} saved")
       key_id += 1
