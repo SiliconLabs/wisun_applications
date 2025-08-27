@@ -85,8 +85,6 @@ extern "C" {
 #define UDP_NOTIFICATION_DEST  "fd00:6172:6d00::1" // fixed IPv6 string
 #define COAP_NOTIFICATION_DEST "fd00:6172:6d00::2" // fixed IPv6 string
 
-#define NVM3_APP_KEY   0xf012
-
 // -----------------------------------------------------------------------------
 //                                Global Variables
 // -----------------------------------------------------------------------------
