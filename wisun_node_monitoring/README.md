@@ -30,8 +30,7 @@ The block diagram of this application is shown in the image below:
 
 ## Simplicity SDK Version ##
 
-SiSDK v2024.12.0
-(older SiSDK version will generate compilation issues due to unknown trace groups)
+SiSDK v2025.06.1
 
 ## Hardware Required ##
 
@@ -95,6 +94,8 @@ Network parameters are set during project development, then the device automatic
   - `chmod a+x coap_all`
   - `chmod a+x ipv6s`
   - `chmod a+x *.sh`
+- The 'fd00:6172:6d00::1' (UDP_NOTIFICATION_DEST) IPv6 and the 'fd00:6172:6d00::2' (COAP_NOTIFICATION_DEST) IPv6 are added to eth0 using the `wsbrd_add.sh` script
+- Multicast routing via tun0 for all ([link local /realm local] [nodes/routers]) devices is allowed once wsbrd is running (tun0 present) using the `multicast_setup.sh` script
 - The [UDP notification receiver](linux_border_router_wsbrd/udp_notification_receiver.py) is started using
   - `python udp_notification_receiver.py 1237 " "`, waiting for messages from the Wi-SUN Nodes on port `1237`.
 - The application is built and flashed to all Wi-SUN devices
@@ -105,7 +106,7 @@ Network parameters are set during project development, then the device automatic
 
 - **Node Initial Connection** – After the application firmware is installed, the devices connect automatically to the Wi-SUN network, selecting the best parent, using several hops if needed, as in any Wi-SUN network.
 
-- **Initial Connection Message** - Once connected, each node sends an initial UDP connection message to the Border Router's IPv6 address on port 1237.
+- **Initial Connection Message** - Once connected, each node sends an initial UDP connection message via the Border Router to the UDP_NOTIFICATION_DEST IPv6 address (fd00:6172:6d00::1) on port UDP_NOTIFICATION_PORT (1237).
 
 ### Buttons and LEDs ###
 
@@ -175,6 +176,7 @@ The URIs are
 |status/neighbor                  | number of neighbors                         | '%d'           | '-e n' returns info for neighbor n (from [sl_wisun_neighbor_info_t](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-neighbor-info-t) |
 |status/connected                 | time since last connection                  | 'ddd-hh:mm:ss' ||
 |status/all                       | all of the 'status' group above             | json           ||
+|status/send                      | Trigger an immediate Tx of status_json_string() | json           | Same message as sent to UDP server|
 |statistic/app/join_states_sec    | array of seconds spent to reach each join state (1 to 5) | 'ddd-hh:mm:ss' ||
 |statistic/app/disconnected_total |  | 'ddd-hh:mm:ss' ||
 |statistic/app/connections        |  | '%d'           ||
