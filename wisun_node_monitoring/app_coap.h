@@ -40,7 +40,8 @@
 #include "sl_wisun_coap_rhnd.h"
 #include "app_timestamp.h"
 
-extern uint16_t connection_count;           // number of connections
+extern uint16_t connection_count;           // number of connections (moving to Join State 5)
+extern uint16_t network_connection_count;   // number of network connections (moving to Join State 5 from min Join State 3)
 extern uint64_t connect_time_sec;           // time stamp of Wisun connect call
 extern uint64_t connection_time_sec;        // last connection time stamp
 extern uint64_t disconnection_time_sec;     // last disconnection time stamp

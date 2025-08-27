@@ -51,6 +51,7 @@
 
 #include "app_timestamp.h"
 #include "app_rtt_traces.h"
+#include "app_wisun_multicast_ota.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -160,8 +161,16 @@ void check_udp_server_messages(void) {
         // Make sure the last byte is 0x00 (end of string).
         udp_buff[udp_r] = 0;
         udp_ip_str = app_wisun_trace_util_get_ip_str((void *) &udp_client_addr.sin6_addr);
+  #ifdef    APP_WISUN_MULTICAST_OTA_H
+        if (strncmp(udp_buff, (char*)"OTA ", 4) == 0) {
+            if (multicast_rx(udp_buff, udp_r) == 0) {
+  #endif /* APP_WISUN_MULTICAST_OTA_H */
         // Print the received message
         printfBothTime("UDP Rx %2ld from %s (%ld bytes): %s\n", count_udp_rx, udp_ip_str, udp_r, udp_buff);
+#ifdef          APP_WISUN_MULTICAST_OTA_H
+            }
+#endif /* APP_WISUN_MULTICAST_OTA_H */
+        }
   #ifdef    APP_DIRECT_CONNECT_H
         // Direct any message starting with 'wisun' to the Direct Connect CLI
         if (strncmp(udp_buff, (char*)"wisun", 5) == 0) {

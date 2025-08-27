@@ -49,9 +49,13 @@
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
 #define NVM3_APP_KEY   0xf012
+#define NVM3_APP_PARAMS_VERSION  10000
 
 // Application parameters
 typedef struct {
+  uint32_t app_params_version;   // Read at boot, set all to defaults
+                                 //  if not matching NVM3_APP_VERSION
+                                 //    This is to avoid clearing the Wi-SUN stack cache
   uint16_t nb_boots;             // Number of reboots since last NVM clear
   uint16_t nb_crashes;           // Number of crashes since last NVM clear
   uint16_t auto_send_sec;        // Notification period in seconds
@@ -59,6 +63,14 @@ typedef struct {
   uint8_t  selected_device_type; // SL_WISUN_ROUTER by default
   uint8_t  set_leaf;             // LEAF mode flag
   int16_t  tx_power_ddbm;        // TX Output power in deci-dBm
+  /* sl_wisun_config_neighbor_table parameters
+  * max_security_neighbor_count(300) >= max_neighbor_count(32) > max_child_count(22)
+  * Each entry in the neighbor table consumes about 450 bytes of RAM.
+  * Each entry in the security neighbor table consumes about 50 bytes of RAM.
+  */
+  uint8_t  max_child_count;      //  Maximum number of RPL children
+  uint8_t  max_neighbor_count;   //  Maximum number of neighbors including children, parent, and temporary neighbors
+  uint16_t max_security_neighbor_count; // Maximum number of neighbors in the security table
 } app_wisun_parameters_t;
 
 // -----------------------------------------------------------------------------

@@ -70,7 +70,7 @@
  void *led0;
  void *led1;
 
- #define START_FLASHES_A 7
+ #define START_FLASHES_A 6
  #define START_FLASHES_B  SL_APPLICATION_VERSION
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
@@ -133,7 +133,7 @@
 #define IF_ERROR_RETURN(ret, ...)            if (ret != SL_STATUS_OK) {printfBothTime("\n"); printfBoth(__VA_ARGS__); return ret;}
 #define IF_ERROR_INCR(ret, error_count, ...) if (ret != SL_STATUS_OK) {printfBothTime("\n"); printfBoth(__VA_ARGS__); error_count++;}
 
- #define TRACES_WHILE_CONNECTING \
+#define TRACES_WHILE_CONNECTING \
     app_set_all_traces(SL_WISUN_TRACE_LEVEL_INFO, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_SOCK   , SL_WISUN_TRACE_LEVEL_INFO , true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_BOOT   , SL_WISUN_TRACE_LEVEL_DEBUG, true); \
@@ -168,16 +168,16 @@
 #define END_JSON   "}\n"
 
 #define DEVICE_CHIP_ITEMS \
-  device_global_ipv6_string, \
-  device_tag, \
-  CHIP, \
-  device_type, \
+  device_global_ipv6_string,\
+  device_tag,\
+  CHIP,\
+  device_type,\
   device_mac_string
 
 #define DEVICE_CHIP_JSON_FORMAT \
   "\"ipv6\":\"%s\",\n"   \
-  "\"device\":\"%s\",\n"           \
-  "\"chip\":  \"%s\",\n"           \
+  "\"device\":\"%s\",\n" \
+  "\"chip\":\"%s\",\n"   \
   "\"type\":\"%s\",\n"   \
   "\"MAC\":\"%s\",\n"    \
 
@@ -189,29 +189,29 @@
   parent_info.etx,          \
   parent_info.routing_cost, \
   parent_info.rsl_in,       \
-  parent_info.rsl_out,      \
-  parent_info.lifetime,     \
-  secondary_tag,            \
-  secondary_info.rsl_in,    \
-  secondary_info.rsl_out    \
+  parent_info.rsl_out      \
+//  parent_info.lifetime
+//  secondary_tag,
+//  secondary_info.rsl_in,
+//  secondary_info.rsl_out
 
 #define PARENT_JSON_FORMAT \
-  "\"parent\":\"%s\",\n"           \
+  "\"parent\":\"%s\",\n"       \
   "\"rpl_rank\":\"%d\",\n"     \
   "\"etx\":\"%d\",\n"          \
   "\"routing_cost\":\"%d\",\n" \
   "\"rsl_in\":\"%d\",\n"       \
   "\"rsl_out\":\"%d\",\n"      \
-  "\"lifetime\":\"%ld\",\n"    \
-  "\"secondary\":\"%s\",\n"    \
-  "\"sec_rsl_in\":\"%d\",\n"   \
-  "\"sec_rsl_out\":\"%d\",\n"  \
+//  "\"lifetime\":\"%ld\",\n"
+//  "\"secondary\":\"%s\",\n"
+//  "\"sec_rsl_in\":\"%d\",\n"
+//  "\"sec_rsl_out\":\"%d\",\n"
 
 #define RUNNING_JSON_FORMAT \
-  "\"running\":     \"%s\",\n"
+  "\"running\":\"%s\",\n"
 
 #define MSG_COUNT_JSON_FORMAT \
-    "\"msg_count\":\"%lld\",\n"
+  "\"msg_count\":\"%lld\",\n"
 
 #ifdef  _SILICON_LABS_32B_SERIES_1             /** Product Series Identifier */
   #ifdef _SILICON_LABS_32B_SERIES_1_CONFIG_2   /** Product Config Identifier */
@@ -240,17 +240,17 @@ void        _check_neighbors(void);
 char*       _connection_json_string();
 char*       _status_json_string (char * start_text);
 char        device_mac_string[40];
+sl_wisun_network_info_t network_info;
 sl_wisun_mac_address_t _get_parent_mac_address_and_update_parent_info(void);
 sl_status_t _select_destinations(void);
 sl_status_t _open_udp_sockets(void);
 sl_status_t _coap_notify(char* json_string);
-uint8_t     _print_and_send_messages (char *in_msg, bool with_time,
-                            bool to_console, bool to_rtt, bool to_udp, bool to_coap);
 
 // -----------------------------------------------------------------------------
 //                                Global Variables
 // -----------------------------------------------------------------------------
-uint16_t connection_count = 0;       // number of connections
+uint16_t connection_count = 0;       // number of connections (moving to Join State 5)
+uint16_t network_connection_count = 0; // number of network connections (moving to Join State 5 from min Join State 3)
 uint64_t connect_time_sec;           // time stamp of Wisun connect call
 uint64_t connection_time_sec;        // last connection time stamp
 uint64_t disconnection_time_sec;     // last disconnection time stamp
@@ -260,6 +260,8 @@ uint64_t msg_count = 0;              // number of messages sent
 sl_wisun_neighbor_info_t parent_info;   // local storage of the parent info
 sl_wisun_neighbor_info_t secondary_info;// local storage of the secondary parent info
 uint16_t preferred_pan_id = 0xffff;  // Preferred PAN Id (0xffff for 'none')
+uint8_t  min_join_state   = 0;       // Used to log Join State changes and check how 'low' it goes
+bool     send_asap;                  // Used to trigger sending the status as soon as possible
 
 #ifdef    APP_TRACK_HEAP
 sl_memory_heap_info_t app_heap_info;
@@ -449,9 +451,9 @@ void app_task(void *args)
   printf("\n");
   sprintf(chip, "%s", CHIP);
 #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-  snprintf(application, 100, "%s %d.%d", "Wi-SUN Node Monitoring V3.2.0", START_FLASHES_A, START_FLASHES_B);
+  snprintf(application, 100, "%s %s %d.%d", chip, "Wi-SUN Node Monitoring V3.4.0 SiSDK 2025_06_2", START_FLASHES_A, START_FLASHES_B);
 #else  /* SL_CATALOG_SIMPLE_LED_PRESENT */
-  snprintf(application, 100, "%s", "Wi-SUN Node Monitoring V3.2.0");
+  snprintf(application, 100, "%s", "Wi-SUN Node Monitoring V3.3.0");
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
   printfBothTime("%s/%s %s\n", chip, SL_BOARD_NAME, application);
   snprintf(version, 80, "Compiled on %s at %s", __DATE__, __TIME__);
@@ -602,10 +604,12 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
 
 #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
   // LEDs indicate the 'version' in 2 steps
-  leds_flash(START_FLASHES_A, 200);
-  osDelay(800);
-  leds_flash(START_FLASHES_B, 200);
-  osDelay(800);
+  leds_flash(START_FLASHES_A, 250);
+  set_leds(0, 0);
+  osDelay(1000);
+  leds_flash(START_FLASHES_B, 250);
+  set_leds(0, 0);
+  osDelay(1000);
   // LEDs show startup option for 1 sec
   set_leds(B1, B0);
   osDelay(1000);
@@ -707,12 +711,12 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
   // Print and send initial connection message
   to_udp  = true;
   to_coap = false;
-  _print_and_send_messages (_connection_json_string(""),
+  print_and_send_messages (_connection_json_string(""),
               with_time, to_console, to_rtt, to_udp, to_coap);
 
 #ifdef    APP_CHECK_PREVIOUS_CRASH
   if (strlen(crash_info_string)) {
-      _print_and_send_messages (crash_info_string,
+      print_and_send_messages (crash_info_string,
                   with_time, to_console, to_rtt, to_udp, to_coap);
   }
 #endif /* APP_CHECK_PREVIOUS_CRASH */
@@ -758,7 +762,7 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
           if (change_leds == 3) set_leds(0, 0);
           previous_change_leds = change_leds;
       }
-#endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
     } else {
 
 #ifdef    WITH_DIRECT_CONNECT
@@ -785,19 +789,20 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
           if (change_leds == join_state) set_leds(0, 0);
           previous_change_leds = change_leds;
       }
-#endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
     }
 
     // Print status message once then disable status
-    if (connected_delay_sec % app_parameters.auto_send_sec == 0) {
-        if (print_keep_alive == true) {
-          _print_and_send_messages (_status_json_string(""),
+    if ((connected_delay_sec % app_parameters.auto_send_sec == 0) || (send_asap)) {
+        if ((print_keep_alive == true) || (send_asap)) {
+          print_and_send_messages (_status_json_string(""),
                     with_time, to_console, to_rtt, to_udp, to_coap);
           print_keep_alive = false;
+          send_asap = false;
           #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
           sl_led_toggle(&sl_led_led0);
           sl_led_toggle(&sl_led_led1);
-          #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
+          #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
         }
     }
     // Enable status for next time
@@ -842,7 +847,7 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
          if (B1) sl_led_turn_on(&sl_led_led1);
         #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
         if (B0 + B1) {
-          _print_and_send_messages (_button_json_string(""),
+          print_and_send_messages (_button_json_string(""),
                     with_time, to_console, to_rtt, to_udp, to_coap);
         #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
            sl_led_turn_off(&sl_led_led0);
@@ -929,6 +934,7 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
     // join_state changed...
     // print current join_state
     printfBothTime("[Join state %u->%u]\n", previous_join_state, join_state);
+    if (join_state < min_join_state) { min_join_state = join_state; }
     if ((join_state > SL_WISUN_JOIN_STATE_DISCONNECTED) && (join_state <= SL_WISUN_JOIN_STATE_OPERATIONAL)) {
       app_join_state_sec[join_state] = now_sec();
       // Store transition delay
@@ -939,6 +945,11 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
     if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
       connection_time_sec = app_join_state_sec[join_state];
       connection_count ++;
+      if (min_join_state <= SL_WISUN_JOIN_STATE_ACQUIRE_PAN_CONFIG) {
+          network_connection_count ++;
+      }
+      // reset min_join_state to follow the next network reconnection
+      min_join_state = SL_WISUN_JOIN_STATE_OPERATIONAL;
       // Count disconnected time only once connected for the first time
       // (it would be unfair to count time before if the Border
       //  Router is off when the node is started)
@@ -949,6 +960,7 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
         printfBothTime("Reconnected after %llu sec\n", connection_time_sec - disconnection_time_sec);
         disconnected_total_sec += connection_time_sec - disconnection_time_sec;
       }
+
 #ifdef    HISTORY
       APPEND_TO_HISTORY(" (%d) %s |", join_state , now_str());
 #endif /* HISTORY */
@@ -958,7 +970,7 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
       // This will occur in case of a reconnection
       if (udp_notification_socket_id) {
         to_udp = to_coap = true;
-        _print_and_send_messages (_connection_json_string(""),
+        print_and_send_messages (_connection_json_string(""),
             with_time, to_console, to_rtt, to_udp, to_coap);
       }
       TRACES_WHEN_CONNECTED;
@@ -1004,19 +1016,20 @@ void  _check_neighbors(void) {
 }
 
 char* _connection_json_string () {
-  #define CONNECTION_JSON_FORMAT_STR                   \
-    START_JSON                                         \
-    DEVICE_CHIP_JSON_FORMAT                            \
-    PARENT_JSON_FORMAT                                 \
-    RUNNING_JSON_FORMAT                                \
-    MSG_COUNT_JSON_FORMAT                              \
-    "\"PAN_ID\": \"0x%04x (%d)\",\n"                   \
-    "\"preferred_pan_id\": \"0x%04x (%d)\",\n"         \
-    "\"join_states_sec\": \"%llu %llu %llu %llu %llu\"\n"\
+  #define CONNECTION_JSON_FORMAT_STR                    \
+    START_JSON                                          \
+    DEVICE_CHIP_JSON_FORMAT                             \
+    PARENT_JSON_FORMAT                                  \
+    RUNNING_JSON_FORMAT                                 \
+    MSG_COUNT_JSON_FORMAT                               \
+    "\"PAN_ID\":\"0x%04x (%d)\",\n"                     \
+    "\"preferred_pan_id\":\"0x%04x (%d)\",\n"           \
+    "\"hop_count\":\"%d\",\n"                           \
+    "\"join_states_sec\": \"%llu %llu %llu %llu %llu\",\n"\
+    "\"application\": \"%s\"\n"                           \
     END_JSON
 
   char sec_string[20];
-  sl_wisun_network_info_t network_info;
 
   sl_wisun_get_network_info(&network_info);
   sprintf(sec_string, "%s", now_str());
@@ -1031,11 +1044,13 @@ char* _connection_json_string () {
     msg_count,
     network_info.pan_id, network_info.pan_id,
     app_parameters.preferred_pan_id, app_parameters.preferred_pan_id,
+    network_info.hop_count,
     app_join_state_delay_sec[1],
     app_join_state_delay_sec[2],
     app_join_state_delay_sec[3],
     app_join_state_delay_sec[4],
-    app_join_state_delay_sec[5]
+    app_join_state_delay_sec[5],
+    application
   );
   return json_string;
 };
@@ -1049,19 +1064,32 @@ char* _status_json_string (char * start_text) {
     RUNNING_JSON_FORMAT                    \
     MSG_COUNT_JSON_FORMAT                  \
     TRACK_HEAP_FORMAT_STRING               \
-    "\"connected\":   \"%s\",\n"           \
+    "\"connected\":\"%s\",\n"              \
     "\"disconnected\":\"%s\",\n"           \
-    "\"connections\": \"%d\",\n"           \
+    "\"connections\":\"%d\",\n"            \
+    "\"network_connections\":\"%d\",\n"    \
     "\"availability\":\"%6.2f\",\n"        \
-    "\"connected_total\":   \"%s\",\n"     \
+    "\"connected_total\":\"%s\",\n"        \
     "\"disconnected_total\":\"%s\",\n"     \
+    "\"hop_count\":\"%d\",\n"              \
+    "\"mac.failed_cca_count\": \"%ld\",\n" \
+    "\"mac.tx_count\": \"%ld\",\n"         \
+    "\"mac.tx_failed_count\": \"%ld\",\n"  \
+    "\"mac.rx_count\": \"%ld\",\n"         \
+    "\"mac.rx_availability_percentage\": \"%d\",\n" \
+    "\"network.ip_no_route\":\"%ld\",\n"   \
+    "\"network.ip_routeloop_detect\": \"%ld\"\n" \
     END_JSON
 
   char running_sec_string[20];
-  char current_join_state_string[20];
-  char current_sec_string[20];
+  char connected_string[20];
+  char disconnected_string[20];
   char connected_sec_string[20];
   char disconnected_sec_string[20];
+  float availability;
+  // sl_wisun_statistics_t is a union, so we need one per statistics type
+  sl_wisun_statistics_t         network_statistics;
+  sl_wisun_statistics_t         mac_statistics;
 
   uint64_t current_state_sec;
 
@@ -1069,51 +1097,59 @@ char* _status_json_string (char * start_text) {
   refresh_parent_tag();
   // Make sure of the join state
   sl_wisun_get_join_state(&join_state);
+  sl_wisun_get_network_info(&network_info);
+  sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_NETWORK, &network_statistics);
+  sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_MAC    , &mac_statistics);
   msg_count++;
 
   if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
     current_state_sec = now_sec() - connection_time_sec;
-    sprintf(current_sec_string,     "%s", dhms(current_state_sec));
+    sprintf(connected_string,       "%s", dhms(current_state_sec));
+    sprintf(disconnected_string,    "no");
     sprintf(connected_sec_string,   "%s", dhms(connected_total_sec + current_state_sec));
     sprintf(disconnected_sec_string,"%s", dhms(disconnected_total_sec));
-    snprintf(json_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE,
-      CONNECTED_JSON_FORMAT_STR,
-      start_text,
-      DEVICE_CHIP_ITEMS,
-      PARENT_INFO_ITEMS,
-      running_sec_string,
-      msg_count,
-      TRACK_HEAP_VALUE
-      current_sec_string,
-      "no",
-      connection_count,
-      100.0*(connected_total_sec + current_state_sec)/(connected_total_sec + current_state_sec + disconnected_total_sec),
-      connected_sec_string,
-      disconnected_sec_string
-    );
+    if (connected_total_sec + current_state_sec + disconnected_total_sec) {
+        availability = 100.0*(connected_total_sec + current_state_sec)/(connected_total_sec + current_state_sec + disconnected_total_sec);
+    } else {
+        availability = 100.0;
+    }
   } else {
     current_state_sec = now_sec() - disconnection_time_sec;
-
-    sprintf(current_join_state_string, " no (join_state %d)", join_state);
-    sprintf(current_sec_string,     "%s", dhms(current_state_sec));
+    sprintf(connected_string, " no (join_state %d)", join_state);
+    sprintf(disconnected_string,    "%s", dhms(current_state_sec));
     sprintf(connected_sec_string,   "%s", dhms(connected_total_sec));
     sprintf(disconnected_sec_string,"%s", dhms(disconnected_total_sec + current_state_sec));
-    snprintf(json_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE,
-      CONNECTED_JSON_FORMAT_STR,
-      start_text,
-      DEVICE_CHIP_ITEMS,
-      PARENT_INFO_ITEMS,
-      running_sec_string,
-      msg_count,
-      TRACK_HEAP_VALUE
-      current_join_state_string,
-      current_sec_string,
-      connection_count,
-      100.0*(connected_total_sec)/(connected_total_sec + disconnected_total_sec + current_state_sec),
-      connected_sec_string,
-      disconnected_sec_string
-    );
+    if (connected_total_sec + disconnected_total_sec + current_state_sec) {
+        availability = 100.0*(connected_total_sec)/(connected_total_sec + disconnected_total_sec + current_state_sec);
+    } else {
+        availability = 100.0;
+    }
   }
+
+  snprintf(json_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE,
+    CONNECTED_JSON_FORMAT_STR,
+    start_text,
+    DEVICE_CHIP_ITEMS,
+    PARENT_INFO_ITEMS,
+    running_sec_string,
+    msg_count,
+    TRACK_HEAP_VALUE
+    connected_string,
+    disconnected_string,
+    connection_count,
+    network_connection_count,
+    availability,
+    connected_sec_string,
+    disconnected_sec_string,
+    network_info.hop_count,
+    mac_statistics.mac.failed_cca_count,
+    mac_statistics.mac.tx_count,
+    mac_statistics.mac.tx_failed_count,
+    mac_statistics.mac.rx_count,
+    mac_statistics.mac.rx_availability_percentage,
+    network_statistics.network.ip_no_route,
+    network_statistics.network.ip_routeloop_detect
+  );
 
   return json_string;
 }
@@ -1231,7 +1267,7 @@ sl_status_t _coap_notify(char* json_string)
   return ret;
 }
 
-uint8_t _print_and_send_messages (char *in_msg, bool with_time,
+uint8_t print_and_send_messages (char *in_msg, bool with_time,
                             bool to_console, bool to_rtt, bool to_udp, bool to_coap) {
   sl_status_t ret = SL_STATUS_OK;
   uint8_t messages_processed = 0;

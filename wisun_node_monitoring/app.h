@@ -89,7 +89,7 @@ extern "C" {
 //                                Global Variables
 // -----------------------------------------------------------------------------
 extern char crash_info_string[];
-
+extern bool send_asap;
 // -----------------------------------------------------------------------------
 //                          Public Function Declarations
 // -----------------------------------------------------------------------------
@@ -105,6 +105,10 @@ extern char crash_info_string[];
 void app_task(void *args);
 void app_reset_statistics(void);
 void refresh_parent_tag(void);
+
+char* status_json_string (char * start_text);
+
+uint8_t print_and_send_messages (char *in_msg, bool with_time, bool to_console, bool to_rtt, bool to_udp, bool to_coap);
 
 #ifdef __cplusplus
 }

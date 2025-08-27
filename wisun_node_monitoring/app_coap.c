@@ -17,6 +17,7 @@
 * "/status/neighbor"                    Neighbor info (per index required by '-e <payload>')
 * "/status/connected"                   How much time the device has been connected for the current connection
 * "/status/all"                         All 'status'
+* "/status/send"                        Trigger a Tx of _status_json_string (ASAP)
 * "/statistics/app/join_state_secs"     How much seconds to jump to each join state
 * "/statistics/app/disconnected_total"  How much time the device has been disconnected since the first connection
 * "/statistics/app/connections"         How many times the device connected
@@ -85,6 +86,7 @@
 #include "app_coap.h"
 #include "app_check_neighbors.h"
 #include "app_rtt_traces.h"
+#include "app_wisun_multicast_ota.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -153,7 +155,7 @@ sl_wisun_coap_packet_t * coap_callback_all_infos (
     "  \"board\": \"%s\",\n"       \
     "  \"device_type\": \"%s\",\n" \
     "  \"application\": \"%s\",\n" \
-    "  \"version\": \"%s\"\n"      \
+    "  \"version\": \"%s\",\n"     \
     "  \"MAC\": \"%s\"\n"          \
     "}\n"
   sl_wisun_mac_address_t device_mac;
@@ -177,7 +179,7 @@ sl_wisun_coap_packet_t * coap_callback_all_statuses (
   #define JSON_ALL_STATUSES_FORMAT_STR      \
     "{\n"                                 \
     "  \"running\": \"%s\",\n"            \
-    "  \"connected\": \"%s\"\n"           \
+    "  \"connected\": \"%s\",\n"          \
     "  \"parent\": \"%s\",\n"             \
     "  \"neighbor_count\": \"%d\"\n"      \
     "}\n"
@@ -196,6 +198,13 @@ sl_wisun_coap_packet_t * coap_callback_all_statuses (
             parent_tag,
             neighbor_count
   );
+  return app_coap_reply(coap_response, req_packet);
+}
+
+sl_wisun_coap_packet_t * coap_callback_send_status_msg (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  send_asap = true;
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "send_asap flag set to true" );
   return app_coap_reply(coap_response, req_packet);
 }
 
@@ -314,7 +323,7 @@ sl_wisun_coap_packet_t * coap_callback_join_states_sec (
 
 sl_wisun_coap_packet_t * coap_callback_connections (
       const  sl_wisun_coap_packet_t *const req_packet)  {
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%d", connection_count);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%d / %d", connection_count, network_connection_count);
   _check_app_statistics_reset(req_packet);
   return app_coap_reply(coap_response, req_packet); }
 
@@ -378,10 +387,11 @@ sl_wisun_coap_packet_t * coap_callback_all_app_statistics (
   #define JSON_ALL_STATISTICS_FORMAT_STR  \
     "{\n"                                 \
     "  \"join_states_sec\":[%llu,%llu,%llu,%llu,%llu],\n" \
-    "  \"connections\": \"%d\",\n"        \
-    "  \"connected_total\": \"%s\",\n"    \
-    "  \"disconnected_total\": \"%s\",\n" \
-    "  \"availability\": \"%6.2f\"\n"     \
+    "  \"connections\": \"%d\",\n"         \
+    "  \"network_connections\": \"%d\",\n" \
+    "  \"connected_total\": \"%s\",\n"     \
+    "  \"disconnected_total\": \"%s\",\n"  \
+    "  \"availability\": \"%6.2f\"\n"      \
     "}\n"
   char connected_total_str[40];
   char disconnected_total_str[40];
@@ -399,6 +409,7 @@ sl_wisun_coap_packet_t * coap_callback_all_app_statistics (
             app_join_state_delay_sec[4],
             app_join_state_delay_sec[5],
             connection_count,
+            network_connection_count,
             connected_total_str,
             disconnected_total_str,
             availability
@@ -407,7 +418,7 @@ sl_wisun_coap_packet_t * coap_callback_all_app_statistics (
   return app_coap_reply(coap_response, req_packet);
 }
 
-//#define   COAP_STACK_STATISTICS
+#define   COAP_STACK_STATISTICS
 #ifdef    COAP_STACK_STATISTICS
 char * phy_statistics_str        (sl_wisun_statistics_t statistics)  {
   #define JSON_PHY_STATISTICS_FORMAT_STR  \
@@ -443,7 +454,8 @@ char * mac_statistics_str        (sl_wisun_statistics_t statistics)  {
     "  \"rx_ms_count\": \"%lu\",\n"         \
     "  \"tx_ms_count\": \"%lu\",\n"         \
     "  \"rx_ms_failed_count\": \"%lu\",\n"  \
-    "  \"tx_ms_failed_count\": %lu\n"       \
+    "  \"tx_ms_failed_count\": \"%lu\",\n"  \
+    "  \"rx_availability_percentage\": \"%u\"\n"  \
     "}\n"
 
 
@@ -463,7 +475,8 @@ char * mac_statistics_str        (sl_wisun_statistics_t statistics)  {
            statistics.mac.rx_ms_count,
            statistics.mac.tx_ms_count,
            statistics.mac.rx_ms_failed_count,
-           statistics.mac.tx_ms_failed_count
+           statistics.mac.tx_ms_failed_count,
+           statistics.mac.rx_availability_percentage
   );
   return coap_response;
 }
@@ -686,7 +699,7 @@ return app_coap_reply(coap_response, req_packet); }
 
 sl_wisun_coap_packet_t * coap_callback_application_parameter (
       const  sl_wisun_coap_packet_t *const req_packet)  {
-  #define MAX_PARAMETER_NAME 20
+  #define MAX_PARAMETER_NAME 40
   char parameter_name[MAX_PARAMETER_NAME];
   int value = 0;
   int res;
@@ -736,6 +749,12 @@ sl_wisun_coap_packet_t * coap_callback_reporter_stop (
   return app_coap_reply(coap_response, req_packet); }
   #endif /* __APP_REPORTER_H__ */
 
+#ifdef    APP_WISUN_MULTICAST_OTA_H
+sl_wisun_coap_packet_t * coap_callback_multicast_ota (
+    const  sl_wisun_coap_packet_t *const req_packet)  {
+    snprintf(coap_response, COAP_MAX_RESPONSE_LEN, missed_chunks());
+  return app_coap_reply(coap_response, req_packet); }
+#endif /* APP_WISUN_MULTICAST_OTA_H */
 
 // CoAP resources init in resource handler (one block per URI)
 uint8_t app_coap_resources_init() {
@@ -804,6 +823,14 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "json";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_all_statuses;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/status/send";
+  coap_resource.data.resource_type = "text";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_send_status_msg;
   coap_resource.discoverable = true;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
@@ -1010,6 +1037,17 @@ uint8_t app_coap_resources_init() {
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 #endif /* __APP_REPORTER_H__ */
+
+
+#ifdef    APP_WISUN_MULTICAST_OTA_H
+  coap_resource.data.uri_path = "/multicast_ota/missed";
+  coap_resource.data.resource_type = "text";
+  coap_resource.data.interface = "multicast_ota";
+  coap_resource.auto_response = coap_callback_multicast_ota;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+#endif /* APP_WISUN_MULTICAST_OTA_H */
 
   printf("  %d/%d CoAP resources added to CoAP Resource handler\n", count, SL_WISUN_COAP_RESOURCE_HND_MAX_RESOURCES);
   return count;

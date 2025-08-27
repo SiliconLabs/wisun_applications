@@ -38,17 +38,19 @@
 // -----------------------------------------------------------------------------
 #include <stdio.h>
 #include <assert.h>
-#include "app_init.h"
+
+#include "sl_main_init.h"
 #include "cmsis_os2.h"
 #include "sl_cmsis_os2_common.h"
+
 #include "sl_wisun_crash_handler.h"
-#include "app.h"
 #include "app_coap.h"
+#include "app.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
-#define APP_STACK_SIZE_BYTES   2*5000UL
+#define APP_STACK_SIZE_BYTES   (5*2048UL)
 
 // -----------------------------------------------------------------------------
 //                          Static Function Declarations
@@ -81,8 +83,6 @@ void app_init(void)
     .priority    = osPriorityNormal,
     .tz_module   = 0
   };
-//  printf("Wi-SUN Event Loop Task: SLI_WISUN_EVENT_LOOP_TASK_STACK_SIZE        %4d (ns_event_loop.c)\n", 1536);
-//  printf("Wi-SUN RF Task        : RF_TASK_STACK_SIZE                          %4d (sli_wisun_driver.c) \n", 500);
   printf("%s/%s starting app_task              : APP_STACK_SIZE_BYTES                        %4ld\n",
         __FILE__, __FUNCTION__,
          APP_STACK_SIZE_BYTES);
