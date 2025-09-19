@@ -1,3 +1,4 @@
+#include "cmsis_os2.h"
 #include "app_wisun_multicast_ota.h"
 
 uint32_t udp_index;
@@ -23,11 +24,15 @@ uint32_t _downl_bytes;
 char  timestamp_string[20];
 char* udp_string;
 
-char    gbl_file[100];     // Expected GBL filename (set as for Unicast OTA)
-char    gbl_filename[100]; // GBL filename in received data
-char    tx_timestamp_str[100];
-char    tag_str[100];
-char    expected_tag[100];
+#define GBL_FILE_NAME_MAX_SIZE 100
+#define OTA_TAG_MAX_SIZE       100
+#define TIMESTAMP_STR_MAX_SIZE 100
+
+char    gbl_file[GBL_FILE_NAME_MAX_SIZE];     // Expected GBL filename (set as for Unicast OTA)
+char    gbl_filename[GBL_FILE_NAME_MAX_SIZE]; // GBL filename in received data
+char    tx_timestamp_str[TIMESTAMP_STR_MAX_SIZE];
+char    tag_str[OTA_TAG_MAX_SIZE];
+char    expected_tag[OTA_TAG_MAX_SIZE];
 
 uint32_t slot0_start_address = 0x12345678;
 uint32_t udp_rx_total_count;
@@ -71,6 +76,46 @@ void clear_ota_data() {
   printf("slot0: address 0x%08lx, length %ld\n", slot0.address, slot0.length);
 
 #if 0
+  ret_val = bootloader_eraseStorageSlot(0);
+    if (ret_val != BOOTLOADER_OK) {
+      printf("bootloader_eraseStorageSlot(0, &slot0) error: 0x%08lx\n", ret_val);
+      return;
+  }
+  printf("slot0 erased\n");
+#endif
+};
+
+
+void clear_ota_data_erase() {
+  int i;
+  int32_t ret_val;
+  _resent_count = 0;
+  _received_count = 0;
+  _downl_bytes = 0;
+
+  sl_wisun_ota_dfu_set_notify_download_chunk(_downl_bytes);
+
+  slot0_start_address = 0x12345678;
+  for (i=0; i<MAX_CHUNKS; i++) {
+    udp_data_len[i]=0;
+    udp_chunk_rx_count[i]=0;
+    missed_index[i]= 0;
+  }
+  printf("Chunks [0:%d] cleared\n", i-1);
+
+  bootloader_getStorageInfo(&storage_info);
+  printf("numStorageSlots: %ld\n", storage_info.numStorageSlots);
+  assert(storage_info.numStorageSlots >= 1);
+  assert(bootloader_getStorageSlotInfo(0, &slot0) == BOOTLOADER_OK);
+
+  ret_val = bootloader_getStorageSlotInfo(0, &slot0);
+  if (ret_val != BOOTLOADER_OK) {
+    printf("bootloader_getStorageSlotInfo(0, &slot0) error: 0x%08lx\n", ret_val);
+    return;
+  }
+  printf("slot0: address 0x%08lx, length %ld\n", slot0.address, slot0.length);
+
+#if 1
   ret_val = bootloader_eraseStorageSlot(0);
     if (ret_val != BOOTLOADER_OK) {
       printf("bootloader_eraseStorageSlot(0, &slot0) error: 0x%08lx\n", ret_val);
@@ -208,6 +253,7 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
   int received = 0;
   int res;
   //int i = 0;
+  uint32_t timereboot;
   uint32_t chunk_size;
   uint32_t start_address;
   uint32_t end_address;
@@ -263,12 +309,12 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
                 info_byte[2] = data_buffer[chunk_size - 2];
                 info_byte[3] = data_buffer[chunk_size - 1];
                  // Write bytes to flash
-                ret_val = bootloader_eraseWriteStorage(0,
+                ret_val = bootloader_writeStorage(0,
                                                   start_address,
                                                   (uint8_t *)data_buffer,
                                                   chunk_size);
                 if (ret_val != BOOTLOADER_OK) {
-                  printf("[%s] UDP Rx %4ld from %s (%4ld bytes): ERROR calling  bootloader_eraseWriteStorage() for chunk[%4ld] | %02x %02x ---(%4ld bytes)--- %02x %02x | [%6ld:%6ld]/[%08lx:%08lx] in Flash: 0x%04x\n",
+                  printf("[%s] UDP Rx %4ld from %s (%4ld bytes): ERROR calling  bootloader_writeStorage() for chunk[%4ld] | %02x %02x ---(%4ld bytes)--- %02x %02x | [%6ld:%6ld]/[%08lx:%08lx] in Flash: 0x%04x\n",
                                   device_tag,
                                   udp_rx_total_count, udp_ip_str, received_bytes,
                                   chunk_index,
@@ -282,25 +328,6 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
                                   start_address,
                                   end_address,
                                   (int)ret_val);
-                  if (ret_val == BOOTLOADER_ERROR_STORAGE_NEEDS_ERASE) {
-                      ret_val = bootloader_eraseRawStorage(slot0_start_address + start_address ,1024);
-                      if (ret_val != BOOTLOADER_OK) {
-                          printf("[%s] bootloader_eraseRawStorage(0x%08lx, 1024) returns 0x%04x\n", device_tag, slot0_start_address + start_address, (int)ret_val);
-                      } else {
-                          ret_val = bootloader_writeRawStorage(slot0_start_address + start_address, (uint8_t *)data_buffer, 1024);
-                          if (ret_val != BOOTLOADER_OK) {
-                              printf("[%s] bootloader_writeRawStorage(0x%08lx, data_buffer, 1024) returns 0x%04x\n", device_tag, slot0_start_address + start_address, (int)ret_val);
-                          } else {
-                              printfTime("[%s] UDP Rx %4ld from %s (%4ld bytes): %s chunk[%4ld] stored using raw erase/write\n",
-                                         device_tag,
-                                         udp_rx_total_count, udp_ip_str, received_bytes,
-                                         gbl_filename,
-                                         chunk_index);
-                              udp_data_len[chunk_index] = chunk_size;
-                              udp_chunk_rx_count[chunk_index]++;
-                          }
-                      }
-                  }
                 } else {
                   udp_data_len[chunk_index] = chunk_size;
                   udp_chunk_rx_count[chunk_index]++;
@@ -361,8 +388,33 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
     }
     else if (strcmp(gbl_filename, "show_missed()"          ) == 0) {received = 5; show_missed();}
     else if (strcmp(gbl_filename, "clear_ota_data()"       ) == 0) {received = 6; clear_ota_data();}
+    else if (strcmp(gbl_filename, "clear_ota_data_erase()" ) == 0) {received = 6; clear_ota_data_erase();}
     else if (strcmp(gbl_filename, "show_repeated()"        ) == 0) {received = 7; show_repeated();}
     else    {printf("unknown multicast_ota command '%s'\n", gbl_filename); received = 0; }
+  } else if (res == 2) {
+      if (strcmp(gbl_filename, "rebootAndInstall()"     ) == 0) {
+          timereboot = chunk_index;
+          if (last_index() > 1) {
+              if (list_missed() == 0) {
+                  received = 4;
+                  //check chunk_index(time in second before reboot is valid
+                  if (timereboot < 90){
+                      printf("[%s] Reboot and install in %ld sec", device_tag, timereboot);
+                      osDelay(timereboot*1000);
+                      rebootAndInstall();
+                  }
+                  else{
+                      printf("[%s] Invalid time : %ld (must be < 90 sec)", device_tag, timereboot);
+                  }
+
+
+              } else {
+                  printf("[%s] There are missed chunks: no reboot\n", device_tag);
+              }
+          } else {
+              printf("[%s] There are no chunks: no reboot\n", device_tag);
+          }
+      }
   } else {
     printf("[%s] UDP Rx %2ld from %s (%4ld bytes): --------  Only %d items can be found in the string %s\n", device_tag, udp_rx_total_count, udp_ip_str, received_bytes, res, udp_buff);
     return 0;
