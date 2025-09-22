@@ -256,14 +256,16 @@ sl_wisun_coap_packet_t * coap_callback_application (
     if (res) {
       if (strcmp(cmd, "clear_and_reconnect")==0) {
         sl_wisun_disconnect();
-        osDelay(2000); //wait for disconnection complete
+        //wait for disconnection complete
+        sl_wisun_app_core_wait_state(SL_WISUN_MSG_DISCONNECTED_IND_ID,5000);
         sl_wisun_clear_credential_cache();
         sl_wisun_app_core_util_connect_and_wait();
         return NULL;
       }
       if (strcmp(cmd, "reconnect")==0) {
         sl_wisun_disconnect();
-        osDelay(2000); //wait for disconnection complete
+        //wait for disconnection complete
+        sl_wisun_app_core_wait_state(SL_WISUN_MSG_DISCONNECTED_IND_ID,5000);
         sl_wisun_app_core_util_connect_and_wait();
         return NULL;
       }
