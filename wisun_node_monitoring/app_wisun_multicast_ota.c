@@ -75,54 +75,12 @@ void clear_ota_data() {
   }
   printf("slot0: address 0x%08lx, length %ld\n", slot0.address, slot0.length);
 
-#if 0
   ret_val = bootloader_eraseStorageSlot(0);
     if (ret_val != BOOTLOADER_OK) {
       printf("bootloader_eraseStorageSlot(0, &slot0) error: 0x%08lx\n", ret_val);
       return;
   }
   printf("slot0 erased\n");
-#endif
-};
-
-
-void clear_ota_data_erase() {
-  int i;
-  int32_t ret_val;
-  _resent_count = 0;
-  _received_count = 0;
-  _downl_bytes = 0;
-
-  sl_wisun_ota_dfu_set_notify_download_chunk(_downl_bytes);
-
-  slot0_start_address = 0x12345678;
-  for (i=0; i<MAX_CHUNKS; i++) {
-    udp_data_len[i]=0;
-    udp_chunk_rx_count[i]=0;
-    missed_index[i]= 0;
-  }
-  printf("Chunks [0:%d] cleared\n", i-1);
-
-  bootloader_getStorageInfo(&storage_info);
-  printf("numStorageSlots: %ld\n", storage_info.numStorageSlots);
-  assert(storage_info.numStorageSlots >= 1);
-  assert(bootloader_getStorageSlotInfo(0, &slot0) == BOOTLOADER_OK);
-
-  ret_val = bootloader_getStorageSlotInfo(0, &slot0);
-  if (ret_val != BOOTLOADER_OK) {
-    printf("bootloader_getStorageSlotInfo(0, &slot0) error: 0x%08lx\n", ret_val);
-    return;
-  }
-  printf("slot0: address 0x%08lx, length %ld\n", slot0.address, slot0.length);
-
-#if 1
-  ret_val = bootloader_eraseStorageSlot(0);
-    if (ret_val != BOOTLOADER_OK) {
-      printf("bootloader_eraseStorageSlot(0, &slot0) error: 0x%08lx\n", ret_val);
-      return;
-  }
-  printf("slot0 erased\n");
-#endif
 };
 
 uint32_t last_index() {
@@ -388,7 +346,6 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
     }
     else if (strcmp(gbl_filename, "show_missed()"          ) == 0) {received = 5; show_missed();}
     else if (strcmp(gbl_filename, "clear_ota_data()"       ) == 0) {received = 6; clear_ota_data();}
-    else if (strcmp(gbl_filename, "clear_ota_data_erase()" ) == 0) {received = 6; clear_ota_data_erase();}
     else if (strcmp(gbl_filename, "show_repeated()"        ) == 0) {received = 7; show_repeated();}
     else    {printf("unknown multicast_ota command '%s'\n", gbl_filename); received = 0; }
   } else if (res == 2) {
