@@ -80,6 +80,7 @@ component:
 define:
 - {name: DEBUG_EFM_USER}
 configuration:
+- {name: SL_WISUN_COAP_RESOURCE_HND_STACK_SIZE_WORD, value: 1024}
 - {name: SL_WISUN_COAP_RESOURCE_HND_MAX_RESOURCES, value: 50U}
 - {name: SL_WISUN_OTA_DFU_AUTO_INSTALL_ENABLED, value: 0U}
 - {name: SL_BOARD_ENABLE_VCOM, value: '1'}

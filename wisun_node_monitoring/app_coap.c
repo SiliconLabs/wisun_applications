@@ -239,25 +239,40 @@ sl_wisun_coap_packet_t * coap_callback_device_type (
 
 sl_wisun_coap_packet_t * coap_callback_application (
       const  sl_wisun_coap_packet_t *const req_packet)  {
-  int res;
-  char cmd[100];
+#define MAX_APPLI_NAME 40
+  int res = 0;
+  char cmd[MAX_APPLI_NAME];
+  char* payload_str = NULL;
+
+  memset(cmd, 0, MAX_APPLI_NAME);
   if (req_packet->payload_len) {
-    // Make sure payload last char is NULL
-    req_packet->payload_ptr[req_packet->payload_len] = 0x00;
-    res = sscanf((char *)req_packet->payload_ptr, "%s", cmd);
+    // Get payload in string format with last char = '\0'
+    payload_str = sl_wisun_coap_get_payload_str(req_packet);
+    if (payload_str != NULL){
+        res = sscanf((char *)payload_str, "%39s", cmd);
+        sl_wisun_coap_free(payload_str);
+    }
+
     if (res) {
       if (strcmp(cmd, "clear_and_reconnect")==0) {
         sl_wisun_disconnect();
+        //wait for disconnection complete
+        sl_wisun_app_core_wait_state(SL_WISUN_MSG_DISCONNECTED_IND_ID,5000);
         sl_wisun_clear_credential_cache();
         sl_wisun_app_core_util_connect_and_wait();
         return NULL;
       }
       if (strcmp(cmd, "reconnect")==0) {
         sl_wisun_disconnect();
+        //wait for disconnection complete
+        sl_wisun_app_core_wait_state(SL_WISUN_MSG_DISCONNECTED_IND_ID,5000);
         sl_wisun_app_core_util_connect_and_wait();
         return NULL;
       }
       snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Unknown '%s' command", cmd);
+    }
+    else{
+      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Bad format command '%s", cmd);
     }
   } else {
     snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", application);
@@ -357,13 +372,17 @@ sl_wisun_coap_packet_t * coap_callback_leds_flash (
   // default: 30 sec at 2 per sec
   #define DEFAULT_COUNT   30
   #define DEFAULT_DELAY  250
+  char* payload_str = NULL;
   uint16_t count;
   uint16_t delay_ms;
   int res = 0;
   if (req_packet->payload_len) {
-    // Make sure payload last char is NULL
-    req_packet->payload_ptr[req_packet->payload_len] = 0x00;
-    res = sscanf((char *)req_packet->payload_ptr, "%hd %hd", &count, &delay_ms);
+    // Get payload in string format with last char = '\0'
+    payload_str = sl_wisun_coap_get_payload_str(req_packet);
+    if (payload_str != NULL ){
+        res = sscanf((char *)payload_str, "%hd %hd", &count, &delay_ms);
+        sl_wisun_coap_free(payload_str);
+    }
   }
   if (res != 2) {
       count    = DEFAULT_COUNT;
@@ -658,12 +677,16 @@ sl_wisun_coap_packet_t * coap_callback_regulation_statistics (
 
 sl_wisun_coap_packet_t * coap_callback_auto_send (
       const  sl_wisun_coap_packet_t *const req_packet)  {
+  char* payload_str = NULL;
   int sec = 0;
-  int res;
+  int res = 0;
   if (req_packet->payload_len) {
-    // Make sure payload last char is NULL
-    req_packet->payload_ptr[req_packet->payload_len] = 0x00;
-    res = sscanf((char *)req_packet->payload_ptr, "%d", &sec);
+    // Get payload in string format with last char = '\0'
+    payload_str = sl_wisun_coap_get_payload_str(req_packet);
+    if (payload_str != NULL ){
+        res = sscanf((char *)payload_str, "%d", &sec);
+        sl_wisun_coap_free(payload_str);
+    }
     if (res) {
         app_parameters.auto_send_sec = (uint16_t)sec;
     }
@@ -673,27 +696,41 @@ return app_coap_reply(coap_response, req_packet); }
 
 sl_wisun_coap_packet_t * coap_callback_trace_level (
       const  sl_wisun_coap_packet_t *const req_packet)  {
+  char* payload_str = NULL;
   int level = 0;
   int group = 0;
-  int res;
+  int res = 0;
+
+  ret = 1;
+
   if (req_packet->payload_len) {
-    // Make sure payload last char is NULL
-    req_packet->payload_ptr[req_packet->payload_len] = 0x00;
-    res = sscanf((char *)req_packet->payload_ptr, "%d %d", &group, &level);
+    // Get payload in string format with last char = '\0'
+    payload_str = sl_wisun_coap_get_payload_str(req_packet);
+    if (payload_str != NULL ){
+        res = sscanf((char *)payload_str, "%d %d", &group, &level);
+    }
     if (res == 2) {
-        // Process /settings/trace_level -e "<group> <level>"
-        trace_level = (uint8_t)level;
-        app_set_trace(group, level, true);
+      // Process /settings/trace_level -e "<group> <level>"
+      trace_level = (uint8_t)level;
+      ret = app_set_trace(group, level, true);
     } else {
-        // Process /settings/trace_level -e "<level>" (all groups)
-    res = sscanf((char *)req_packet->payload_ptr, "%d", &level);
+      // Process /settings/trace_level -e "<level>" (all groups)
+      if (payload_str != NULL ){
+        res = sscanf((char *)payload_str, "%d", &level);
+      }
       if (res == 1) {
         trace_level = (uint8_t)level;
-        app_set_all_traces(level, true);
+        ret = app_set_all_traces(level, true);
+      }
     }
+    sl_wisun_coap_free(payload_str);
   }
+  if (ret == SL_STATUS_OK){
+      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", trace_level);
   }
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", trace_level);
+  else{
+      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Error app_set_all_traces 0x%lx", ret);
+  }
 return app_coap_reply(coap_response, req_packet); }
 
 
@@ -701,29 +738,43 @@ sl_wisun_coap_packet_t * coap_callback_application_parameter (
       const  sl_wisun_coap_packet_t *const req_packet)  {
   #define MAX_PARAMETER_NAME 40
   char parameter_name[MAX_PARAMETER_NAME];
+  char* payload_str = NULL;
   int value = 0;
   int res;
   sl_status_t set_get_res = SL_STATUS_NOT_SUPPORTED;
+
+  // Reset parameter_name tab
+  memset(parameter_name, 0, MAX_PARAMETER_NAME);
   if (req_packet->payload_len) {
-    // Make sure payload last char is NULL
-    req_packet->payload_ptr[req_packet->payload_len] = 0x00;
-    res = sscanf((char *)req_packet->payload_ptr, "%s %d",
-                 parameter_name, &value);
-    if (res == 2) {
-        // Process /settings/parameter -e "<name> <value>"
-        set_get_res = set_app_parameter(parameter_name,  value);
-    } else {
-        res = sscanf((char *)req_packet->payload_ptr, "%s", parameter_name);
-      if (res == 1) {
-          // Process /settings/parameter -e "<name>"
-          set_get_res = get_app_parameter(parameter_name, &value);
+    // Get payload in string format with last char = '\0'
+    payload_str = sl_wisun_coap_get_payload_str(req_packet);
+    if (payload_str != NULL ){
+      res = sscanf((char *)payload_str, "%39s %d",
+                   parameter_name, &value);
+
+
+
+      if (res == 2) {
+          // Process /settings/parameter -e "<name> <value>"
+          set_get_res = set_app_parameter(parameter_name,  value);
+      } else {
+          res = sscanf((char *)payload_str, "%39s", parameter_name);
+        if (res == 1) {
+            // Process /settings/parameter -e "<name>"
+            set_get_res = get_app_parameter(parameter_name, &value);
+        }
       }
+      // Free payload_str
+      sl_wisun_coap_free(payload_str);
+    }
+    else{
+        set_get_res = SL_STATUS_ALLOCATION_FAILED;
     }
   }
   if (set_get_res == SL_STATUS_OK) {
       snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", value);
   } else {
-      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "NOT_SUPPORTED");
+      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Error : 0x%lX", set_get_res);
   }
 return app_coap_reply(coap_response, req_packet); }
 
@@ -731,10 +782,14 @@ return app_coap_reply(coap_response, req_packet); }
 #ifdef    __APP_REPORTER_H__
 sl_wisun_coap_packet_t * coap_callback_reporter_start (
     const  sl_wisun_coap_packet_t *const req_packet)  {
+  char* payload_str = NULL;
   if (req_packet->payload_len) {
-      // Make sure payload last char is NULL
-      req_packet->payload_ptr[req_packet->payload_len] = 0x00;
-      app_start_reporter(UDP_NOTIFICATION_DEST, 1000, (char *)req_packet->payload_ptr);
+      // Get payload in string format with last char = '\0'
+      payload_str = sl_wisun_coap_get_payload_str(req_packet);
+      if (payload_str != NULL ){
+          app_start_reporter(UDP_NOTIFICATION_DEST, 1000, (char *)payload_str);
+          sl_wisun_coap_free(payload_str);
+      }
     } else {
         // if no payload, accept all lines
       app_start_reporter(UDP_NOTIFICATION_DEST, 1000, (char *)"*");
