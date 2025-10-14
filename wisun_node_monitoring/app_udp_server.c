@@ -169,8 +169,9 @@ void check_udp_server_messages(void) {
         printfBothTime("UDP Rx %2ld from %s (%ld bytes): %s\n", count_udp_rx, udp_ip_str, udp_r, udp_buff);
 #ifdef          APP_WISUN_MULTICAST_OTA_H
             }
-#endif /* APP_WISUN_MULTICAST_OTA_H */
         }
+#endif /* APP_WISUN_MULTICAST_OTA_H */
+
   #ifdef    APP_DIRECT_CONNECT_H
         // Direct any message starting with 'wisun' to the Direct Connect CLI
         if (strncmp(udp_buff, (char*)"wisun", 5) == 0) {
