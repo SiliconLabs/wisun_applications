@@ -10,6 +10,11 @@ uint32_t udp_received_count;
 #include "sl_wisun_ota_dfu.h"
 #include "btl_interface.h"
 #include "printf.h"
+#include "app_parameters.h"
+
+#define CLEAR_NVM_NO   0
+#define CLEAR_NVM_APP  1
+#define CLEAR_NVM_FULL 2
 
 extern char device_tag[];
 //extern sl_wisun_ota_dfu_settings_t _settings;
@@ -205,9 +210,56 @@ void setImageToBootload(int slot) {
   printf("[%s] bootloader_setImageToBootload(%d) %ld 0x%04lx\n", device_tag, slot, ret_val, ret_val);
 }
 
-void rebootAndInstall(void) {
-  printf("[%s] bootloader_rebootAndInstall()\n", device_tag);
-  bootloader_rebootAndInstall();
+uint8_t rebootAndInstall(uint32_t timereboot, uint8_t clear_nvm) {
+  sl_status_t status;
+  uint8_t ret = 0xff;
+  if (last_index() > 1) {
+      if (list_missed() == 0) {
+          if (verify_image_in_flash()) {
+              setImageToBootload(0);
+              if (timereboot < 90){
+                  printf("[%s] Reboot and install in %ld sec\n", device_tag, timereboot);
+                  osDelay(timereboot*1000);
+
+                  if (clear_nvm == CLEAR_NVM_APP){
+                      printf("[%s] Clear NVM APP\n", device_tag);
+                      if (delete_app_parameters() != SL_STATUS_OK){
+                          return 5;
+                      }
+                  }
+                  else if (clear_nvm == CLEAR_NVM_FULL){
+                      printf("[%s] Clear NVM FULL\n", device_tag);
+                      status = nvm3_eraseAll(nvm3_defaultHandle);
+                      if (status != SL_STATUS_OK) {
+                          printfBothTime("nvm3_eraseAll(nvm3_defaultHandle) returned 0x%04lX, (check sl_status.h)\n",
+                                          status);
+                          return 5;
+                      } else {
+                          printfBothTime("application parameters deleted\n");
+                      }
+
+                  }
+
+                  printf("[%s] bootloader_rebootAndInstall()\n", device_tag);
+                  bootloader_rebootAndInstall();
+                  ret = 0;
+              } else {
+                  printf("[%s] Invalid time : %ld (must be < 90 sec)", device_tag, timereboot);
+                  ret = 1;
+              }
+          } else {
+              printf("[%s] verify_image_in_flash() failed: no reboot\n", device_tag);
+              ret = 2;
+          }
+      } else {
+          printf("[%s] There are missed chunks: no reboot\n", device_tag);
+          ret = 3;
+      }
+  } else {
+      printf("[%s] There are no chunks: no reboot\n", device_tag);
+      ret = 4;
+  }
+  return ret;
 }
 
 int multicast_rx(char* udp_buff, uint32_t received_bytes) {
@@ -346,30 +398,35 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
   } else if (res == 2) {
       if (strcmp(gbl_filename, "rebootAndInstall()"     ) == 0) {
           timereboot = chunk_index;
-          if (last_index() > 1) {
-              if (list_missed() == 0) {
-                  if (verify_image_in_flash()) {
-                      setImageToBootload(0);
-                      if (timereboot < 90){
-                          printf("[%s] Reboot and install in %ld sec", device_tag, timereboot);
-                          osDelay(timereboot*1000);
-                          rebootAndInstall();
-                          received = 4;
-                      } else {
-                          printf("[%s] Invalid time : %ld (must be < 90 sec)", device_tag, timereboot);
-                          received = -4;
-                      }
-                  } else {
-                      printf("[%s] verify_image_in_flash() failed: no reboot\n", device_tag);
-                      received = -4;
-                  }
-              } else {
-                  printf("[%s] There are missed chunks: no reboot\n", device_tag);
-              }
-          } else {
-              printf("[%s] There are no chunks: no reboot\n", device_tag);
+          if (rebootAndInstall(timereboot, CLEAR_NVM_NO) == 0){
+              received = 8;
           }
+          else{
+              received = -8;
+          }
+
       }
+      else if (strcmp(gbl_filename, "rebootAndInstallClearNVMApp()"     ) == 0) {
+          timereboot = chunk_index;
+          if (rebootAndInstall(timereboot, CLEAR_NVM_APP) == 0){
+              received = 9;
+          }
+          else{
+              received = -9;
+          }
+
+      }
+      else if (strcmp(gbl_filename, "rebootAndInstallClearNVMFull()"     ) == 0) {
+          timereboot = chunk_index;
+          if (rebootAndInstall(timereboot, CLEAR_NVM_FULL) == 0){
+              received = 10;
+          }
+          else{
+              received = -10;
+          }
+
+      }
+      else    {printf("unknown multicast_ota command '%s'\n", gbl_filename); received = 0; }
   } else {
     printf("[%s] UDP Rx %2ld from %s (%4ld bytes): --------  Only %d items can be found in the string %s\n", device_tag, udp_rx_total_count, udp_ip_str, received_bytes, res, udp_buff);
     return 0;
