@@ -142,12 +142,15 @@ sl_status_t show_missed_from_list() {
 
   missed_count = list_missed();
   if (last_chunk_index) {
-    printf("[%s] show_missed_from_list(): %ld missed chunks, %ld received chunks out of %ld chunks (%.2f%% success rate)\n",
+    printf("[%s] show_missed_from_list(): %ld missed chunks, %ld received chunks out of %ld chunks (%.2f%% success rate) from %s %s\n",
                    device_tag,
                    missed_count,
                    last_chunk_index - missed_count,
                    last_chunk_index,
-                   100.0*(last_chunk_index - missed_count)/last_chunk_index);
+                   100.0*(last_chunk_index - missed_count)/last_chunk_index,
+                   gbl_file,
+                   expected_tag
+                   );
 
     snprintf(information_string, INFO_STRING_LENGTH, "[%s] %3ld/%3ld missed chunks ", device_tag, missed_count, last_chunk_index);
     info_length = strlen(information_string);
@@ -156,7 +159,7 @@ sl_status_t show_missed_from_list() {
       info_length = strlen(information_string);
     }
   } else {
-    snprintf(information_string, INFO_STRING_LENGTH, "[%s] %ld missed chunks because %ld received\n", device_tag, missed_count, last_chunk_index);
+    snprintf(information_string, INFO_STRING_LENGTH, "[%s] %ld missed chunks because %ld received from %s %s\n", device_tag, missed_count, last_chunk_index, gbl_file, expected_tag);
   }
   printf("%s\n", information_string);
   return SL_STATUS_OK;
@@ -210,7 +213,7 @@ void rebootAndInstall(void) {
 int multicast_rx(char* udp_buff, uint32_t received_bytes) {
   int received = 0;
   int res;
-  //int i = 0;
+
   uint32_t timereboot;
   uint32_t chunk_size;
   uint32_t start_address;
@@ -226,6 +229,7 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
   info_byte[3] = 0x33;
 
   sprintf(expected_tag, SL_BOARD_NAME);
+  // NB:  slot0_start_address is set to 0x12345678 in clear_ota_data()
   if (slot0_start_address == 0x12345678) {
     ret_val = bootloader_getStorageSlotInfo(0, &slot0);
     sl_wisun_ota_dfu_get_gbl_path(gbl_file, 100);
@@ -235,6 +239,8 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
     }
     printf("slot0: address 0x%08lx, length %ld. It can accept max %ld chunks of 1024 bytes\n", slot0.address, slot0.length, slot0.length/1024);
     slot0_start_address = slot0.address;
+  } else {
+    sl_wisun_ota_dfu_get_gbl_path(gbl_file, 100);
   }
 
   res = sscanf(udp_buff, "OTA %s %ld %ld %s %s", gbl_filename, &chunk_index, &data_offset, tx_timestamp_str, tag_str);
@@ -333,17 +339,6 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
     if      (strcmp(gbl_filename, "show_missed_from_list()") == 0) {received = 1; show_missed_from_list();}
     else if (strcmp(gbl_filename, "verify_image_in_flash()") == 0) {received = 2; verify_image_in_flash();}
     else if (strcmp(gbl_filename, "setImageToBootload()"   ) == 0) {received = 3; setImageToBootload(0);}
-    else if (strcmp(gbl_filename, "rebootAndInstall()"     ) == 0) {
-        if (last_index() > 1) {
-            if (list_missed() == 0) {
-                received = 4; rebootAndInstall();
-            } else {
-                printf("[%s] There are missed chunks: no reboot\n", device_tag);
-            }
-        } else {
-            printf("[%s] There are no chunks: no reboot\n", device_tag);
-        }
-    }
     else if (strcmp(gbl_filename, "show_missed()"          ) == 0) {received = 5; show_missed();}
     else if (strcmp(gbl_filename, "clear_ota_data()"       ) == 0) {received = 6; clear_ota_data();}
     else if (strcmp(gbl_filename, "show_repeated()"        ) == 0) {received = 7; show_repeated();}
@@ -353,18 +348,21 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
           timereboot = chunk_index;
           if (last_index() > 1) {
               if (list_missed() == 0) {
-                  received = 4;
-                  //check chunk_index(time in second before reboot is valid
-                  if (timereboot < 90){
-                      printf("[%s] Reboot and install in %ld sec", device_tag, timereboot);
-                      osDelay(timereboot*1000);
-                      rebootAndInstall();
+                  if (verify_image_in_flash()) {
+                      setImageToBootload(0);
+                      if (timereboot < 90){
+                          printf("[%s] Reboot and install in %ld sec", device_tag, timereboot);
+                          osDelay(timereboot*1000);
+                          rebootAndInstall();
+                          received = 4;
+                      } else {
+                          printf("[%s] Invalid time : %ld (must be < 90 sec)", device_tag, timereboot);
+                          received = -4;
+                      }
+                  } else {
+                      printf("[%s] verify_image_in_flash() failed: no reboot\n", device_tag);
+                      received = -4;
                   }
-                  else{
-                      printf("[%s] Invalid time : %ld (must be < 90 sec)", device_tag, timereboot);
-                  }
-
-
               } else {
                   printf("[%s] There are missed chunks: no reboot\n", device_tag);
               }

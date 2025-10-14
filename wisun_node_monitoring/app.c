@@ -57,7 +57,7 @@
 #include "sl_wisun_coap.h"
 #include "sl_wisun_coap_config.h"
 
- #include "app_parameters.h"
+#include "app_parameters.h"
  /* Increase SL_APPLICATION_VERSION in app_properties_config.h to use DELTA DFU */
  #include "app_properties_config.h"
 
@@ -76,6 +76,10 @@
 
 #include "app_coap.h"
 #include "app_check_neighbors.h"
+
+#ifdef    SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT
+#include "btl_interface.h"
+#endif  /* SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT */
 
 #define   APP_TRACK_HEAP
 //#define   APP_TRACK_HEAP_DIFF
@@ -431,6 +435,9 @@ void app_task(void *args)
   uint8_t previous_change_leds = 5;
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
   bool with_time, to_console, to_rtt, to_udp, to_coap;
+#ifdef    SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT
+  BootloaderStorageInformation_t storage_info;
+#endif  /* SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT */
 
   app_timestamp_init();
   init_app_parameters();
@@ -451,12 +458,26 @@ void app_task(void *args)
   printf("\n");
   sprintf(chip, "%s", CHIP);
 #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-  snprintf(application, 100, "%s %s %d.%d", chip, "Wi-SUN Node Monitoring V3.4.0 SiSDK 2025_06_2", START_FLASHES_A, START_FLASHES_B);
+  snprintf(application, 100, "%s %s %s %d.%d", chip, SL_BOARD_NAME, "Wi-SUN Node Monitoring V3.4.0 SiSDK 2025_06_2", START_FLASHES_A, START_FLASHES_B);
 #else  /* SL_CATALOG_SIMPLE_LED_PRESENT */
   snprintf(application, 100, "%s", "Wi-SUN Node Monitoring V3.3.0");
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
   printfBothTime("%s/%s %s\n", chip, SL_BOARD_NAME, application);
   snprintf(version, 80, "Compiled on %s at %s", __DATE__, __TIME__);
+
+#ifdef    SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT
+  bootloader_getStorageInfo(&storage_info);
+  #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+    if (storage_info.info->partSize == 0) {
+        leds_flash(100, 25);
+        set_leds(0, 0);
+        osDelay(1000);
+    }
+  #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+  snprintf(version, 80, "Compiled on %s at %s (flash partSize %ld)", __DATE__, __TIME__, storage_info.info->partSize);
+#else /* SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT */
+  snprintf(version, 80, "Compiled on %s at %s (no bootloader)", __DATE__, __TIME__);
+#endif /* SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT */
 
   printfBothTime("%s\n", chip);
   printfBothTime("%s\n", SL_BOARD_NAME);
@@ -716,6 +737,7 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
 
 #ifdef    APP_CHECK_PREVIOUS_CRASH
   if (strlen(crash_info_string)) {
+      osDelay(2UL);
       print_and_send_messages (crash_info_string,
                   with_time, to_console, to_rtt, to_udp, to_coap);
   }
@@ -728,6 +750,8 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
   #endif /* APP_TRACK_HEAP_DIFF */
   refresh_heap = true;
 #endif /* APP_TRACK_HEAP */
+
+  osDelay(2UL);
 
   while (1) {
     ///////////////////////////////////////////////////////////////////////////
