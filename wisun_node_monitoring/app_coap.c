@@ -156,11 +156,17 @@ sl_wisun_coap_packet_t * coap_callback_all_infos (
     "  \"device_type\": \"%s\",\n" \
     "  \"application\": \"%s\",\n" \
     "  \"version\": \"%s\",\n"     \
+    "  \"stack_version\": \"%d.%d.%d_b%d\",\n"\
     "  \"MAC\": \"%s\"\n"          \
     "}\n"
   sl_wisun_mac_address_t device_mac;
+  uint8_t major;
+  uint8_t minor;
+  uint8_t patch;
+  uint16_t build;
   sl_wisun_get_mac_address(&device_mac);
   buf = app_wisun_mac_addr_to_str(&device_mac);
+  sl_wisun_get_stack_version(&major, &minor, &patch, &build);
   snprintf(coap_response, COAP_MAX_RESPONSE_LEN, JSON_ALL_INFOS_FORMAT_STR,
             device_tag,
             chip,
@@ -168,6 +174,7 @@ sl_wisun_coap_packet_t * coap_callback_all_infos (
             device_type,
             application,
             version,
+            major, minor, patch, build,
             buf
   );
   app_wisun_free((void*)buf);

@@ -107,7 +107,7 @@ void init_tcp_server(void) {
   #if       (WITH_TCP_SERVER == SO_NONBLOCK)
     // Open TCP server socket in non-blocking (polling) mode
     socket_type = SOCK_STREAM|SOCK_NONBLOCK;
-    printfBothTime("udp_server in non-blocking/Polling mode\n");
+    printfBothTime("tcp_server in non-blocking/Polling mode\n");
   #endif /* (WITH_TCP_SERVER == SO_NONBLOCK) */
 
   tcp_server_sockid = socket(AF_INET6, socket_type, IPPROTO_TCP);
