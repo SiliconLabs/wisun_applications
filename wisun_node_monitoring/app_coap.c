@@ -816,6 +816,17 @@ sl_wisun_coap_packet_t * coap_callback_multicast_ota (
     const  sl_wisun_coap_packet_t *const req_packet)  {
     snprintf(coap_response, COAP_MAX_RESPONSE_LEN, missed_chunks());
   return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_multicast_ota_rx (
+    const  sl_wisun_coap_packet_t *const req_packet)  {
+    snprintf(coap_response, COAP_MAX_RESPONSE_LEN, rx_chunks());
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_multicast_ota_info (
+    const  sl_wisun_coap_packet_t *const req_packet)  {
+    snprintf(coap_response, COAP_MAX_RESPONSE_LEN, ota_multicast_info());
+  return app_coap_reply(coap_response, req_packet); }
+
 #endif /* APP_WISUN_MULTICAST_OTA_H */
 
 // CoAP resources init in resource handler (one block per URI)
@@ -1106,6 +1117,22 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "text";
   coap_resource.data.interface = "multicast_ota";
   coap_resource.auto_response = coap_callback_multicast_ota;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/multicast_ota/rx";
+  coap_resource.data.resource_type = "text";
+  coap_resource.data.interface = "multicast_ota";
+  coap_resource.auto_response = coap_callback_multicast_ota_rx;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/multicast_ota/info";
+  coap_resource.data.resource_type = "text";
+  coap_resource.data.interface = "multicast_ota";
+  coap_resource.auto_response = coap_callback_multicast_ota_info;
   coap_resource.discoverable = true;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;

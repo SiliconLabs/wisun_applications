@@ -13,10 +13,16 @@
 extern "C" {
 #endif
 
+#ifndef MULTICAST_OTA_STORE_IN_FLASH
+#define MULTICAST_OTA_STORE_IN_FLASH 1
+#endif /* MULTICAST_OTA_STORE_IN_FLASH */
+
 #define MAX_CHUNKS     1024
 #define MAX_DATA_BYTES 1232
 
 void clear_ota_data();
+
+uint32_t last_index_rx(void);
 
 uint32_t last_index();
 
@@ -31,6 +37,10 @@ sl_status_t show_missed_from_list();
 void show_missed();
 
 char* missed_chunks();
+
+char* rx_chunks();
+
+char* ota_multicast_info();
 
 char* now_timestamp();
 
