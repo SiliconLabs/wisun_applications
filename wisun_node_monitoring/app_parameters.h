@@ -86,6 +86,7 @@ extern app_wisun_parameters_t app_parameters;
 sl_status_t init_app_parameters();
 sl_status_t read_app_parameters();
 sl_status_t save_app_parameters();
+sl_status_t delete_app_parameters();
 
 // Set and Print application parameters
 void        print_app_parameters();

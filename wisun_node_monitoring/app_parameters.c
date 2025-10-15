@@ -308,3 +308,16 @@ sl_status_t save_app_parameters() {
   return status;
 }
 
+
+sl_status_t delete_app_parameters() {
+  sl_status_t status;
+  status = nvm3_deleteObject(nvm3_defaultHandle, NVM3_APP_KEY);
+  if (status != SL_STATUS_OK) {
+      // What to do here? Assert?
+      printfBothTime("nvm3_deleteObject(nvm3_defaultHandle, 0x%04x) returned 0x%04lX, (check sl_status.h)\n",
+                     NVM3_APP_KEY, status);
+  } else {
+      printfBothTime("application parameters deleted\n");
+  }
+  return status;
+}
