@@ -210,16 +210,16 @@ void setImageToBootload(int slot) {
   printf("[%s] bootloader_setImageToBootload(%d) %ld 0x%04lx\n", device_tag, slot, ret_val, ret_val);
 }
 
-uint8_t rebootAndInstall(uint32_t timereboot, uint8_t clear_nvm) {
+uint8_t rebootAndInstall(uint32_t time_reboot_sec, uint8_t clear_nvm) {
   sl_status_t status;
   uint8_t ret = 0xff;
   if (last_index() > 1) {
       if (list_missed() == 0) {
           if (verify_image_in_flash()) {
               setImageToBootload(0);
-              if (timereboot < 90){
-                  printf("[%s] Reboot and install in %ld sec\n", device_tag, timereboot);
-                  osDelay(timereboot*1000);
+              if (time_reboot_sec < 90){
+                  printf("[%s] Reboot and install in %ld sec\n", device_tag, time_reboot_sec);
+                  osDelay(time_reboot_sec*1000);
 
                   if (clear_nvm == CLEAR_NVM_APP){
                       printf("[%s] Clear NVM APP\n", device_tag);
@@ -244,7 +244,7 @@ uint8_t rebootAndInstall(uint32_t timereboot, uint8_t clear_nvm) {
                   bootloader_rebootAndInstall();
                   ret = 0;
               } else {
-                  printf("[%s] Invalid time : %ld (must be < 90 sec)", device_tag, timereboot);
+                  printf("[%s] Invalid time : %ld (must be < 90 sec)", device_tag, time_reboot_sec);
                   ret = 1;
               }
           } else {
@@ -266,7 +266,7 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
   int received = 0;
   int res;
 
-  uint32_t timereboot;
+  uint32_t time_reboot_sec;
   uint32_t chunk_size;
   uint32_t start_address;
   uint32_t end_address;
@@ -397,8 +397,8 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
     else    {printf("unknown multicast_ota command '%s'\n", gbl_filename); received = 0; }
   } else if (res == 2) {
       if (strcmp(gbl_filename, "rebootAndInstall()"     ) == 0) {
-          timereboot = chunk_index;
-          if (rebootAndInstall(timereboot, CLEAR_NVM_NO) == 0){
+          time_reboot_sec = chunk_index;
+          if (rebootAndInstall(time_reboot_sec, CLEAR_NVM_NO) == 0){
               received = 8;
           }
           else{
@@ -407,8 +407,8 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
 
       }
       else if (strcmp(gbl_filename, "rebootAndInstallClearNVMApp()"     ) == 0) {
-          timereboot = chunk_index;
-          if (rebootAndInstall(timereboot, CLEAR_NVM_APP) == 0){
+          time_reboot_sec = chunk_index;
+          if (rebootAndInstall(time_reboot_sec, CLEAR_NVM_APP) == 0){
               received = 9;
           }
           else{
@@ -417,8 +417,8 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
 
       }
       else if (strcmp(gbl_filename, "rebootAndInstallClearNVMFull()"     ) == 0) {
-          timereboot = chunk_index;
-          if (rebootAndInstall(timereboot, CLEAR_NVM_FULL) == 0){
+          time_reboot_sec = chunk_index;
+          if (rebootAndInstall(time_reboot_sec, CLEAR_NVM_FULL) == 0){
               received = 10;
           }
           else{
