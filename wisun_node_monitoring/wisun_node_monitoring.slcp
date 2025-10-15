@@ -1,11 +1,13 @@
 project_name: wisun_node_monitoring
 label: wisun_node_monitoring
+
 description: The Wi-SUN Node Monitoring sample application is based on Wi-SUN SoC
   Empty. It adds OTA DFU & CoAP support to monitor the device connection status. It
   can be easily expanded to monitor sensors and control actuators. Defining COAP_APP_STATISTICS
   allows monitoring connection statistics. Defining COAP_STACK_STATISTICS allows monitoring
   stack statistics.
 category: Wi-SUN Examples
+
 filter:
 - name: Device Type
   value: [SoC]
@@ -13,10 +15,14 @@ filter:
   value: [Beginner]
 - name: Wireless Technology
   value: [Wi-SUN]
+
 package: wisun
+
 quality: experimental
+
 readme:
 - {path: README.md}
+
 source:
 - {path: app_check_neighbors.c}
 - {path: app_coap.c}
@@ -33,6 +39,7 @@ source:
 - {path: app_wisun_multicast_ota.c}
 - {path: main.c}
 - {path: ../component/crash_handler/sl_wisun_crash_handler.c}
+
 include:
 - path: .
   file_list:
@@ -51,34 +58,42 @@ include:
 - path: ../component/crash_handler/
   file_list:
   - {path: sl_wisun_crash_handler.h}
+
 toolchain_settings:
 - {value: '-Wl,--wrap=__stack_chk_fail,--wrap=__assert_func', option: gcc_linker_option}
+
 component:
-- {id: clock_manager}
-- {id: device_init}
-- {id: emlib_rmu}
-- {id: iostream_recommended_stream}
-- {id: iostream_retarget_stdio}
-- {id: micriumos_kernel}
-- {id: nvm3_default}
-- {id: printf}
-- {id: radio_config_brd_wisun_singlephy}
-- {id: restrictions_profile_wisun_fan_1_0}
-- {id: restrictions_profile_wisun_fan_1_1}
-- {id: restrictions_profile_wisun_han}
-- {id: segger_rtt}
-- {id: segger_rtt_printf}
-- {id: sl_main}
-- {id: sl_wisun_app_core}
-- {id: sl_wisun_ota_dfu}
-- {id: sl_wisun_trace_util}
-- {id: sleeptimer}
-- {id: slist}
-- {id: wisun_config}
-- {id: wisun_stack}
-- {id: wisun_stack_debug}
+  - {id: simple_led,    condition: [brd2705a], instance: [led0, led1]}
+  - {id: simple_button, condition: [brd2705a], instance: [btn0, btn1]}
+  - {id: simple_led,    condition: [brd4270b, hardware_board_mainboard], instance: [led0, led1]}
+  - {id: simple_button, condition: [brd4270b, hardware_board_mainboard], instance: [btn0, btn1]}
+  - id: clock_manager
+  - id: device_init
+  - id: emlib_rmu
+  - id: iostream_recommended_stream
+  - id: iostream_retarget_stdio
+  - id: micriumos_kernel
+  - id: nvm3_default
+  - id: printf
+  - id: radio_config_brd_wisun_singlephy
+  - id: restrictions_profile_wisun_fan_1_0
+  - id: restrictions_profile_wisun_fan_1_1
+  - id: restrictions_profile_wisun_han
+  - id: segger_rtt
+  - id: segger_rtt_printf
+  - id: sl_main
+  - id: sl_wisun_app_core
+  - id: sl_wisun_ota_dfu
+  - id: sl_wisun_trace_util
+  - id: sleeptimer
+  - id: slist
+  - id: wisun_config
+  - id: wisun_stack
+  - id: wisun_stack_debug
+
 define:
-- {name: DEBUG_EFM_USER}
+  - name: DEBUG_EFM_USER
+
 configuration:
 - {name: SL_WISUN_COAP_RESOURCE_HND_STACK_SIZE_WORD, value: 1024}
 - {name: SL_WISUN_COAP_RESOURCE_HND_MAX_RESOURCES, value: 50U}
@@ -128,6 +143,7 @@ configuration:
   name: SL_SLEEPTIMER_WALLCLOCK_CONFIG
   value: '1'
 - {name: SL_STACK_SIZE, value: '5120'}
+
 ui_hints:
   highlight:
   - {path: README.md, focus: true}
