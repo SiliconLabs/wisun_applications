@@ -65,6 +65,7 @@ extern "C" {
 
 #define HISTORY
 //#define LIST_RF_CONFIGS
+
 // UDP and TCP server need to be set to either SO_NONBLOCK or SO_EVENT_MODE, if defined
 // Comment the lines if the corresponding server is not required
 #define WITH_UDP_SERVER    SO_NONBLOCK

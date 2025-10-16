@@ -49,7 +49,43 @@
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
 #define NVM3_APP_KEY   0xf012
-#define NVM3_APP_PARAMS_VERSION  10000
+
+#if __has_include("ltn_config.h")
+#include "ltn_config.h"
+#endif
+
+#ifndef   TX_POWER_DDBM
+  #ifndef WISUN_CONFIG_TX_POWER
+    #define TX_POWER_DDBM  0
+  #else /* WISUN_CONFIG_TX_POWER */
+    #define TX_POWER_DDBM  WISUN_CONFIG_TX_POWER
+  #endif /* WISUN_CONFIG_TX_POWER */
+#endif /* TX_POWER_DDBM */
+#ifndef  NVM3_APP_PARAMS_VERSION
+  #define NVM3_APP_PARAMS_VERSION   10000
+#endif /* NVM3_APP_PARAMS_VERSION */
+#ifndef  AUTO_SEND_SEC
+  #define AUTO_SEND_SEC             15*60
+#endif /* AUTO_SEND_SEC */
+#ifndef  PREFERRED_PAN_ID
+  #define PREFERRED_PAN_ID         0xffff
+#endif /* PREFERRED_PAN_ID */
+#ifndef  SELECTED_DEVICE_TYPE
+  #define SELECTED_DEVICE_TYPE          SL_WISUN_ROUTER
+#endif /* SELECTED_DEVICE_TYPE */
+#ifndef  SET_LEAF
+  #define SET_LEAF                      0
+#endif /* SET_LEAF */
+#ifndef  MAX_CHILD_COUNT
+  #define MAX_CHILD_COUNT              22
+#endif /* MAX_CHILD_COUNT */
+#ifndef  MAX_NEIGHBOR_COUNT
+  #define MAX_NEIGHBOR_COUNT           32
+#endif /* MAX_NEIGHBOR_COUNT */
+#ifndef  MAX_SECURITY_NEIGHBOR_COUNT
+  #define MAX_SECURITY_NEIGHBOR_COUNT 500
+#endif /* MAX_SECURITY_NEIGHBOR_COUNT */
+
 
 // Application parameters
 typedef struct {

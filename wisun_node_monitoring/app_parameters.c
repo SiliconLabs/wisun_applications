@@ -88,19 +88,15 @@ void print_app_parameters() {
 }
 
 void set_app_parameters_defaults() {
-  app_parameters.app_params_version   = NVM3_APP_PARAMS_VERSION;
-  app_parameters.auto_send_sec        = 15*60;
-  app_parameters.preferred_pan_id     = 0xffff;
-  app_parameters.selected_device_type = SL_WISUN_ROUTER;
-  app_parameters.set_leaf             = 0;
-#ifdef    WISUN_CONFIG_TX_POWER
-  app_parameters.tx_power_ddbm        = WISUN_CONFIG_TX_POWER;
-#else  /* WISUN_CONFIG_TX_POWER */
-  app_parameters.tx_power_ddbm        = 200;
-#endif /* WISUN_CONFIG_TX_POWER */
-  app_parameters.max_child_count      = 22;
-  app_parameters.max_neighbor_count   = 32;
-  app_parameters.max_security_neighbor_count = 500;
+  app_parameters.app_params_version          = NVM3_APP_PARAMS_VERSION;
+  app_parameters.auto_send_sec               = AUTO_SEND_SEC;
+  app_parameters.preferred_pan_id            = PREFERRED_PAN_ID;
+  app_parameters.selected_device_type        = SELECTED_DEVICE_TYPE;
+  app_parameters.set_leaf                    = SET_LEAF;
+  app_parameters.tx_power_ddbm               = TX_POWER_DDBM;
+  app_parameters.max_child_count             = MAX_CHILD_COUNT;
+  app_parameters.max_neighbor_count          = MAX_NEIGHBOR_COUNT;
+  app_parameters.max_security_neighbor_count = MAX_SECURITY_NEIGHBOR_COUNT;
 }
 
 sl_status_t init_app_parameters() {
