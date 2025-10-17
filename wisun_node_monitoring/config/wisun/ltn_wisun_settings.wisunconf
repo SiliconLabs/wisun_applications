@@ -1,11 +1,11 @@
 {
   "networkName": "large_test_network",
-  "networkSize": "SL_WISUN_NETWORK_SIZE_LARGE",
+  "networkSize": "SL_WISUN_NETWORK_SIZE_MEDIUM",
   "deviceType": "SL_WISUN_ROUTER",
   "deviceProfile": null,
   "macAddress": null,
   "dwellInterval": null,
-  "txOutputPower": null,
+  "txOutputPower": 0,
   "broadcastRetries": 2,
   "macList": [],
   "isDenyList": false,

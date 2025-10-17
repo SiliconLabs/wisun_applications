@@ -592,17 +592,20 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CO
   check_buttons = true;
   app_parameters.selected_device_type = SL_WISUN_ROUTER;
   if (startup_option == 1) {
-    sl_wisun_clear_credential_cache();
-    printfBothTime("Cleared credential cache (startup_option 1)\n");
+    nvm3_eraseAll(nvm3_defaultHandle);
+    printfBothTime("Cleared entire NVM (startup_option 1)\n");
   }
   if (startup_option == 2) {
     app_parameters.selected_device_type = SL_WISUN_LFN;
     printfBothTime("Starting as LFN (startup_option = 2)\n");
-    sprintf(device_type, "LFN by user choice");
+  }
+  if (startup_option == 3) {
+    nvm3_deleteObject(nvm3_defaultHandle, NVM3_APP_KEY);
+    printfBothTime("Application parameters deleted from NVM\n");
   }
 #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
 
-  printfBothTime("device_type %s\n", device_type);
+printfBothTime("device_type %s\n", device_type);
 
 #ifdef    WITH_DIRECT_CONNECT
   if (app_parameters.selected_device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
