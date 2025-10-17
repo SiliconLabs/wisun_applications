@@ -5,7 +5,7 @@
   "deviceProfile": null,
   "macAddress": null,
   "dwellInterval": null,
-  "txOutputPower": null,
+  "txOutputPower": 0,
   "broadcastRetries": 2,
   "macList": [],
   "isDenyList": false,
