@@ -47,6 +47,13 @@
 #include "sl_string.h"
 #include "sl_memory_manager.h"
 
+#if __has_include("ltn_config.h")
+#include "ltn_config.h"
+#  pragma message("?? Using settings from app_config.h")
+#else
+#  pragma message("?? app_config.h not found. Using default behavior")
+#endif
+
 #include "sl_wisun_api.h"
 #include "sl_wisun_types.h"
 #include "sl_wisun_version.h"
@@ -70,9 +77,17 @@
  void *led0;
  void *led1;
 
- #define START_FLASHES_A 6
- #define START_FLASHES_B  SL_APPLICATION_VERSION
+ #ifndef START_FLASHES_A
+  #define START_FLASHES_A 6
+ #endif /* START_FLASHES_A */
+  #ifndef START_FLASHES_B
+   #define START_FLASHES_B  SL_APPLICATION_VERSION
+  #endif /* START_FLASHES_B */
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+
+#ifndef APP_VERSION_STRING
+  #define APP_VERSION_STRING "V6.2"
+#endif /* APP_VERSION_STRING */
 
 #include "app_coap.h"
 #include "app_check_neighbors.h"
@@ -458,9 +473,9 @@ void app_task(void *args)
   printf("\n");
   sprintf(chip, "%s", CHIP);
 #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-  snprintf(application, 100, "%s %s %s %d.%d", chip, SL_BOARD_NAME, "Wi-SUN Node Monitoring V3.4.0 SiSDK 2025_06_2", START_FLASHES_A, START_FLASHES_B);
+  snprintf(application, 100, "%s %s %s %s %d.%d", chip, SL_BOARD_NAME, "Wi-SUN Node Monitoring", APP_VERSION_STRING, START_FLASHES_A, START_FLASHES_B);
 #else  /* SL_CATALOG_SIMPLE_LED_PRESENT */
-  snprintf(application, 100, "%s", "Wi-SUN Node Monitoring V3.3.0");
+  snprintf(application, 100, "%s %s %s %s", chip, SL_BOARD_NAME, "Wi-SUN Node Monitoring", APP_VERSION_STRING);
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
   printfBothTime("%s/%s %s\n", chip, SL_BOARD_NAME, application);
   snprintf(version, 80, "Compiled on %s at %s", __DATE__, __TIME__);
@@ -479,8 +494,6 @@ void app_task(void *args)
   snprintf(version, 80, "Compiled on %s at %s (no bootloader)", __DATE__, __TIME__);
 #endif /* SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT */
 
-  printfBothTime("%s\n", chip);
-  printfBothTime("%s\n", SL_BOARD_NAME);
   printfBothTime("%s\n", application);
   printfBothTime("%s\n", version);
 

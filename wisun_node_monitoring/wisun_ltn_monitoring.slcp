@@ -1,0 +1,156 @@
+project_name: wisun_node_monitoring
+label: wisun_node_monitoring
+
+description: The Wi-SUN Node Monitoring sample application is based on Wi-SUN SoC
+  Empty. It adds OTA DFU & CoAP support to monitor the device connection status. It
+  can be easily expanded to monitor sensors and control actuators. Defining COAP_APP_STATISTICS
+  allows monitoring connection statistics. Defining COAP_STACK_STATISTICS allows monitoring
+  stack statistics.
+category: Wi-SUN Examples
+
+filter:
+- name: Device Type
+  value: [SoC]
+- name: Project Difficulty
+  value: [Beginner]
+- name: Wireless Technology
+  value: [Wi-SUN]
+
+package: wisun
+
+quality: experimental
+
+readme:
+- {path: README.md}
+
+source:
+- {path: app_check_neighbors.c}
+- {path: app_coap.c}
+- {path: app.c}
+- {path: app_direct_connect.c}
+- {path: app_init.c}
+- {path: app_list_configs.c}
+- {path: app_parameters.c}
+- {path: app_rtt_traces.c}
+- {path: app_reporter.c}
+- {path: app_tcp_server.c}
+- {path: app_timestamp.c}
+- {path: app_udp_server.c}
+- {path: app_wisun_multicast_ota.c}
+- {path: main.c}
+- {path: ../component/crash_handler/sl_wisun_crash_handler.c}
+
+include:
+- path: config
+  file_list:
+  - {path: ltn_config.h}
+  - {path: wisun/ltn_wisun_settings.wisunconf}
+- path: .
+  file_list:
+  - {path: app_check_neighbors.h}
+  - {path: app_coap.h}
+  - {path: app_direct_connect.h}
+  - {path: app.h}
+  - {path: app_list_configs.h}
+  - {path: app_reporter.h}
+  - {path: app_parameters.h}
+  - {path: app_rtt_traces.h}
+  - {path: app_tcp_server.h}
+  - {path: app_udp_server.h}
+  - {path: app_wisun_multicast_ota.h}
+  - {path: app_timestamp.h}
+
+- path: ../component/crash_handler/
+  file_list:
+  - {path: sl_wisun_crash_handler.h}
+
+toolchain_settings:
+- {value: '-Wl,--wrap=__stack_chk_fail,--wrap=__assert_func', option: gcc_linker_option}
+
+component:
+  - id: clock_manager
+  - id: device_init
+  - id: emlib_rmu
+  - id: iostream_recommended_stream
+  - id: iostream_retarget_stdio
+  - id: micriumos_kernel
+  - id: nvm3_default
+  - id: printf
+  - id: segger_rtt
+  - id: segger_rtt_printf
+  - id: sl_main
+  - id: sl_wisun_app_core
+  - id: sl_wisun_ota_dfu
+  - id: sl_wisun_trace_util
+  - id: sleeptimer
+  - id: slist
+  - id: wisun_config
+  - id: wisun_stack
+  - id: wisun_stack_debug
+  # Selecting all PHYs for the board/device/freq_range
+  - id: wisun_default_radioconf
+  # Adding leds and buttons for selected HW
+  - {id: simple_led,    condition: [brd2705a], instance: [led0, led1]}
+  - {id: simple_button, condition: [brd2705a], instance: [btn0, btn1]}
+  - {id: simple_led,    condition: [brd4270b, hardware_board_mainboard], instance: [led0, led1]}
+  - {id: simple_button, condition: [brd4270b, hardware_board_mainboard], instance: [btn0, btn1]}
+
+define:
+  - name: DEBUG_EFM_USER
+
+configuration:
+  - {name: SL_WISUN_COAP_RESOURCE_HND_STACK_SIZE_WORD, value: 1024}
+  - {name: SL_WISUN_COAP_RESOURCE_HND_MAX_RESOURCES, value: 50U}
+  - {name: SL_WISUN_OTA_DFU_AUTO_INSTALL_ENABLED, value: 0U}
+  - {name: SL_BOARD_ENABLE_VCOM, value: '1'}
+  - {name: SL_CLI_LOCAL_ECHO, value: (1)}
+  - condition: [SL_CATALOG_IOSTREAM_EUSART_PRESENT]
+    name: SL_IOSTREAM_EUSART_VCOM_CONVERT_BY_DEFAULT_LF_TO_CRLF
+    value: '1'
+  - condition: [SL_CATALOG_IOSTREAM_EUSART_PRESENT]
+    name: SL_IOSTREAM_EUSART_VCOM_FLOW_CONTROL_TYPE
+    value: SL_IOSTREAM_EUSART_UART_FLOW_CTRL_NONE
+  - condition: [SL_CATALOG_IOSTREAM_USART_PRESENT]
+    name: SL_IOSTREAM_USART_VCOM_CONVERT_BY_DEFAULT_LF_TO_CRLF
+    value: '1'
+  - condition: [SL_CATALOG_IOSTREAM_USART_PRESENT]
+    name: SL_IOSTREAM_USART_VCOM_FLOW_CONTROL_TYPE
+    value: SL_IOSTREAM_USART_UART_FLOW_CTRL_NONE
+  - {name: SL_WISUN_COAP_RESOURCE_HND_VERBOSE_MODE_ENABLE, value: '1'}
+  - condition: [micriumos_kernel]
+    name: OS_CFG_APP_HOOKS_EN
+    value: '1'
+  - condition: [freertos]
+    name: configUSE_POSIX_ERRNO
+    value: '1'
+  - condition: [micriumos_kernel]
+    name: OS_CFG_ERRNO_EN
+    value: '1'
+  - condition: [hardware_board_has_eff]
+    name: SL_RAIL_UTIL_PA_SELECTION_SUBGHZ
+    value: RAIL_TX_POWER_MODE_SUBGIG_EFF_POWERSETTING_TABLE
+  - condition: [hardware_board_has_eff]
+    name: RAIL_UTIL_EFF_MAX_TX_CONTINUOUS_POWER_DBM
+    value: '20'
+  - condition: [hardware_board_has_eff]
+    name: RAIL_UTIL_EFF_MAX_TX_DUTY_CYCLE
+    value: '100'
+  - {name: SL_RAIL_UTIL_PTI_BAUD_RATE_HZ, value: '3200000'}
+  - condition: [device_sdid_220, hardware_board_default_rf_band_470]
+    name: SL_DEVICE_INIT_RFFPLL_BAND
+    value: '1'
+  - {name: SL_HEAP_SIZE, value: '0xD400'}
+  - condition: [sl_wisun_ota_dfu]
+    name: SL_SOCKET_BUFFER_SIZE
+    value: '532'
+  - condition: [sl_wisun_ota_dfu]
+    name: SL_SLEEPTIMER_WALLCLOCK_CONFIG
+    value: '1'
+  - {name: SL_STACK_SIZE, value: '5120'}
+
+ui_hints:
+  highlight:
+  - {path: README.md, focus: true}
+  - {path: app.c}
+  - {path: config/wisun/ltn_wisun_settings.wisunconf}
+
