@@ -13,6 +13,19 @@
     <properties key="quality" value="PRODUCTION"/>
     <properties key="filters" value="Device\ Type|SoC Project\ Difficulty|Beginner Wireless\ Technology|Wi-SUN"/>
   </descriptors>
+  <descriptors name="wisun_ltn_monitoring" label="Wi-SUN LTN Monitoring Application" description="This node monitoring example project is a derivative of the Wi-SUN Node Monitoring application, tailored for Silicon Labs Internal Large Test Network. Nothing different except settings which match the installed 1000 Nodes network">
+    <properties key="namespace" value="template.uc"/>
+    <properties key="solutionReferenceId" value="app.wisun.example.wisun_node_monitoring.wisun_ltn_monitoring.slcp"/>
+    <properties key="projectFilePaths" value="wisun_node_monitoring/wisun_ltn_monitoring.slcp"/>
+    <properties key="readmeFiles" value="wisun_node_monitoring/README.md"/>
+    <properties key="boardCompatibility" value="brd2705a brd4270b"/>
+    <properties key="partCompatibility" value=" .*efr32fg25.* .*efr32zg28.* "/>
+    <properties key="ideCompatibility" value="generic-template makefile-ide simplicity-ide visual-studio-code"/>
+    <properties key="toolchainCompatibility" value="gcc"/>
+    <properties key="category" value="Wi-SUN Examples"/>
+    <properties key="quality" value="EVALUATION"/>
+    <properties key="filters" value="Device\ Type|SoC Project\ Difficulty|Beginner Wireless\ Technology|Wi-SUN"/>
+  </descriptors>
   <descriptors name="wisun_soc_csmp_agent_skeleton" label="Wi-SUN - SoC Csmp Agent Sample Skeleton" description="This project helps creating a skeleton for the Wi-SUN csmp agent sample application that can be built later on the cisco csmp agent repository.">
     <properties key="namespace" value="template.uc"/>
     <properties key="keywords" value="universal\ configurator"/>
