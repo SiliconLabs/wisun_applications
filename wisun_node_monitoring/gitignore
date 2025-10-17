@@ -55,6 +55,9 @@ dkms.conf
 
 .*
 
-
+# Compilation artifacts
 GNU ARM v* - Default/
 
+# LTN files (these are only for Internal use)
+config/
+*ltn*.slcp
