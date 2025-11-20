@@ -570,7 +570,7 @@ static uint8_t app_join_network(uint8_t network_index) {
   trustedca_count = 0;
 #endif   /* WISUN_CONFIG_DDP */
   certificate_options = SL_WISUN_CERTIFICATE_OPTION_IS_REF;
-  if (!trustedca_count) {
+  if (trustedca_count == 0) {
     printfBothTime("No trusted CA keychain, init from builtin credentials\r\n");
     const uint32_t max_cert_str_len = 2048U;
 
@@ -717,22 +717,21 @@ static uint8_t app_join_network(uint8_t network_index) {
   ret = sl_wisun_join((const uint8_t *)this_network.network_name, &this_network.phy);
   if (ret == SL_STATUS_OK) {
     printf("[Connecting to \"%s\"]\r\n", this_network.network_name);
-    printfBothTime("Network %d: %s\n",
+    printfBothTime("Network[%d]: %s\n",
         app_parameters.network_index,
         app_wisun_phy_to_str(&(network[app_parameters.network_index].phy)));
   } else {
-    printf("[Connection failed: %lu]\r\n", ret);
-    if (ret != SL_STATUS_OK) {
+    printf("[Join failed: %lu]\r\n", ret);
+    if (ret == SL_STATUS_FAIL) {
         sl_wisun_get_join_state(&join_state);
         if (join_state == SL_WISUN_JOIN_STATE_DISCONNECTED) {
-            printfBothTime("Network %d: Incorrect PHY selection: Will never connect on %s\n",
+            printfBothTime("Network[%d]: Incorrect PHY selection: Will never connect on %s\n",
                 app_parameters.network_index,
                 app_wisun_phy_to_str(&(network[app_parameters.network_index].phy)));
         }
+        goto cleanup;
     }
-    ret = __LINE__; goto cleanup;
   }
-
 
 #if SL_RAIL_IEEE802154_SUPPORTS_G_MODE_SWITCH
   // Configure POM-IE
@@ -763,7 +762,7 @@ static uint8_t app_join_network(uint8_t network_index) {
                               phy_mode_id_p,
                               app_settings_wisun.rx_mdr_capable);
     if (ret != SL_STATUS_OK) {
-      printfBothTime("[Failed: unable to set RX PhyModeId list: %lu]\r\n", ret);
+      printfBothTime("[Failed: unable to set RX PhyModeId list in POM-IE for Mode Switch: %lu]\r\n", ret);
       ret = __LINE__; goto cleanup;
     }
   }
@@ -787,7 +786,11 @@ cleanup:
   app_parameter_mutex_release();
 
   if (ret != SL_STATUS_OK) {
-      printfBothTime("app_join_network(%d) failed around line %ld\n", app_parameters.network_index, ret);
+      if (ret != SL_STATUS_FAIL) {
+          printfBothTime("app_join_network(%d) failed around line %ld\n", app_parameters.network_index, ret);
+      } else {
+          printfBothTime("sl_wisun_join() failed: the most probable cause is an unknown PHY. Check you Radio configuration\n");
+      }
   }
 
   return ret;
@@ -1009,31 +1012,48 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
   init_udp_server();
 #endif /* WITH_UDP_SERVER */
 
-  // Store the time where we call app_wisun_connect_and_wait()
+  // Store the time where we call app_join_network()
   connect_time_sec = now_sec();
-    // connect to the wisun network
+  // connect to the wisun network
   join_res = app_join_network(app_parameters.network_index);
 
   while (1) { // To allow a Direct Connect connection, regularly check UDP messages
+      #ifdef    WITH_DIRECT_CONNECT
+        #ifdef    WITH_UDP_SERVER
+        check_udp_server_messages();
+        #endif /* WITH_UDP_SERVER */
+      #endif /* WITH_DIRECT_CONNECT */
       now = now_sec();
       sl_wisun_get_join_state(&join_state);
       if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) break;
-      if (now % 60 == 0) {
-          printfTime("Waiting for connection to %s. join_state %d\n",
-                     WISUN_CONFIG_NETWORK_NAME, join_state);
-      } else {
+      if (join_res == SL_STATUS_OK) {
         if (now % 60 == 0) {
-            printfBothTime("Waiting for connection to \"%s\": %s. join_state %d\n",
+            printfBothTime("Waiting for connection to network[%d]: \"%s\": %s. join_state %d\n",
+                       app_parameters.network_index,
                        network[app_parameters.network_index].network_name,
                        app_wisun_phy_to_str(&network[app_parameters.network_index].phy),
                        join_state);
         }
+      } else {
+        if (join_res != SL_STATUS_OK) {
+            if (join_res == SL_STATUS_FAIL) {
+                printfBothTime("Invalid PHY\n");
+            } else {
+                printfBothTime("Check the traces and the app_join_network() code around line %d\n", join_res);
+            }
+            printfBothTime("Will not connect to \"%s\": %s. join_res %d\n",
+                       network[app_parameters.network_index].network_name,
+                       app_wisun_phy_to_str(&network[app_parameters.network_index].phy),
+                       join_res);
+            app_parameters.network_index = (app_parameters.network_index + 1) % MAX_NETWORK_CONFIGS;
+            printfBothTime("Attempting to connect to network[%d]: \"%s\": %s\n",
+                       app_parameters.network_index,
+                       network[app_parameters.network_index].network_name,
+                       app_wisun_phy_to_str(&network[app_parameters.network_index].phy));
+            connect_time_sec = now_sec();
+            join_res = app_join_network(app_parameters.network_index);
+        }
       }
-    #ifdef    WITH_DIRECT_CONNECT
-      #ifdef    WITH_UDP_SERVER
-      check_udp_server_messages();
-      #endif /* WITH_UDP_SERVER */
-    #endif /* WITH_DIRECT_CONNECT */
       osDelay(1000);
   }
 

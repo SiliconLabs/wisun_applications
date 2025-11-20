@@ -740,7 +740,6 @@ sl_wisun_coap_packet_t * coap_callback_trace_level (
   }
 return app_coap_reply(coap_response, req_packet); }
 
-
 sl_wisun_coap_packet_t * coap_callback_application_parameter (
       const  sl_wisun_coap_packet_t *const req_packet)  {
   #define MAX_PARAMETER_NAME 40
@@ -804,7 +803,6 @@ sl_wisun_coap_packet_t * coap_callback_application_parameter (
   }
 
 return app_coap_reply(coap_response, req_packet); }
-
 
 #ifdef    __APP_REPORTER_H__
 sl_wisun_coap_packet_t * coap_callback_reporter_start (
