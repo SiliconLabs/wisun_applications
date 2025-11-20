@@ -160,6 +160,44 @@ See [app_parameters.md](app_parameters.md) for details
 
 Once all devices are connected, the [`coap_all`](linux_border_router_wsbrd/coap_all) bash script allows sending the same CoAP request to all connected devices, allowing an easy monitoring of the entire network.
 
+### CoAP Install ###
+
+Depending on the Linux distribution, various `libcoap` versions are available.
+
+- `libcoap2` does not support encryption, and uses `coap-client` to process requests
+- `libcoap3` supports encryption, and enforces TLS using `coap-client`. To bypass encryption on the Wi-SUN network (the Wi-SUN data traffic is natively encrypted), use the alternate `coap-client-notls` when using `libcoap3`.
+
+#### libcoap3 installation on Debian versions not supporting it ####
+
+Some Debian distros (such as bullseye) don't support `libcoap3` natively.
+
+To install `libcoap3`
+
+- Check you distro's 'Codename':
+
+```bash
+$  lsb_release -a
+No LSB modules are available.
+Distributor ID: Raspbian
+Description:    Raspbian GNU/Linux 11 (bullseye)
+Release:        11
+Codename:       bullseye
+```
+
+Add the 'bookworm' repository list:
+
+```bash
+echo "deb http://deb.debian.org/debian bookworm main" | sudo tee /etc/apt/sources.list.d/bookworm.list
+```
+
+Install libcoap3
+
+```bash
+sudo apt install -t bookworm libcoap3 libcoap3-bin libcoap3-dev
+```
+
+- Then, use `coap-client-notls` instead of `coap-client`
+
 ### CoAP Resources ###
 
 The following resources are available via CoAP, split in several groups. To reduce the initial code size, some are only conditionally compiled:
