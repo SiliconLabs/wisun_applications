@@ -51,12 +51,14 @@
 #include "ltn_config.h"
 #  pragma message("?? Using settings from app_config.h")
 #else
-#  pragma message("?? app_config.h not found. Using default behavior")
+#  pragma message("?? app_config.h not found. Using default config")
 #endif
 
 #include "sl_wisun_api.h"
+#include "sl_wisun_app_core.h"
 #include "sl_wisun_types.h"
 #include "sl_wisun_version.h"
+#include "sl_wisun_keychain.h"
 #include "sl_wisun_trace_util.h"
 #include "sl_wisun_crash_handler.h"
 #include "sl_wisun_event_mgr.h"
@@ -434,10 +436,368 @@ void leds_flash(uint16_t count, uint16_t delay_ms) {
 }
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
+static uint16_t _get_cert_str_len(const uint8_t *cert, const uint16_t max_cert_len)
+{
+  uint16_t n = 0;
+  if (cert == NULL) {
+    return 0U;
+  }
+  for (n = 0; n < max_cert_len && *cert; n++, cert++) {
+    ;
+  }
+  return n;
+}
+
+static uint8_t app_join_network(uint8_t network_index) {
+  sl_status_t ret;
+  sl_wisun_connection_params_t connection_params;
+  sl_wisun_join_state_t join_state;
+  //sl_wisun_channel_mask_t channel_mask;
+  //sl_wisun_lfn_params_t lfn_params;
+  uint8_t phy_mode_id_count, is_mdr_command_capable;
+  uint8_t phy_mode_id[SL_WISUN_MAX_PHY_MODE_ID_COUNT];
+  uint8_t *phy_mode_id_p, *phy_mode_id_count_p;
+#if SL_RAIL_IEEE802154_SUPPORTS_G_MODE_SWITCH
+  bool set_pom_ie = false;
+#endif
+  uint8_t trustedca_count;
+  uint8_t idx;
+  sl_wisun_keychain_entry_t *trustedca = NULL;
+  sl_wisun_keychain_credential_t *credential = NULL;
+  uint16_t certificate_options;
+
+  app_settings_wisun_t this_network;
+
+#if SL_RAIL_IEEE802154_SUPPORTS_G_MODE_SWITCH
+  bool set_pom_ie = false;
+#endif
+
+  app_parameter_mutex_acquire();
+  sl_wisun_get_join_state(&join_state);
+
+  app_parameters.network_index = network_index % MAX_NETWORK_CONFIGS;
+  this_network = network[app_parameters.network_index];
+  if (join_state != SL_WISUN_JOIN_STATE_DISCONNECTED) {
+    printfBothTime("Not disconnected: disconnect\r\n");
+    sl_wisun_disconnect();
+  }
+
+  ret = sl_wisun_set_device_type((sl_wisun_device_type_t)this_network.device_type);
+  if (ret != SL_STATUS_OK) {
+    printfBothTime("[Failed: unable to set device type to %d: %lu]\r\n", this_network.device_type, ret);
+    ret = __LINE__; goto cleanup;
+  }
+
+  if (this_network.device_type == SL_WISUN_ROUTER) {
+    switch (this_network.network_size) {
+      case SL_WISUN_NETWORK_SIZE_SMALL:
+        connection_params = SL_WISUN_PARAMS_PROFILE_SMALL;
+        break;
+      case SL_WISUN_NETWORK_SIZE_MEDIUM:
+        connection_params = SL_WISUN_PARAMS_PROFILE_MEDIUM;
+        break;
+      case SL_WISUN_NETWORK_SIZE_LARGE:
+        connection_params = SL_WISUN_PARAMS_PROFILE_LARGE;
+        break;
+      case SL_WISUN_NETWORK_SIZE_TEST:
+        connection_params = SL_WISUN_PARAMS_PROFILE_TEST;
+        break;
+      case SL_WISUN_NETWORK_SIZE_CERTIFICATION:
+        connection_params = SL_WISUN_PARAMS_PROFILE_CERTIF;
+        break;
+      default:
+        printfBothTime("[Failed: unsupported network size]\r\n");
+        ret = __LINE__; goto cleanup;
+    }
+    connection_params.traffic.lowpan_mtu = this_network.lowpan_mtu;
+    connection_params.traffic.ipv6_mru = this_network.ipv6_mru;
+    connection_params.traffic.max_edfe_fragment_count = this_network.max_edfe_fragment_count;
+
+    ret = sl_wisun_set_connection_parameters(&connection_params);
+  }
+
+  if (ret != SL_STATUS_OK) {
+    printfBothTime("[Failed: unable to set network size: %lu]\r\n", ret);
+    ret = __LINE__; goto cleanup;
+  }
+
+  ret = sl_wisun_config_neighbor_table(this_network.max_child_count, this_network.max_neighbor_count, this_network.max_security_neighbor_count);
+  if (ret != SL_STATUS_OK) {
+    printfBothTime("[Failed: unable to set neighbor table sizes (%d, %d, %d): %lu]\r\n", this_network.max_child_count, this_network.max_neighbor_count, this_network.max_security_neighbor_count, ret);
+    ret = __LINE__; goto cleanup;
+  }
+
+  if (this_network.device_type == SL_WISUN_ROUTER) {
+    ret = sl_wisun_set_preferred_pan(this_network.preferred_pan_id);
+    if (ret != SL_STATUS_OK) {
+      printfBothTime("[Failed: unable to set preferred PAN: %lu]\r\n", ret);
+      ret = __LINE__; goto cleanup;
+    }
+  }
+#ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+  if (this_network.device_type == SL_WISUN_LFN) {
+    switch (this_network.lfn_profile) {
+      case SL_WISUN_LFN_PROFILE_TEST:
+        lfn_params = SL_WISUN_PARAMS_LFN_TEST;
+        break;
+      case SL_WISUN_LFN_PROFILE_BALANCED:
+        lfn_params = SL_WISUN_PARAMS_LFN_BALANCED;
+        break;
+      case SL_WISUN_LFN_PROFILE_ECO:
+        lfn_params = SL_WISUN_PARAMS_LFN_ECO;
+        break;
+      default:
+        printfBothTime("[Failed: unsupported LFN profile]\r\n");
+        ret = __LINE__; goto cleanup;
+    }
+    ret = sl_wisun_set_lfn_parameters(&lfn_params);
+    if (ret != SL_STATUS_OK) {
+      printfBothTime("[Failed: unable to set LFN parameters: %lu]\r\n", ret);
+      ret = __LINE__; goto cleanup;
+    }
+  }
+#endif /* SL_CATALOG_WISUN_FFN_DEVICE_SUPPORT_PRESENT */
+
+  ret = sl_wisun_set_tx_power_ddbm(this_network.tx_power_ddbm);
+  if (ret != SL_STATUS_OK) {
+    printfBothTime("[Failed: unable to set TX power: %lu]\r\n", ret);
+    ret = __LINE__; goto cleanup;
+  }
+
+#if defined(WISUN_CONFIG_DDP)
+  trustedca_count = sl_wisun_keychain_get_trustedca_count();
+#else    /* WISUN_CONFIG_DDP */
+  trustedca_count = 0;
+#endif   /* WISUN_CONFIG_DDP */
+  certificate_options = SL_WISUN_CERTIFICATE_OPTION_IS_REF;
+  if (!trustedca_count) {
+    printfBothTime("No trusted CA keychain, init from builtin credentials\r\n");
+    const uint32_t max_cert_str_len = 2048U;
+
+    // set the trusted certificate
+    ret = sl_wisun_set_trusted_certificate(SL_WISUN_CERTIFICATE_OPTION_IS_REF,
+                                           _get_cert_str_len(wisun_config_ca_certificate, max_cert_str_len) + 1,
+                                           wisun_config_ca_certificate);
+    if (ret != SL_STATUS_OK) {
+      printf("[Failed: unable to set the trusted certificate: %lu]\n", ret);
+      return ret;
+    }
+
+    // set the device certificate
+    ret = sl_wisun_set_device_certificate(SL_WISUN_CERTIFICATE_OPTION_IS_REF | SL_WISUN_CERTIFICATE_OPTION_HAS_KEY,
+                                          _get_cert_str_len(wisun_config_device_certificate, max_cert_str_len) + 1,
+                                          wisun_config_device_certificate);
+    if (ret != SL_STATUS_OK) {
+      printf("[Failed: unable to set the device certificate: %lu]\n", ret);
+      return ret;
+    }
+
+    // set the device private key
+    // NOTE: to use a wrapped PSA private key, the app needs to import the key
+    // and use the API sl_wisun_set_device_private_key_id() instead of the one below
+    ret = sl_wisun_set_device_private_key(SL_WISUN_PRIVATE_KEY_OPTION_IS_REF,
+                                          _get_cert_str_len(wisun_config_device_private_key, max_cert_str_len) + 1,
+                                          wisun_config_device_private_key);
+    if (ret != SL_STATUS_OK) {
+      printf("[Failed: unable to set the device private key: %lu]\n", ret);
+      return ret;
+    }
+
+  } else {
+    printfBothTime("%d trusted CA keychains\r\n", trustedca_count);
+    for (idx = 0; idx < trustedca_count; ++idx) {
+      trustedca = sl_wisun_keychain_get_trustedca(idx);
+      if (!trustedca) {
+        printf("[Failed to load trusted CA]\r\n");
+        ret = __LINE__; goto cleanup;
+      }
+      if (trustedca->keychain == SL_WISUN_KEYCHAIN_NVM) {
+        printf("[Using NVM trusted CA #%u]\r\n", idx);
+      } else if (trustedca->keychain == SL_WISUN_KEYCHAIN_BUILTIN) {
+        printf("[Using built-in trusted CA #%u]\r\n", idx);
+      }
+
+      ret = sl_wisun_set_trusted_certificate(certificate_options,
+                                             trustedca->data_length,
+                                             trustedca->data);
+      if (ret != SL_STATUS_OK) {
+        printfBothTime("[Failed: unable to set the trusted certificate: %lu]\r\n", ret);
+        ret = __LINE__; goto cleanup;
+      }
+
+      sl_free(trustedca);
+      trustedca = NULL;
+      certificate_options |= SL_WISUN_CERTIFICATE_OPTION_APPEND;
+    }
+
+    credential = sl_wisun_keychain_get_credential((sl_wisun_keychain_t)this_network.keychain, this_network.keychain_index);
+    if (!credential) {
+      printfBothTime("[Failed: unable to load credential for keychain %d]\r\n", this_network.keychain_index);
+      //ret = __LINE__; goto cleanup;
+    }
+    if (credential->certificate.keychain == SL_WISUN_KEYCHAIN_NVM) {
+      printf("[Using NVM device credentials]\r\n");
+    } else if (credential->certificate.keychain == SL_WISUN_KEYCHAIN_BUILTIN) {
+      printf("[Using built-in device credentials]\r\n");
+    }
+
+    ret = sl_wisun_set_device_certificate(SL_WISUN_CERTIFICATE_OPTION_IS_REF | SL_WISUN_CERTIFICATE_OPTION_HAS_KEY,
+                                          credential->certificate.data_length,
+                                          credential->certificate.data);
+    if (ret != SL_STATUS_OK) {
+      printfBothTime("[Failed: unable to set the device certificate: %lu]\r\n", ret);
+      ret = __LINE__; goto cleanup;
+    }
+
+    if (credential->pk.type == SL_WISUN_KEYCHAIN_KEY_TYPE_PLAINTEXT) {
+      ret = sl_wisun_set_device_private_key(SL_WISUN_PRIVATE_KEY_OPTION_IS_REF,
+                                            credential->pk.u.plaintext.data_length,
+                                            credential->pk.u.plaintext.data);
+    } else {
+      ret = sl_wisun_set_device_private_key_id(credential->pk.u.key_id);
+    }
+    if (ret != SL_STATUS_OK) {
+      printfBothTime("[Failed: unable to set the device private key: %lu]\r\n", ret);
+      ret = __LINE__; goto cleanup;
+    }
+  }
+
+/*
+  ret = app_settings_get_channel_mask(this_network.allowed_channels, &channel_mask);
+  ret = sl_wisun_set_channel_mask(&channel_mask);
+  if (ret != SL_STATUS_OK) {
+    printfBothTime("[Failed: unable to set channel mask: %lu]\r\n", ret);
+    res = __LINE__; goto cleanup;
+  }
+*/
+  if (this_network.device_type == SL_WISUN_ROUTER) {
+    ret = sl_wisun_set_unicast_settings(this_network.uc_dwell_interval_ms);
+    if (ret != SL_STATUS_OK) {
+      printfBothTime("[Failed: unable to set unicast settings: %lu]\r\n", ret);
+      ret = __LINE__; goto cleanup;
+    }
+  }
+
+  ret = sl_wisun_set_regulation((sl_wisun_regulation_t)this_network.regulation);
+  if (ret != SL_STATUS_OK) {
+    printfBothTime("[Failed: unable to set regional regulation: %lu]\r\n", ret);
+    ret = __LINE__; goto cleanup;
+  }
+
+  ret = sl_wisun_set_regulation_tx_thresholds(this_network.regulation_warning_threshold,
+                                              this_network.regulation_alert_threshold);
+  if (ret != SL_STATUS_OK) {
+    printfBothTime("[Failed: unable to set regulation TX thresholds: %lu]\r\n", ret);
+  }
+
+#if 0
+  ret = sl_wisun_set_pti_state(this_network.pti_state);
+  if (ret != SL_STATUS_OK) {
+    printf("[Failed to set PTI state]\r\n");
+    ret = __LINE__; goto cleanup;
+  }
+#endif
+
+  #if SLI_WISUN_DISABLE_SECURITY
+  ret = sl_wisun_set_security_state(app_security_state);
+  if (ret != SL_STATUS_OK) {
+    printf("[Failed to set security state %"PRIu32"]\r\n", app_security_state);
+    ret = __LINE__; goto cleanup;
+  }
+#endif
+/*
+  // As per RFC3748, "The Identity Response field MUST NOT be null terminated"
+  ret = sl_wisun_set_eap_identity(strlen(this_network.eap_identity),
+                                  (const uint8_t *)this_network.eap_identity);
+  if (ret != SL_STATUS_OK) {
+    printf("[Failed to set EAP identity]\r\n");
+    ret = __LINE__; goto cleanup;
+  }
+*/
+  ret = sl_wisun_join((const uint8_t *)this_network.network_name, &this_network.phy);
+  if (ret == SL_STATUS_OK) {
+    printf("[Connecting to \"%s\"]\r\n", this_network.network_name);
+    printfBothTime("Network %d: %s\n",
+        app_parameters.network_index,
+        app_wisun_phy_to_str(&(network[app_parameters.network_index].phy)));
+  } else {
+    printf("[Connection failed: %lu]\r\n", ret);
+    if (ret != SL_STATUS_OK) {
+        sl_wisun_get_join_state(&join_state);
+        if (join_state == SL_WISUN_JOIN_STATE_DISCONNECTED) {
+            printfBothTime("Network %d: Incorrect PHY selection: Will never connect on %s\n",
+                app_parameters.network_index,
+                app_wisun_phy_to_str(&(network[app_parameters.network_index].phy)));
+        }
+    }
+    ret = __LINE__; goto cleanup;
+  }
+
+
+#if SL_RAIL_IEEE802154_SUPPORTS_G_MODE_SWITCH
+  // Configure POM-IE
+  // If PhyModeIds are set by user, send them to the stack, otherwise
+  // retrieve the default PhyModeIds from the stack first
+  if (app_settings_wisun.rx_phy_mode_ids_count == 0) {
+    // Check if default PhyList can be retrieved from device
+    if (sl_wisun_get_pom_ie(&phy_mode_id_count, phy_mode_id, &is_mdr_command_capable) == SL_STATUS_OK) {
+      phy_mode_id_p = phy_mode_id;
+      phy_mode_id_count_p = &phy_mode_id_count;
+
+      if (is_mdr_command_capable != app_settings_wisun.rx_mdr_capable) {
+        set_pom_ie = true;
+      }
+    } else {
+      // POM-IE not available
+      ret = __LINE__; goto cleanup;
+    }
+  } else {
+    // Set by user
+    phy_mode_id_p = app_settings_wisun.rx_phy_mode_ids;
+    phy_mode_id_count_p = &app_settings_wisun.rx_phy_mode_ids_count;
+    set_pom_ie = true;
+  }
+
+  if (set_pom_ie) {
+    ret = sl_wisun_set_pom_ie(*phy_mode_id_count_p,
+                              phy_mode_id_p,
+                              app_settings_wisun.rx_mdr_capable);
+    if (ret != SL_STATUS_OK) {
+      printfBothTime("[Failed: unable to set RX PhyModeId list: %lu]\r\n", ret);
+      ret = __LINE__; goto cleanup;
+    }
+  }
+#else
+  (void)phy_mode_id_count;
+  (void)is_mdr_command_capable;
+  (void)phy_mode_id;
+  (void)phy_mode_id_p;
+  (void)phy_mode_id_count_p;
+#endif
+
+cleanup:
+
+  if (trustedca) {
+    sl_free(trustedca);
+  }
+  if (credential) {
+    sl_free(credential);
+  }
+
+  app_parameter_mutex_release();
+
+  if (ret != SL_STATUS_OK) {
+      printfBothTime("app_join_network(%d) failed around line %ld\n", app_parameters.network_index, ret);
+  }
+
+  return ret;
+}
+
 /* App task function*/
 void app_task(void *args)
 {
   (void) args;
+  uint16_t join_res = 0;
   uint64_t now = 0;
   uint64_t connection_timestamp;
   uint64_t connected_delay_sec;
@@ -588,25 +948,22 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
   startup_option = B0 + (B1 << 1);
   printfBothTime("Startup option %d ('%d%d')\n", startup_option, B1, B0);
   check_buttons = true;
-  app_parameters.selected_device_type = SL_WISUN_ROUTER;
+  network[app_parameters.network_index].device_type = SL_WISUN_ROUTER;
   if (startup_option == 1) {
-    nvm3_eraseAll(nvm3_defaultHandle);
-    printfBothTime("Cleared entire NVM (startup_option 1)\n");
+    sl_wisun_clear_credential_cache();
+    printfBothTime("Cleared credential cache (startup_option 1)\n");
   }
   if (startup_option == 2) {
-    app_parameters.selected_device_type = SL_WISUN_LFN;
+      network[app_parameters.network_index].device_type = SL_WISUN_LFN;
     printfBothTime("Starting as LFN (startup_option = 2)\n");
-  }
-  if (startup_option == 3) {
-    nvm3_deleteObject(nvm3_defaultHandle, NVM3_APP_KEY);
-    printfBothTime("Application parameters deleted from NVM\n");
+    sprintf(device_type, "LFN by user choice");
   }
 #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
 
-printfBothTime("device_type %s\n", device_type);
+  printfBothTime("device_type %s\n", device_type);
 
 #ifdef    WITH_DIRECT_CONNECT
-  if (app_parameters.selected_device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
+  if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
     // Register our Direct Connect custom callback function with the event manager (aka 'em')
     app_wisun_em_custom_callback_register(SL_WISUN_MSG_DIRECT_CONNECT_LINK_AVAILABLE_IND_ID, app_direct_connect_custom_callback);
     app_wisun_em_custom_callback_register(SL_WISUN_MSG_DIRECT_CONNECT_LINK_STATUS_IND_ID   , app_direct_connect_custom_callback);
@@ -654,10 +1011,8 @@ printfBothTime("device_type %s\n", device_type);
 
   // Store the time where we call app_wisun_connect_and_wait()
   connect_time_sec = now_sec();
-  #ifdef    SL_CATALOG_WISUN_APP_CORE_PRESENT
     // connect to the wisun network
-  sl_wisun_app_core_network_connect();
-  #endif /* SL_CATALOG_WISUN_APP_CORE_PRESENT */
+  join_res = app_join_network(app_parameters.network_index);
 
   while (1) { // To allow a Direct Connect connection, regularly check UDP messages
       now = now_sec();
@@ -666,6 +1021,13 @@ printfBothTime("device_type %s\n", device_type);
       if (now % 60 == 0) {
           printfTime("Waiting for connection to %s. join_state %d\n",
                      WISUN_CONFIG_NETWORK_NAME, join_state);
+      } else {
+        if (now % 60 == 0) {
+            printfBothTime("Waiting for connection to \"%s\": %s. join_state %d\n",
+                       network[app_parameters.network_index].network_name,
+                       app_wisun_phy_to_str(&network[app_parameters.network_index].phy),
+                       join_state);
+        }
       }
     #ifdef    WITH_DIRECT_CONNECT
       #ifdef    WITH_UDP_SERVER
@@ -1071,7 +1433,7 @@ char* _connection_json_string () {
     sec_string,
     msg_count,
     network_info.pan_id, network_info.pan_id,
-    app_parameters.preferred_pan_id, app_parameters.preferred_pan_id,
+    network[app_parameters.network_index].preferred_pan_id, network[app_parameters.network_index].preferred_pan_id,
     network_info.hop_count,
     app_join_state_delay_sec[1],
     app_join_state_delay_sec[2],
