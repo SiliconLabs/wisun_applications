@@ -7,6 +7,20 @@ The app_parameters code is split in 2 files:
 
 ## General features ##
 
+A typical CoAP request is (use `coap-client` when using `libcoap2`, `coap-client-notls` when using `libcoap3`):
+
+```bash
+coap-client-notls -m get -N -B 10 -t text coap://[<IPv6>]:5683/<CoAP URI> -e "<payload>"
+```
+
+Example
+
+```bash
+coap-client-notls -m get -N -B 10 -t text coap://[fd12:3456::62a4:23ff:fe37:aee6]:5683/settings/parameter -e "app_parameters"
+```
+
+The following URIs are used to manage general items
+
 | CoAP request | CoAP URI           | payload                                         | usage                                                       |
 |--------------|------------------- |-------------------------------------------------|-------------------------------------------------------------|
 | -m put       | settings/parameter | -e "defaults  `value`"                          | set app_parameters to the defaults, using `value` as a bitfield to select networks. Use `0` to set all |
