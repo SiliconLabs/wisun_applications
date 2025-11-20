@@ -746,43 +746,63 @@ sl_wisun_coap_packet_t * coap_callback_application_parameter (
   #define MAX_PARAMETER_NAME 40
   char parameter_name[MAX_PARAMETER_NAME];
   char* payload_str = NULL;
+  char  value_str[1000];
   int value = 0;
-  int res;
-  sl_status_t set_get_res = SL_STATUS_NOT_SUPPORTED;
+  int index = 10;
+  int done  = 0;
 
   // Reset parameter_name tab
   memset(parameter_name, 0, MAX_PARAMETER_NAME);
+
   if (req_packet->payload_len) {
     // Get payload in string format with last char = '\0'
     payload_str = sl_wisun_coap_get_payload_str(req_packet);
-    if (payload_str != NULL ){
-      res = sscanf((char *)payload_str, "%39s %d",
-                   parameter_name, &value);
+    sprintf(value_str, "%s", "(no_value_str)");
+    printfBothTime("coap_request code %d, payload %s\n", req_packet->msg_code, payload_str);
+    if (payload_str != NULL ) {
 
-
-
-      if (res == 2) {
-          // Process /settings/parameter -e "<name> <value>"
-          set_get_res = set_app_parameter(parameter_name,  value);
-      } else {
-          res = sscanf((char *)payload_str, "%39s", parameter_name);
-        if (res == 1) {
-            // Process /settings/parameter -e "<name>"
-            set_get_res = get_app_parameter(parameter_name, &value);
+        if (req_packet->msg_code == COAP_MSG_CODE_REQUEST_PUT) {
+          if (done == 0) { // PUT <parameter> <int> <int>
+            if (3 == sscanf((char *)payload_str, "%s %d %d", parameter_name, &index, &value)) { done++; }
+          }
+          if (done == 0) { // PUT <parameter> <int> <str>
+            if (3 == sscanf((char *)payload_str, "%s %d %s", parameter_name, &index, value_str)) { done++; }
+          }
+          if (done == 0) { // PUT <parameter> <int>
+            if  (2 == sscanf((char *)payload_str, "%s %d", parameter_name, &value)) { done++; }
+          }
+          if (done) {
+            set_app_parameter(parameter_name, index, value, value_str);
+            snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", value_str);
+          } else {
+            snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Can not PUT app_parameter %s", parameter_name);
+          }
         }
-      }
+
+        if (req_packet->msg_code == COAP_MSG_CODE_REQUEST_GET) {
+          if (done == 0) { // GET <parameter> <int> <str>
+            if (2 == sscanf((char *)payload_str, "%s %d", parameter_name, &index)) { done++; }
+          }
+          if (done == 0) { // GET <parameter>
+            if (1 == sscanf((char *)payload_str, "%s", parameter_name)) { done++; }
+          }
+          // Conclusion
+          if (done) {
+            get_app_parameter(parameter_name, index, &value, value_str);
+            snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", value_str);
+          } else {
+            snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Can not GET app_parameter %s", parameter_name);
+          }
+
+        }
       // Free payload_str
       sl_wisun_coap_free(payload_str);
     }
-    else{
-        set_get_res = SL_STATUS_ALLOCATION_FAILED;
-    }
-  }
-  if (set_get_res == SL_STATUS_OK) {
-      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", value);
   } else {
-      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Error : 0x%lX", set_get_res);
+      snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
+               "Missing payload. Use: put settings/parameter -e \"parameter_name [int] [int|str]\" or  get settings/parameter -e \"parameter_name [int]\"");
   }
+
 return app_coap_reply(coap_response, req_packet); }
 
 
