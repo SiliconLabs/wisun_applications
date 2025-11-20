@@ -471,13 +471,12 @@ void app_task(void *args)
 
   osDelay(1000);
   printf("\n");
-  sprintf(chip, "%s", CHIP);
 #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
   snprintf(application, 100, "%s %s %s %s %d.%d", chip, SL_BOARD_NAME, "Wi-SUN Node Monitoring", APP_VERSION_STRING, START_FLASHES_A, START_FLASHES_B);
 #else  /* SL_CATALOG_SIMPLE_LED_PRESENT */
   snprintf(application, 100, "%s %s %s %s", chip, SL_BOARD_NAME, "Wi-SUN Node Monitoring", APP_VERSION_STRING);
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
-  printfBothTime("%s/%s %s\n", chip, SL_BOARD_NAME, application);
+  printfBothTime("%s\n", application);
   snprintf(version, 80, "Compiled on %s at %s", __DATE__, __TIME__);
 
 #ifdef    SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT
@@ -497,16 +496,15 @@ void app_task(void *args)
   printfBothTime("%s\n", application);
   printfBothTime("%s\n", version);
 
-  printfBothTime("Network %s\n", WISUN_CONFIG_NETWORK_NAME);
+  printfBothTime("Network %s\n",
+    network[app_parameters.network_index].network_name);
 #ifdef    SL_CATALOG_APP_OS_STAT_PRESENT
 #ifdef APP_OS_STAT_UPDATE_PERIOD_TIME_MS
 printfBothTime("with app_os_stat every %d ms\n", APP_OS_STAT_UPDATE_PERIOD_TIME_MS);
 #endif /* APP_OS_STAT_UPDATE_PERIOD_TIME_MS */
 #endif /* SL_CATALOG_APP_OS_STAT_PRESENT */
-printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(WISUN_CONFIG_NETWORK_SIZE));
-#ifdef    WISUN_CONFIG_TX_POWER
-  printfBothTime("Tx Power %d dBm\n", WISUN_CONFIG_TX_POWER);
-#endif /* WISUN_CONFIG_TX_POWER */
+printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
+    network[app_parameters.network_index].network_size));
 #ifdef    WISUN_CONFIG_BROADCAST_RETRIES
   printfBothTime("Broadcast Retries %d\n", WISUN_CONFIG_BROADCAST_RETRIES);
 #endif /* WISUN_CONFIG_BROADCAST_RETRIES */
@@ -628,15 +626,6 @@ printfBothTime("device_type %s\n", device_type);
   list_rf_configs();
 #endif /* LIST_RF_CONFIGS */
 
-  if (app_parameters.set_leaf) {
-      if (app_parameters.selected_device_type == SL_WISUN_ROUTER) {
-          sl_wisun_set_leaf(true);
-          printfBothTime("LEAF mode %d\n", app_parameters.set_leaf);
-      } else {
-          printfBothTime("LEAF mode %d is incompatible with device_type %d\n",
-                app_parameters.set_leaf, app_parameters.selected_device_type);
-      }
-  }
   printfBothTime("app_parameters.auto_send_sec %d\n", app_parameters.auto_send_sec);
 
 #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
@@ -654,9 +643,6 @@ printfBothTime("device_type %s\n", device_type);
   // If LEDs stay at 0: check selected PHY vs Radio Config
   set_leds(0, 0);
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
-
-  sl_wisun_set_preferred_pan(app_parameters.preferred_pan_id);
-  printfBothTime("preferred_pan_id 0x%04x\n", app_parameters.preferred_pan_id);
 
 #ifdef WITH_TCP_SERVER
   init_tcp_server();
@@ -931,10 +917,10 @@ sl_wisun_mac_address_t _get_parent_mac_address_and_update_parent_info(void) {
   }
 
   ret = sl_wisun_get_neighbor_count(&neighbor_count);
-  if (ret) printf("[Failed: sl_wisun_get_neighbor_count() returned 0x%04x]\n", (uint16_t)ret);
+  if (ret) {printfBothTime("[Failed: sl_wisun_get_neighbor_count() returned 0x%04x]\n", (uint16_t)ret);}
   sl_wisun_mac_address_t neighbor_mac_addresses[neighbor_count];
   ret = sl_wisun_get_neighbors(&neighbor_count, neighbor_mac_addresses);
-  if (ret) printf("[Failed: sl_wisun_get_neighbors() returned 0x%04x]\n", (uint16_t)ret);
+  if (ret) {printfBothTime("[Failed: sl_wisun_get_neighbors() returned 0x%04x]\n", (uint16_t)ret);}
   for (i = 0 ; i < neighbor_count; i++) {
       sl_wisun_get_neighbor_info(&neighbor_mac_addresses[i], &neighbor_info);
       if (neighbor_info.type == SL_WISUN_NEIGHBOR_TYPE_PRIMARY_PARENT) {
@@ -1045,7 +1031,9 @@ void  _check_neighbors(void) {
   uint8_t neighbor_count;
   uint8_t i;
   ret = sl_wisun_get_neighbor_count(&neighbor_count);
-  if (ret) printf("[Failed: sl_wisun_get_neighbor_count() returned 0x%04x]\n", (uint16_t)ret);
+  if (ret) {
+      printfBothTime("[Failed: sl_wisun_get_neighbor_count() returned 0x%04x]\n", (uint16_t)ret);
+  }
   if (neighbor_count == 0) {
     printf(" no neighbor\n");
   } else {
