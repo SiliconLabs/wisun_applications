@@ -125,7 +125,7 @@ char* network_string(int i) {
   "\"tx_power_ddbm\": \"%d\",\n" \
   "\"max_child_count\": \"%d\",\n" \
   "\"max_neighbor_count\": \"%d\",\n" \
-  "\"max_security_neighbor_count\": \"%d\",\n"
+  "\"max_security_neighbor_count\": \"%d\""
   snprintf(res_string, 1000, NETWORK_FORMAT_STR,
           i,
           network[i].network_name,
@@ -162,7 +162,7 @@ char* app_parameters_string() {
   "\"nb_crashes\": \"%d\",\n" \
   "\"auto_send_sec\": \"%d\",\n" \
   "\"network_count\": \"%d\",\n" \
-  "\"network_index\": \"%d\",\n"
+  "\"network_index\": \"%d\""
 
   snprintf(res_string, 1000, PARAMETERS_FORMAT_STR,
           app_parameters.app_params_version,
@@ -302,8 +302,27 @@ sl_status_t set_app_parameter(char* parameter_name, int index, int value, char* 
     if (match) {
         // Set all defaults
         set_app_parameters_defaults(value);
-        // Save default settings if passed a value with bit 2 set
-        if (value & 0x11) { save_app_parameters(); }
+        // Save default settings if passed a value different from 0
+        if (value & ((1 << MAX_NETWORK_CONFIGS) -1)) {
+            save_app_parameters();
+            sprintf(value_str, "set defaults and autosaved for networks matching 0x%02x bitfield", value);
+        } else {
+            sprintf(value_str, "set all defaults (no autosave), use 'save' before rebooting");
+        }
+        printfBothTime("%s\n", value_str);
+        return SL_STATUS_OK;
+    }
+  }
+  if  (!match) { match = (sl_strcasecmp(parameter_name, "save") == 0);
+    if (match) {
+      value = (uint16_t)save_app_parameters();
+      if (value == SL_STATUS_OK) {
+          sprintf(value_str, "saved to nvm3 with success %d networks", MAX_NETWORK_CONFIGS);
+      } else {
+          sprintf(value_str, "nvm3 save  error: %d", value);
+      }
+      printfBothTime("%s\n", value_str);
+      return SL_STATUS_OK;
     }
   }
   // reboot options
@@ -405,9 +424,6 @@ sl_status_t get_app_parameter(char* parameter_name, int index, int* value, char*
   index = index;
   value_str = value_str;
   printfBothTime("get_app_parameter(%s, index %d, *value, *value_str)\n", parameter_name, index);
-  if  (!match) { match = (sl_strcasecmp(parameter_name, "save") == 0);
-    if (match) { *value = (uint16_t)save_app_parameters(); }
-  }
   if  (!match) { match = (sl_strcasecmp(parameter_name, "nb_boots") == 0);
     if (match) { *value = (uint16_t)app_parameters.nb_boots; }
   }

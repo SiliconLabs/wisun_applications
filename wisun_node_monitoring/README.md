@@ -30,7 +30,7 @@ The block diagram of this application is shown in the image below:
 
 ## Simplicity SDK Version ##
 
-SiSDK v2025.06.1
+SiSDK v2025.06.2
 
 ## Hardware Required ##
 
@@ -154,26 +154,7 @@ The `app_parameters.c/.h` code allows
 - Rebooting
 
 It can be easily extended to support any additional application parameter.
-
-| `set/get` Application Parameter | Comments |
-|-----------------------------|----------|
-| `auto_send_sec`             | Delay between 2 notification messages |
-| `neighbor_table_size`       | Max Number of RPL neighbors in table (ín range'devices) |
-| `preferred_pan_id`          | Preferred PAN id to use if receiving PAs from this PAN ID. Default ('none') = `0x0000` |
-| `selected_device_type`      | Control of device type (if enabled by installed components) |
-| `set_leaf`                  | Control of FFN LEAF device |
-| `tx_power_ddbm`             | Tx Output Power |
-
-| `get` only Application Parameter | Comments |
-|----------------------------------|----------|
-| `nb_boots`                       | Number of times the device booted |
-| `nb_crashes`                     | Number of times the crash handler has been called |
-
-| Application Parameter controls | Comments |
-|--------------------------------|----------|
-| `defaults`                     | Reset all parameters to defaults from `set_app_parameters_defaults()`. Call with `<value>` > 0 to directly save once set |
-| `save`                         | Save current parameter set to NVM |
-| `reboot <delay>`               | Reboot in `delay`seconds. Convenient to reboot all devices using a multicast message while leaving enough time for the message to propagate |
+See [app_parameters.md](app_parameters.md) for details
 
 ### Normal Mode ###
 
