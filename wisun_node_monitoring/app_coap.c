@@ -848,7 +848,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "tag";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_device;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -856,7 +856,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "tag";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_chip;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -864,7 +864,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "txt";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_board;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -872,7 +872,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "text";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_device_type;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -880,7 +880,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "text";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_application;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -888,7 +888,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "text";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_version;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -904,7 +904,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "text";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_send_status_msg;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -912,7 +912,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "dhms";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_running;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -920,7 +920,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "tag";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_parent;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -928,7 +928,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "json";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_neighbor;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -937,7 +937,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "dhms";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_connected;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -945,7 +945,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "array";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_join_states_sec;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -953,7 +953,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "dhms";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_disconnected_total;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -961,7 +961,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "int";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_connections;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -969,7 +969,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "dhms";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_connected_total;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -977,6 +977,14 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "ratio";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_availability;
+  coap_resource.discoverable = false;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/statistics/app/all";
+  coap_resource.data.resource_type = "json";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_all_app_statistics;
   coap_resource.discoverable = true;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
@@ -1002,14 +1010,6 @@ uint8_t app_coap_resources_init() {
 #endif /* HISTORY */
 
 #endif /* COAP_APP_STATISTICS */
-
-  coap_resource.data.uri_path = "/statistics/app/all";
-  coap_resource.data.resource_type = "json";
-  coap_resource.data.interface = "node";
-  coap_resource.auto_response = coap_callback_all_app_statistics;
-  coap_resource.discoverable = true;
-  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
-  count++;
 
 #ifdef    COAP_STACK_STATISTICS
   coap_resource.data.uri_path = "/statistics/stack/phy";
