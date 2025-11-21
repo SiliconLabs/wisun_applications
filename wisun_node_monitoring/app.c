@@ -448,7 +448,7 @@ static uint16_t _get_cert_str_len(const uint8_t *cert, const uint16_t max_cert_l
   return n;
 }
 
-static uint8_t app_join_network(uint8_t network_index) {
+uint8_t app_join_network(uint8_t network_index) {
   sl_status_t ret;
   sl_wisun_connection_params_t connection_params;
   sl_wisun_join_state_t join_state;
@@ -716,10 +716,10 @@ static uint8_t app_join_network(uint8_t network_index) {
 */
   ret = sl_wisun_join((const uint8_t *)this_network.network_name, &this_network.phy);
   if (ret == SL_STATUS_OK) {
-    printf("[Connecting to \"%s\"]\r\n", this_network.network_name);
-    printfBothTime("Network[%d]: %s\n",
-        app_parameters.network_index,
-        app_wisun_phy_to_str(&(network[app_parameters.network_index].phy)));
+    printfBothTime("[Connecting to Network[%d]: \"%s\": %s]\r\n",
+          app_parameters.network_index,
+          this_network.network_name,
+          app_wisun_phy_to_str(&(network[app_parameters.network_index].phy)));
   } else {
     printf("[Join failed: %lu]\r\n", ret);
     if (ret == SL_STATUS_FAIL) {
