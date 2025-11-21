@@ -47,13 +47,6 @@
 #include "sl_string.h"
 #include "sl_memory_manager.h"
 
-#if __has_include("ltn_config.h")
-#include "ltn_config.h"
-#  pragma message("?? Using settings from app_config.h")
-#else
-#  pragma message("?? app_config.h not found. Using default config")
-#endif
-
 #include "sl_wisun_api.h"
 #include "sl_wisun_app_core.h"
 #include "sl_wisun_types.h"

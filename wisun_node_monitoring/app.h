@@ -51,6 +51,13 @@ extern "C" {
 #include "app_timestamp.h"
 #include "app_rtt_traces.h"
 
+#if __has_include("ltn_config.h")
+#include "ltn_config.h"
+#  pragma message("?? Using settings from app_config.h")
+#else
+#  pragma message("?? app_config.h not found. Using default config")
+#endif
+
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
