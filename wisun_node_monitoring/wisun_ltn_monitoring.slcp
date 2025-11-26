@@ -22,6 +22,7 @@ quality: experimental
 
 readme:
 - {path: README.md}
+- [path: app_parameters.md}
 
 source:
 - {path: app_check_neighbors.c}
