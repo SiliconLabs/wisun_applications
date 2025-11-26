@@ -67,7 +67,7 @@
 #include "sl_sleeptimer.h"
 #include "SEGGER_RTT.h"
 
-#define TIMESTAMP_MSG_LEN 1024
+#define TIMESTAMP_MSG_LEN 1400
 extern char timestamped_msg_buffer[TIMESTAMP_MSG_LEN];
 extern char *timestamped_msg;
 
