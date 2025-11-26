@@ -636,7 +636,7 @@ bool _check_stack_statistics_reset(sl_wisun_statistics_type_t statistics_type,
 sl_wisun_coap_packet_t * coap_callback_phy_statistics (
       const  sl_wisun_coap_packet_t *const req_packet)  {
   ret = sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_PHY, &statistics);
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", phy_statistics_str(statistics) );
+  phy_statistics_str(statistics);
   _check_stack_statistics_reset(SL_WISUN_STATISTICS_TYPE_PHY, req_packet);
   return app_coap_reply(coap_response, req_packet);
 }
@@ -644,7 +644,7 @@ sl_wisun_coap_packet_t * coap_callback_phy_statistics (
 sl_wisun_coap_packet_t * coap_callback_mac_statistics (
       const  sl_wisun_coap_packet_t *const req_packet)  {
   ret = sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_MAC, &statistics);
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", mac_statistics_str(statistics) );
+  mac_statistics_str(statistics);
   _check_stack_statistics_reset(SL_WISUN_STATISTICS_TYPE_MAC, req_packet);
   return app_coap_reply(coap_response, req_packet);
 }
@@ -652,7 +652,7 @@ sl_wisun_coap_packet_t * coap_callback_mac_statistics (
 sl_wisun_coap_packet_t * coap_callback_fhss_statistics (
       const  sl_wisun_coap_packet_t *const req_packet)  {
   ret = sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_FHSS, &statistics);
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", fhss_statistics_str(statistics) );
+  fhss_statistics_str(statistics);
   _check_stack_statistics_reset(SL_WISUN_STATISTICS_TYPE_FHSS, req_packet);
   return app_coap_reply(coap_response, req_packet);
 }
@@ -660,7 +660,7 @@ sl_wisun_coap_packet_t * coap_callback_fhss_statistics (
 sl_wisun_coap_packet_t * coap_callback_wisun_statistics (
       const  sl_wisun_coap_packet_t *const req_packet)  {
   ret = sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_WISUN, &statistics);
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", wisun_statistics_str(statistics) );
+  wisun_statistics_str(statistics);
   _check_stack_statistics_reset(SL_WISUN_STATISTICS_TYPE_WISUN, req_packet);
   return app_coap_reply(coap_response, req_packet);
 }
@@ -668,7 +668,7 @@ sl_wisun_coap_packet_t * coap_callback_wisun_statistics (
 sl_wisun_coap_packet_t * coap_callback_network_statistics (
       const  sl_wisun_coap_packet_t *const req_packet)  {
   ret = sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_NETWORK, &statistics);
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", network_statistics_str(statistics) );
+  network_statistics_str(statistics);
   _check_stack_statistics_reset(SL_WISUN_STATISTICS_TYPE_NETWORK, req_packet);
   return app_coap_reply(coap_response, req_packet);
 }
@@ -676,7 +676,7 @@ sl_wisun_coap_packet_t * coap_callback_network_statistics (
 sl_wisun_coap_packet_t * coap_callback_regulation_statistics (
       const  sl_wisun_coap_packet_t *const req_packet)  {
   ret = sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_REGULATION, &statistics);
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", regulation_statistics_str(statistics) );
+  regulation_statistics_str(statistics);
   _check_stack_statistics_reset(SL_WISUN_STATISTICS_TYPE_REGULATION, req_packet);
   return app_coap_reply(coap_response, req_packet);
 }
