@@ -1,0 +1,10 @@
+﻿# Properties file for Simplicity Studio metadata
+id=uc.extension.wisun_applications
+
+version=1.0.0
+
+label=Wi-SUN Applications
+description=Wi-SUN Applications
+
+prop.file.templatesFile=templates.xml
+prop.subLabel=Wi-SUN\\ Application\\1.0.0 
