@@ -193,6 +193,7 @@ echo "deb http://deb.debian.org/debian bookworm main" | sudo tee /etc/apt/source
 Install libcoap3
 
 ```bash
+sudo apt update
 sudo apt install -t bookworm libcoap3 libcoap3-bin libcoap3-dev
 ```
 
