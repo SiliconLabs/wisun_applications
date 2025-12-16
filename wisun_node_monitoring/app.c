@@ -1475,6 +1475,9 @@ char* _status_json_string (char * start_text) {
     "\"connected_total\":\"%s\",\n"        \
     "\"disconnected_total\":\"%s\",\n"     \
     "\"hop_count\":\"%d\",\n"              \
+    "\"phy.crc_fails\": \"%ld\",\n"        \
+    "\"phy.tx_timeouts\": \"%ld\",\n"      \
+    "\"phy.rx_timeouts\": \"%ld\",\n"      \
     "\"mac.failed_cca_count\": \"%ld\",\n" \
     "\"mac.tx_count\": \"%ld\",\n"         \
     "\"mac.tx_failed_count\": \"%ld\",\n"  \
@@ -1493,6 +1496,7 @@ char* _status_json_string (char * start_text) {
   // sl_wisun_statistics_t is a union, so we need one per statistics type
   sl_wisun_statistics_t         network_statistics;
   sl_wisun_statistics_t         mac_statistics;
+  sl_wisun_statistics_t         phy_statistics;
 
   uint64_t current_state_sec;
 
@@ -1503,6 +1507,7 @@ char* _status_json_string (char * start_text) {
   sl_wisun_get_network_info(&network_info);
   sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_NETWORK, &network_statistics);
   sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_MAC    , &mac_statistics);
+  sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_PHY    , &phy_statistics);
   msg_count++;
 
   if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
@@ -1545,6 +1550,9 @@ char* _status_json_string (char * start_text) {
     connected_sec_string,
     disconnected_sec_string,
     network_info.hop_count,
+    phy_statistics.phy.crc_fails,
+    phy_statistics.phy.tx_timeouts,
+    phy_statistics.phy.rx_timeouts,
     mac_statistics.mac.failed_cca_count,
     mac_statistics.mac.tx_count,
     mac_statistics.mac.tx_failed_count,
