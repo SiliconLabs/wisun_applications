@@ -46,6 +46,7 @@
 #include "sl_wisun_crash_handler.h"
 #include "app_coap.h"
 #include "app.h"
+#include "app_action_scheduler.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -72,6 +73,8 @@ void app_init(void)
   sl_wisun_crash_handler_init();
 
   app_coap_resources_init();
+
+  app_scheduler_action_init();
   /* Creating App main thread */
   const osThreadAttr_t app_task_attr = {
     .name        = "app_task",

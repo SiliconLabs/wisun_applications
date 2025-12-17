@@ -187,7 +187,7 @@ char*       network_string(int i);
 void        print_app_parameters();
 char*       app_parameters_string();
 void        set_app_parameters_defaults();
-sl_status_t set_app_parameter(char* parameter_name, int index, int value, char* value_str);
-sl_status_t get_app_parameter(char* parameter_name, int index, int* value, char* value_str);
+sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, char* value_str);
+sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, char* value_str);
 
 #endif  // APP_PARAMETERS_H

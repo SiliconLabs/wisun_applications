@@ -38,6 +38,8 @@ source:
 - {path: app_timestamp.c}
 - {path: app_udp_server.c}
 - {path: app_wisun_multicast_ota.c}
+- {path: app_action_scheduler.c}
+
 - {path: main.c}
 - {path: ../component/crash_handler/sl_wisun_crash_handler.c}
 
@@ -60,6 +62,7 @@ include:
   - {path: app_udp_server.h}
   - {path: app_wisun_multicast_ota.h}
   - {path: app_timestamp.h}
+  - {path: app_action_scheduler.h}
 
 - path: ../component/crash_handler/
   file_list:

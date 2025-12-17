@@ -11,10 +11,7 @@ uint32_t udp_received_count;
 #include "btl_interface.h"
 #include "printf.h"
 #include "app_parameters.h"
-
-#define CLEAR_NVM_NO   0
-#define CLEAR_NVM_APP  1
-#define CLEAR_NVM_FULL 2
+#include "app_action_scheduler.h"
 
 extern char device_tag[];
 //extern sl_wisun_ota_dfu_settings_t _settings;
@@ -375,57 +372,51 @@ void setImageToBootload(int slot) {
   printf("[%s] bootloader_setImageToBootload(%d) %ld 0x%04lx\n", device_tag, slot, ret_val, ret_val);
 }
 
-uint8_t rebootAndInstall(uint32_t time_reboot_sec, uint8_t clear_nvm) {
-  sl_status_t status;
-  uint8_t ret = 0xff;
-  if (last_index() > 1) {
-      if (list_missed() == 0) {
-          if (verify_image_in_flash()) {
-              setImageToBootload(0);
-              if (time_reboot_sec < 90){
-                  printf("[%s] Reboot and install in %ld sec\n", device_tag, time_reboot_sec);
-                  osDelay(time_reboot_sec*1000);
+uint8_t rebootAndInstall(uint32_t time_reboot_sec, uint8_t clear_nvm)
+{
+  uint8_t ret = 0xFF;
 
-                  if (clear_nvm == CLEAR_NVM_APP){
-                      printf("[%s] Clear NVM APP\n", device_tag);
-                      if (delete_app_parameters() != SL_STATUS_OK){
-                          return 5;
-                      }
-                  }
-                  else if (clear_nvm == CLEAR_NVM_FULL){
-                      printf("[%s] Clear NVM FULL\n", device_tag);
-                      status = nvm3_eraseAll(nvm3_defaultHandle);
-                      if (status != SL_STATUS_OK) {
-                          printfBothTime("nvm3_eraseAll(nvm3_defaultHandle) returned 0x%04lX, (check sl_status.h)\n",
-                                          status);
-                          return 5;
-                      } else {
-                          printfBothTime("application parameters deleted\n");
-                      }
-
-                  }
-
-                  printf("[%s] bootloader_rebootAndInstall()\n", device_tag);
-                  bootloader_rebootAndInstall();
-                  ret = 0;
-              } else {
-                  printf("[%s] Invalid time : %ld (must be < 90 sec)", device_tag, time_reboot_sec);
-                  ret = 1;
-              }
-          } else {
-              printf("[%s] verify_image_in_flash() failed: no reboot\n", device_tag);
-              ret = 2;
-          }
-      } else {
-          printf("[%s] There are missed chunks: no reboot\n", device_tag);
-          ret = 3;
-      }
-  } else {
-      printf("[%s] There are no chunks: no reboot\n", device_tag);
-      ret = 4;
+  if (last_index() <= 1) {
+    printf("[%s] There are no chunks: no reboot\n", device_tag);
+    return 4;
   }
+
+  if (list_missed() != 0) {
+    printf("[%s] There are missed chunks: no reboot\n", device_tag);
+    return 3;
+  }
+
+  if (!verify_image_in_flash()) {
+    printf("[%s] verify_image_in_flash() failed: no reboot\n", device_tag);
+    return 2;
+  }
+
+  if (time_reboot_sec >= 90U) {
+    printf("[%s] Invalid time : %ld (must be < 90 sec)\n",
+           device_tag, (long)time_reboot_sec);
+    return 1;
+  }
+
+  uint32_t delay_ms = time_reboot_sec * 1000U;
+  printf("[%s] Scheduling reboot and install in %lu ms\n",
+         device_tag, (unsigned long)delay_ms);
+
+  if (!app_scheduler_action_schedule(APP_SCHEDULER_OTA_REBOOT_INSTALL,
+                                    delay_ms,
+                                    clear_nvm)) {
+    printf("[%s] Failed to schedule rebootAndInstall\n", device_tag);
+    ret = 5;
+  } else {
+    uint32_t remaining;
+    app_scheduler_action_get_remaining(&remaining, NULL);
+    printf("[%s] rebootAndInstall scheduled, remaining=%lu ms\n",
+           device_tag, (unsigned long)remaining);
+    ret = 0;
+  }
+
   return ret;
 }
+
 
 int multicast_rx(char* udp_buff, uint32_t received_bytes) {
   int received = 0;
