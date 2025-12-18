@@ -162,12 +162,22 @@ Once all devices are connected, the [`coap_all`](linux_border_router_wsbrd/coap_
 
 ### CoAP Install ###
 
+#### libcoap3 installation on Debian versions not supporting it ####
+
+#### Adding missing keys ####
+
+For libcop3 installation, the following keys need to be installed to allow accessing the bookworm repositories
+
+```bash
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 9165938D90FDDD2E
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6ED0E7B82643E131
+```
+
 Depending on the Linux distribution, various `libcoap` versions are available.
 
 - `libcoap2` does not support encryption, and uses `coap-client` to process requests
 - `libcoap3` supports encryption, and enforces TLS using `coap-client`. To bypass encryption on the Wi-SUN network (the Wi-SUN data traffic is natively encrypted), use the alternate `coap-client-notls` when using `libcoap3`.
-
-#### libcoap3 installation on Debian versions not supporting it ####
 
 Some Debian distros (such as bullseye) don't support `libcoap3` natively.
 
