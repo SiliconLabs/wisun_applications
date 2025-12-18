@@ -166,7 +166,7 @@ Once all devices are connected, the [`coap_all`](linux_border_router_wsbrd/coap_
 
 #### Adding missing keys ####
 
-For libcop3 installation, the following keys need to be installed to allow accessing the bookworm repositories
+For libcoap3 installation, the following keys need to be installed to allow accessing the bookworm repositories
 
 ```bash
 sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9
