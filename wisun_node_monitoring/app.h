@@ -88,10 +88,6 @@ extern "C" {
   #include "app_direct_connect.h"
 #endif /* WITH_DIRECT_CONNECT */
 
-// Notifications destinations (UDP and CoAP)
-// Set to fixed IPv6 strings
-#define UDP_NOTIFICATION_DEST  "fd00:6172:6d00::1" // fixed IPv6 string
-#define COAP_NOTIFICATION_DEST "fd00:6172:6d00::2" // fixed IPv6 string
 
 // -----------------------------------------------------------------------------
 //                                Global Variables

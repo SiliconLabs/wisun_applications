@@ -1575,14 +1575,16 @@ sl_status_t _select_destinations(void) {
   IF_ERROR(ret, "[Failed: unable to retrieve the Device Global IPv6: 0x%04x]\n", (uint16_t)ret);
 
   // Set the UDP notification destination
-  printfBothTime("UDP_NOTIFICATION_DEST: %s\n", UDP_NOTIFICATION_DEST);
-  sl_wisun_stoip6(UDP_NOTIFICATION_DEST, strlen(UDP_NOTIFICATION_DEST), udp_notification_sockaddr_in6.sin6_addr.address);
+  printfBothTime("UDP_NOTIFICATION_DEST: %s\n", network[app_parameters.network_index].udp_notification_dest);
+  sl_wisun_stoip6(network[app_parameters.network_index].udp_notification_dest, strlen(network[app_parameters.network_index].udp_notification_dest)
+                , udp_notification_sockaddr_in6.sin6_addr.address);
   sl_wisun_ip6tos(udp_notification_sockaddr_in6.sin6_addr.address, udp_notification_ipv6_string);
   printfBothTime("UDP  Notification destination: %s/%5d\n" , udp_notification_ipv6_string, UDP_NOTIFICATION_PORT);
 
   // Set the CoAP notification destination
-  printfBothTime("COAP_NOTIFICATION_DEST: %s\n", COAP_NOTIFICATION_DEST);
-  sl_wisun_stoip6(COAP_NOTIFICATION_DEST   , strlen(COAP_NOTIFICATION_DEST), coap_notification_sockaddr_in6.sin6_addr.address);
+  printfBothTime("COAP_NOTIFICATION_DEST: %s\n", network[app_parameters.network_index].coap_notification_dest);
+  sl_wisun_stoip6(network[app_parameters.network_index].coap_notification_dest   , strlen(network[app_parameters.network_index].coap_notification_dest)
+                , coap_notification_sockaddr_in6.sin6_addr.address);
   sl_wisun_ip6tos(coap_notification_sockaddr_in6.sin6_addr.address, coap_notification_ipv6_string);
   printfBothTime("COAP Notification destination: %s/%5d\n"  , coap_notification_ipv6_string, COAP_NOTIFICATION_PORT);
 

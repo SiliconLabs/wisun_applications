@@ -7,6 +7,7 @@
 #define APP_VERSION_STRING "F"
 
 #define NVM3_APP_PARAMS_VERSION   10000
+#define DEFAULT_NETWORK_INDEX     0
 #define AUTO_SEND_SEC             15*60
 #define PREFERRED_PAN_ID         0xffff
 #define SELECTED_DEVICE_TYPE          SL_WISUN_ROUTER
@@ -14,5 +15,12 @@
 #define MAX_CHILD_COUNT              22
 #define MAX_NEIGHBOR_COUNT           32
 #define MAX_SECURITY_NEIGHBOR_COUNT 500
+
+#define UDP_NOTIFICATION_DEST "fd00:6172:6d00::1"
+#define COAP_NOTIFICATION_DEST "fd00:6172:6d00::2"
+#define UDP_NOTIFICATION_DEST_2  "2001:db8:0:2:d47:e4c8:60ad:b4ab"
+#define COAP_NOTIFICATION_DEST_2 "2001:db8:0:2:d47:e4c8:60ad:b4ab"
+
+#define MULTICAST_OTA_STORE_IN_FLASH 1
 
 #endif /* LTN_CONFIG_H */

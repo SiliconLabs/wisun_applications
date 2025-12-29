@@ -6,6 +6,10 @@
 #include "app_timestamp.h"
 #include "app_rtt_traces.h"
 
+#if __has_include("ltn_config.h")
+#include "ltn_config.h"
+#endif
+
 #ifndef APP_WISUN_MULTICAST_OTA_H
 #define APP_WISUN_MULTICAST_OTA_H
 

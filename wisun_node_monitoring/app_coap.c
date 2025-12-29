@@ -823,12 +823,12 @@ sl_wisun_coap_packet_t * coap_callback_reporter_start (
       // Get payload in string format with last char = '\0'
       payload_str = sl_wisun_coap_get_payload_str(req_packet);
       if (payload_str != NULL ){
-          app_start_reporter(UDP_NOTIFICATION_DEST, 1000, (char *)payload_str);
+          app_start_reporter(network[app_parameters.network_index].udp_notification_dest, 1000, (char *)payload_str);
           sl_wisun_coap_free(payload_str);
       }
     } else {
         // if no payload, accept all lines
-      app_start_reporter(UDP_NOTIFICATION_DEST, 1000, (char *)"*");
+      app_start_reporter(network[app_parameters.network_index].udp_notification_dest, 1000, (char *)"*");
     }
     snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "started");
   return app_coap_reply(coap_response, req_packet); }
