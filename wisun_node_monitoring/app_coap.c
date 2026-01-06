@@ -89,6 +89,7 @@
 #include "app_check_neighbors.h"
 #include "app_rtt_traces.h"
 #include "app_wisun_multicast_ota.h"
+#include "app_action_scheduler.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -265,20 +266,26 @@ sl_wisun_coap_packet_t * coap_callback_application (
     }
 
     if (res) {
-      if (strcmp(cmd, "clear_and_reconnect")==0) {
-        sl_wisun_disconnect();
-        //wait for disconnection complete
-        sl_wisun_app_core_wait_state(SL_WISUN_MSG_DISCONNECTED_IND_ID,5000);
-        sl_wisun_clear_credential_cache();
-        sl_wisun_app_core_util_connect_and_wait();
-        return NULL;
+      if (strcmp(cmd, "clear_and_reconnect") == 0) {
+        if (app_scheduler_action_schedule(APP_SCHEDULER_CLEAR_AND_RECONNECT, 0U, CLEAR_NVM_NO)) {
+          snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
+                  "clear_and_reconnect scheduled");
+        } else {
+          snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
+                  "Failed to schedule clear_and_reconnect");
+        }
+        return app_coap_reply(coap_response, req_packet);
       }
-      if (strcmp(cmd, "reconnect")==0) {
-        sl_wisun_disconnect();
-        //wait for disconnection complete
-        sl_wisun_app_core_wait_state(SL_WISUN_MSG_DISCONNECTED_IND_ID,5000);
-        sl_wisun_app_core_util_connect_and_wait();
-        return NULL;
+
+      if (strcmp(cmd, "reconnect") == 0) {
+        if (app_scheduler_action_schedule(APP_SCHEDULER_RECONNECT, 0U, CLEAR_NVM_NO)) {
+          snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
+                  "reconnect scheduled");
+        } else {
+          snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
+                  "Failed to schedule reconnect");
+        }
+        return app_coap_reply(coap_response, req_packet);
       }
       snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Unknown '%s' command", cmd);
     }
@@ -750,7 +757,7 @@ sl_wisun_coap_packet_t * coap_callback_application_parameter (
   char parameter_name[MAX_PARAMETER_NAME];
   char* payload_str = NULL;
   char  value_str[1000];
-  int value = 0;
+  uint32_t value = 0;
   int index = 10;
   int done  = 0;
 
@@ -766,13 +773,13 @@ sl_wisun_coap_packet_t * coap_callback_application_parameter (
 
         if (req_packet->msg_code == COAP_MSG_CODE_REQUEST_PUT) {
           if (done == 0) { // PUT <parameter> <int> <int>
-            if (3 == sscanf((char *)payload_str, "%s %d %d", parameter_name, &index, &value)) { done++; }
+            if (3 == sscanf((char *)payload_str, "%s %d %ld", parameter_name, &index, &value)) { done++; }
           }
           if (done == 0) { // PUT <parameter> <int> <str>
             if (3 == sscanf((char *)payload_str, "%s %d %s", parameter_name, &index, value_str)) { done++; }
           }
           if (done == 0) { // PUT <parameter> <int>
-            if  (2 == sscanf((char *)payload_str, "%s %d", parameter_name, &value)) { done++; }
+            if  (2 == sscanf((char *)payload_str, "%s %ld", parameter_name, &value)) { done++; }
           }
           if (done) {
             set_app_parameter(parameter_name, index, value, value_str);

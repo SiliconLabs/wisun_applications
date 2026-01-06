@@ -53,6 +53,7 @@
 #include "app_parameters.h"
 #include "app_timestamp.h"
 #include "app_rtt_traces.h"
+#include "app_action_scheduler.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -283,10 +284,10 @@ sl_status_t init_app_parameters() {
   return status;
 }
 
-sl_status_t set_app_parameter(char* parameter_name, int index, int value, char* value_str) {
+sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, char* value_str) {
   bool match = false;
 
-  printfBothTime("set_app_parameter(%s, index %d, value %d, %s)\n", parameter_name, index, value, value_str);
+  printfBothTime("set_app_parameter(%s, index %d, value %ld, %s)\n", parameter_name, index, value, value_str);
 
   if  (!match) { match = (sl_strcasecmp(parameter_name, "auto_send_sec") == 0);
     if (match) { app_parameters.auto_send_sec = (uint16_t)value; }
@@ -295,7 +296,7 @@ sl_status_t set_app_parameter(char* parameter_name, int index, int value, char* 
     if (match) {
         app_parameters.network_index = (uint16_t)value;
         save_app_parameters();
-        printfBothTime("Prepared to reboot on network %d\n", value);
+        printfBothTime("Prepared to reboot on network %ld\n", value);
     }
   }
   if  (!match) { match = (sl_strcasecmp(parameter_name, "defaults") == 0);
@@ -305,7 +306,7 @@ sl_status_t set_app_parameter(char* parameter_name, int index, int value, char* 
         // Save default settings if passed a value different from 0
         if (value & ((1 << MAX_NETWORK_CONFIGS) -1)) {
             save_app_parameters();
-            sprintf(value_str, "set defaults and autosaved for networks matching 0x%02x bitfield", value);
+            sprintf(value_str, "set defaults and autosaved for networks matching 0x%02lx bitfield", value);
         } else {
             sprintf(value_str, "set all defaults (no autosave), use 'save' before rebooting");
         }
@@ -319,7 +320,7 @@ sl_status_t set_app_parameter(char* parameter_name, int index, int value, char* 
       if (value == SL_STATUS_OK) {
           sprintf(value_str, "saved to nvm3 with success %d networks", MAX_NETWORK_CONFIGS);
       } else {
-          sprintf(value_str, "nvm3 save  error: %d", value);
+          sprintf(value_str, "nvm3 save  error: %ld", value);
       }
       printfBothTime("%s\n", value_str);
       return SL_STATUS_OK;
@@ -328,19 +329,32 @@ sl_status_t set_app_parameter(char* parameter_name, int index, int value, char* 
   // reboot options
   if  (!match) { match = (sl_strcasecmp(parameter_name, "reboot") == 0);
     if (match) {
-        // Reboot in <value> ms
-        printfBothTime("Rebooting in %d ms\n", value);
-        osDelay(value);
-        NVIC_SystemReset();
+      if (app_scheduler_action_schedule(APP_SCHEDULER_REBOOT, value, CLEAR_NVM_NO)) {
+        uint32_t remaining;
+        app_scheduler_action_get_remaining(&remaining, NULL);
+        sprintf(value_str,
+                "reboot scheduled in %lu ms (remaining=%lu ms)",
+                (unsigned long)value,
+                (unsigned long)remaining);
+      } else {
+        sprintf(value_str, "Failed to schedule reboot");
+      }
     }
   }
   if  (!match) { match = (sl_strcasecmp(parameter_name, "clear_credential_cache_and_reboot") == 0);
     if (match) { // This is useful to test a full network restart, with credentials cleared on both ends
-        sl_wisun_clear_credential_cache();
-        // Reboot in <value> ms
-        printfBothTime("Rebooting in %d ms\n", value);
-        osDelay(value);
-        NVIC_SystemReset();
+      if (app_scheduler_action_schedule(APP_SCHEDULER_CLEAR_CRED_AND_REBOOT,
+                                      value,
+                                      CLEAR_NVM_NO)) {
+        uint32_t remaining;
+        app_scheduler_action_get_remaining(&remaining, NULL);
+        sprintf(value_str,
+                "clear_credential_cache_and_reboot scheduled in %lu ms (remaining=%lu ms)",
+                (unsigned long)value,
+                (unsigned long)remaining);
+      } else {
+        sprintf(value_str, "Failed to schedule clear_credential_cache_and_reboot");
+      }
     }
   }
   if (!match) {
@@ -395,7 +409,7 @@ sl_status_t set_app_parameter(char* parameter_name, int index, int value, char* 
         }
         // Conclusion
         if (match) {
-            sprintf(value_str, "\"network[%d].%s\": \"%d\"", index, parameter_name, value);
+            sprintf(value_str, "\"network[%d].%s\": \"%ld\"", index, parameter_name, value);
             printfBothTime("%s\n", value_str);
             return SL_STATUS_OK;
         } else {
@@ -412,37 +426,37 @@ sl_status_t set_app_parameter(char* parameter_name, int index, int value, char* 
       printfBothTime("%s\n", value_str);
       return SL_STATUS_NOT_SUPPORTED;
   } else {
-      sprintf(value_str, "\"%s\": \"%d\"", parameter_name, value);
+      sprintf(value_str, "\"%s\": \"%ld\"", parameter_name, value);
       printfBothTime("%s\n", value_str);
       return SL_STATUS_OK;
   }
 }
 
-sl_status_t get_app_parameter(char* parameter_name, int index, int* value, char* value_str) {
+sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, char* value_str) {
   bool match = false;
-  *value = 0xffff;
+  *value = 0xffffffff;
   index = index;
   value_str = value_str;
   printfBothTime("get_app_parameter(%s, index %d, *value, *value_str)\n", parameter_name, index);
   if  (!match) { match = (sl_strcasecmp(parameter_name, "nb_boots") == 0);
-    if (match) { *value = (uint16_t)app_parameters.nb_boots; }
+    if (match) { *value = (uint32_t)app_parameters.nb_boots; }
   }
   if  (!match) { match = (sl_strcasecmp(parameter_name, "nb_crashes") == 0);
-    if (match) { *value = (uint16_t)app_parameters.nb_crashes; }
+    if (match) { *value = (uint32_t)app_parameters.nb_crashes; }
   }
   if  (!match) { match = (sl_strcasecmp(parameter_name, "auto_send_sec") == 0);
-    if (match) { *value = (uint16_t)app_parameters.auto_send_sec; }
+    if (match) { *value = (uint32_t)app_parameters.auto_send_sec; }
   }
   if  (!match) { match = (sl_strcasecmp(parameter_name, "network_count") == 0);
-    if (match) { *value = (uint16_t)app_parameters.network_count; }
+    if (match) { *value = (uint32_t)app_parameters.network_count; }
   }
   if  (!match) { match = (sl_strcasecmp(parameter_name, "network_index") == 0);
-    if (match) { *value = (uint16_t)app_parameters.network_index; }
+    if (match) { *value = (uint32_t)app_parameters.network_index; }
   }
   if  (!match) { match = (sl_strcasecmp(parameter_name, "app_parameters") == 0);
     if (match) {
         sprintf(value_str, "%s", app_parameters_string());
-        *value = (uint16_t)app_parameters.network_index;
+        *value = (uint32_t)app_parameters.network_index;
         printfBothTime("%s\n", value_str);
         return SL_STATUS_OK;
     }
@@ -466,49 +480,57 @@ sl_status_t get_app_parameter(char* parameter_name, int index, int* value, char*
         }
       }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "network_size") == 0);
-        if (match) { *value = (uint16_t)network[index].network_size; }
+        if (match) { *value = (uint32_t)network[index].network_size; }
       }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "tx_power_ddbm") == 0);
-        if (match) { *value = (int16_t)network[index].tx_power_ddbm; }
+        if (match) { *value = (uint32_t)network[index].tx_power_ddbm; }
       }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "device_type") == 0);
-        if (match) { *value = (int16_t)network[index].device_type; }
+        if (match) { *value = (uint32_t)network[index].device_type; }
       }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "preferred_pan_id") == 0);
-        if (match) { *value = (uint16_t)network[index].preferred_pan_id; }
+        if (match) { *value = (uint32_t)network[index].preferred_pan_id; }
       }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "max_hop_count") == 0);
-        if (match) { *value = (uint16_t)network[index].max_hop_count; }
+        if (match) { *value = (uint32_t)network[index].max_hop_count; }
       }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "set_leaf") == 0);
-        if (match) { *value = (uint16_t)network[index].set_leaf; }
+        if (match) { *value = (uint32_t)network[index].set_leaf; }
       }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "type") == 0);
-        if (match) { *value = (uint16_t)network[index].phy.type; }
+        if (match) { *value = (uint32_t)network[index].phy.type; }
       }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "reg_domain") == 0);
-        if (match) { *value = (uint16_t)network[index].phy.config.fan11.reg_domain; }
+        if (match) { *value = (uint32_t)network[index].phy.config.fan11.reg_domain; }
       }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "phy_mode_id") == 0);
-        if (match) { *value = (uint16_t)network[index].phy.config.fan11.phy_mode_id; }
+        if (match) { *value = (uint32_t)network[index].phy.config.fan11.phy_mode_id; }
       }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "chan_plan_id") == 0);
-        if (match) { *value = (uint16_t)network[index].phy.config.fan11.chan_plan_id; }
+        if (match) { *value = (uint32_t)network[index].phy.config.fan11.chan_plan_id; }
       }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "max_child_count") == 0);
-        if (match) { *value = (int8_t)network[index].max_child_count; }
+        if (match) { *value = (uint32_t)network[index].max_child_count; }
       }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "max_neighbor_count") == 0);
-        if (match) { *value = (int8_t)network[index].max_neighbor_count; }
+        if (match) { *value = (uint32_t)network[index].max_neighbor_count; }
       }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "max_security_neighbor_count") == 0);
-        if (match) { *value = (int16_t)network[index].max_security_neighbor_count; }
+        if (match) { *value = (uint32_t)network[index].max_security_neighbor_count; }
       }
+
       if  (match) {
-          sprintf(value_str, "\"network[%d].%s\": \"%d\"", index, parameter_name, *value);
+          sprintf(value_str, "\"network[%d].%s\": \"%ld\"", index, parameter_name, *value);
           printfBothTime("%s\n", value_str);
           return SL_STATUS_OK;
       }
+    }
+
+    if  (!match) { match = (sl_strcasecmp(parameter_name, "reboot") == 0);
+      if (match) {app_scheduler_action_get_remaining(value, NULL); }
+    }
+    if  (!match) { match = (sl_strcasecmp(parameter_name, "clear_credential_cache_and_reboot") == 0);
+      if (match) {app_scheduler_action_get_remaining(value, NULL); }
     }
   }
   if  (!match) {
@@ -516,7 +538,7 @@ sl_status_t get_app_parameter(char* parameter_name, int index, int* value, char*
       printfBothTime("%s\n", value_str);
       return SL_STATUS_NOT_SUPPORTED;
   } else {
-      sprintf(value_str, "\"%s\": \"%d\"", parameter_name, *value);
+      sprintf(value_str, "\"%s\": \"%ld\"", parameter_name, *value);
       printfBothTime("%s\n", value_str);
       return SL_STATUS_OK;
   }

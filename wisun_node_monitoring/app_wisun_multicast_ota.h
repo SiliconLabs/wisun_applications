@@ -20,6 +20,8 @@ extern "C" {
 #define MAX_CHUNKS     1024
 #define MAX_DATA_BYTES 1232
 
+sl_status_t delete_app_parameters(void);
+
 void clear_ota_data();
 
 uint32_t last_index_rx(void);
