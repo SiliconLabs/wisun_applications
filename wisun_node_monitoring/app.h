@@ -51,6 +51,13 @@ extern "C" {
 #include "app_timestamp.h"
 #include "app_rtt_traces.h"
 
+#if __has_include("ltn_config.h")
+#include "ltn_config.h"
+#  pragma message("?? Using settings from app_config.h")
+#else
+#  pragma message("?? app_config.h not found. Using default config")
+#endif
+
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
@@ -103,6 +110,7 @@ extern bool send_asap;
   void leds_flash(uint16_t count, uint16_t delay_ms);
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
+uint8_t app_join_network(uint8_t network_index);
 void app_task(void *args);
 void app_reset_statistics(void);
 void refresh_parent_tag(void);

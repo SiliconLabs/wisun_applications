@@ -30,7 +30,7 @@ The block diagram of this application is shown in the image below:
 
 ## Simplicity SDK Version ##
 
-SiSDK v2025.06.1
+SiSDK v2025.06.2
 
 ## Hardware Required ##
 
@@ -154,30 +154,60 @@ The `app_parameters.c/.h` code allows
 - Rebooting
 
 It can be easily extended to support any additional application parameter.
-
-| `set/get` Application Parameter | Comments |
-|-----------------------------|----------|
-| `auto_send_sec`             | Delay between 2 notification messages |
-| `neighbor_table_size`       | Max Number of RPL neighbors in table (ín range'devices) |
-| `preferred_pan_id`          | Preferred PAN id to use if receiving PAs from this PAN ID. Default ('none') = `0x0000` |
-| `selected_device_type`      | Control of device type (if enabled by installed components) |
-| `set_leaf`                  | Control of FFN LEAF device |
-| `tx_power_ddbm`             | Tx Output Power |
-
-| `get` only Application Parameter | Comments |
-|----------------------------------|----------|
-| `nb_boots`                       | Number of times the device booted |
-| `nb_crashes`                     | Number of times the crash handler has been called |
-
-| Application Parameter controls | Comments |
-|--------------------------------|----------|
-| `defaults`                     | Reset all parameters to defaults from `set_app_parameters_defaults()`. Call with `<value>` > 0 to directly save once set |
-| `save`                         | Save current parameter set to NVM |
-| `reboot <delay>`               | Reboot in `delay`seconds. Convenient to reboot all devices using a multicast message while leaving enough time for the message to propagate |
+See [app_parameters.md](app_parameters.md) for details
 
 ### Normal Mode ###
 
 Once all devices are connected, the [`coap_all`](linux_border_router_wsbrd/coap_all) bash script allows sending the same CoAP request to all connected devices, allowing an easy monitoring of the entire network.
+
+### CoAP Install ###
+
+#### libcoap3 installation on Debian versions not supporting it ####
+
+#### Adding missing keys ####
+
+For libcoap3 installation, the following keys need to be installed to allow accessing the bookworm repositories
+
+```bash
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 9165938D90FDDD2E
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6ED0E7B82643E131
+```
+
+Depending on the Linux distribution, various `libcoap` versions are available.
+
+- `libcoap2` does not support encryption, and uses `coap-client` to process requests
+- `libcoap3` supports encryption, and enforces TLS using `coap-client`. To bypass encryption on the Wi-SUN network (the Wi-SUN data traffic is natively encrypted), use the alternate `coap-client-notls` when using `libcoap3`.
+
+Some Debian distros (such as bullseye) don't support `libcoap3` natively.
+
+To install `libcoap3`
+
+- Check you distro's 'Codename':
+
+```bash
+$  lsb_release -a
+No LSB modules are available.
+Distributor ID: Raspbian
+Description:    Raspbian GNU/Linux 11 (bullseye)
+Release:        11
+Codename:       bullseye
+```
+
+Add the 'bookworm' repository list:
+
+```bash
+echo "deb http://deb.debian.org/debian bookworm main" | sudo tee /etc/apt/sources.list.d/bookworm.list
+```
+
+Install libcoap3
+
+```bash
+sudo apt update
+sudo apt install -t bookworm libcoap3 libcoap3-bin libcoap3-dev
+```
+
+- Then, use `coap-client-notls` instead of `coap-client`
 
 ### CoAP Resources ###
 

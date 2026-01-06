@@ -112,9 +112,6 @@ static const osMutexAttr_t _app_reporter_mutex_attr = {
   .cb_size   = 0U
 };
 
-// -----------------------------------------------------------------------------
-//                          Static Function Definitions
-// -----------------------------------------------------------------------------
 /* Mutex acquire */
 __STATIC_INLINE void _app_reporter_mutex_acquire(void)
 {

@@ -73,6 +73,8 @@
 //                                   Includes
 // -----------------------------------------------------------------------------
 #include "sl_string.h"
+#include "sl_memory_manager.h"
+
 #include "sl_wisun_api.h"
 #include "sl_wisun_types.h"
 #include "sl_wisun_config.h"
@@ -97,8 +99,10 @@
 //------------------------------------------------------------------------------
 char coap_response[COAP_MAX_RESPONSE_LEN];
 uint8_t coap_response_current_len = 0;
-
+char* allocated_heap;
 sl_status_t ret;
+uint32_t realloced_bytes = 0;
+void* realloc_ptr;
 sl_wisun_statistics_t statistics;
 // -----------------------------------------------------------------------------
 //                          Static Function Declarations
@@ -740,51 +744,69 @@ sl_wisun_coap_packet_t * coap_callback_trace_level (
   }
 return app_coap_reply(coap_response, req_packet); }
 
-
 sl_wisun_coap_packet_t * coap_callback_application_parameter (
       const  sl_wisun_coap_packet_t *const req_packet)  {
   #define MAX_PARAMETER_NAME 40
   char parameter_name[MAX_PARAMETER_NAME];
   char* payload_str = NULL;
+  char  value_str[1000];
   int value = 0;
-  int res;
-  sl_status_t set_get_res = SL_STATUS_NOT_SUPPORTED;
+  int index = 10;
+  int done  = 0;
 
   // Reset parameter_name tab
   memset(parameter_name, 0, MAX_PARAMETER_NAME);
+
   if (req_packet->payload_len) {
     // Get payload in string format with last char = '\0'
     payload_str = sl_wisun_coap_get_payload_str(req_packet);
-    if (payload_str != NULL ){
-      res = sscanf((char *)payload_str, "%39s %d",
-                   parameter_name, &value);
+    sprintf(value_str, "%s", "(no_value_str)");
+    printfBothTime("coap_request code %d, payload %s\n", req_packet->msg_code, payload_str);
+    if (payload_str != NULL ) {
 
-
-
-      if (res == 2) {
-          // Process /settings/parameter -e "<name> <value>"
-          set_get_res = set_app_parameter(parameter_name,  value);
-      } else {
-          res = sscanf((char *)payload_str, "%39s", parameter_name);
-        if (res == 1) {
-            // Process /settings/parameter -e "<name>"
-            set_get_res = get_app_parameter(parameter_name, &value);
+        if (req_packet->msg_code == COAP_MSG_CODE_REQUEST_PUT) {
+          if (done == 0) { // PUT <parameter> <int> <int>
+            if (3 == sscanf((char *)payload_str, "%s %d %d", parameter_name, &index, &value)) { done++; }
+          }
+          if (done == 0) { // PUT <parameter> <int> <str>
+            if (3 == sscanf((char *)payload_str, "%s %d %s", parameter_name, &index, value_str)) { done++; }
+          }
+          if (done == 0) { // PUT <parameter> <int>
+            if  (2 == sscanf((char *)payload_str, "%s %d", parameter_name, &value)) { done++; }
+          }
+          if (done) {
+            set_app_parameter(parameter_name, index, value, value_str);
+            snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", value_str);
+          } else {
+            snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Can not PUT app_parameter %s", parameter_name);
+          }
         }
-      }
+
+        if (req_packet->msg_code == COAP_MSG_CODE_REQUEST_GET) {
+          if (done == 0) { // GET <parameter> <int> <str>
+            if (2 == sscanf((char *)payload_str, "%s %d", parameter_name, &index)) { done++; }
+          }
+          if (done == 0) { // GET <parameter>
+            if (1 == sscanf((char *)payload_str, "%s", parameter_name)) { done++; }
+          }
+          // Conclusion
+          if (done) {
+            get_app_parameter(parameter_name, index, &value, value_str);
+            snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", value_str);
+          } else {
+            snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Can not GET app_parameter %s", parameter_name);
+          }
+
+        }
       // Free payload_str
       sl_wisun_coap_free(payload_str);
     }
-    else{
-        set_get_res = SL_STATUS_ALLOCATION_FAILED;
-    }
-  }
-  if (set_get_res == SL_STATUS_OK) {
-      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", value);
   } else {
-      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Error : 0x%lX", set_get_res);
+      snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
+               "Missing payload. Use: put settings/parameter -e \"parameter_name [int] [int|str]\" or  get settings/parameter -e \"parameter_name [int]\"");
   }
-return app_coap_reply(coap_response, req_packet); }
 
+return app_coap_reply(coap_response, req_packet); }
 
 #ifdef    __APP_REPORTER_H__
 sl_wisun_coap_packet_t * coap_callback_reporter_start (
@@ -829,6 +851,73 @@ sl_wisun_coap_packet_t * coap_callback_multicast_ota_info (
 
 #endif /* APP_WISUN_MULTICAST_OTA_H */
 
+sl_wisun_coap_packet_t * coap_callback_realloc (
+    const  sl_wisun_coap_packet_t *const req_packet)  {
+char* payload_str = NULL;
+uint32_t previously_malloced;
+int nb_bytes = 0;
+int res;
+previously_malloced = realloced_bytes;
+sl_memory_heap_info_t app_heap_info_before;
+sl_memory_heap_info_t app_heap_info_after;
+sl_memory_get_heap_info(&app_heap_info_before);
+
+if (req_packet->payload_len) {
+  // Get payload in string format with last char = '\0'
+  payload_str = sl_wisun_coap_get_payload_str(req_packet);
+  if (payload_str != NULL ){
+      res = sscanf((char *)payload_str, "%d", &nb_bytes);
+      if (res == 1) {
+        // Process /malloc -e "<nb_bytes>"
+          if (nb_bytes == 0) {
+              realloc_ptr = sl_realloc(realloc_ptr, 0);
+              realloced_bytes = 0;
+              snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "nb_bytes %d. deallocated %ld bytes (at %p). Heap used %d -> %d (%.2f -> %.2f %%) free %d",
+                       nb_bytes,
+                       previously_malloced,
+                       realloc_ptr,
+                       app_heap_info_before.used_size,
+                       app_heap_info_after.used_size,
+                       1.0*app_heap_info_before.used_size/(app_heap_info_before.total_size/100.0),
+                       1.0*app_heap_info_after.used_size /(app_heap_info_after.total_size /100.0),
+                       app_heap_info_after.free_size
+                       );
+          } else {
+              realloc_ptr = sl_realloc(realloc_ptr, previously_malloced + nb_bytes);
+            if (realloc_ptr != NULL) {
+              realloced_bytes += nb_bytes;
+              sl_memory_get_heap_info(&app_heap_info_after);
+              snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "nb_bytes %d. allocated %ld bytes %ld -> %ld (at %p). Heap used %d -> %d (%.2f -> %.2f %%)",
+                       nb_bytes,
+                       realloced_bytes - previously_malloced,
+                       previously_malloced,
+                       realloced_bytes,
+                       realloc_ptr,
+                       app_heap_info_before.used_size,
+                       app_heap_info_after.used_size,
+                       1.0*app_heap_info_before.used_size/(app_heap_info_before.total_size/100.0),
+                       1.0*app_heap_info_after.used_size /(app_heap_info_after.total_size /100.0)
+                       );
+            } else {
+                snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "error allocating %d bytes. Currently allocated %ld",
+                         nb_bytes,
+                         previously_malloced);
+            }
+        }
+      } else {
+          snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "incorrect 'malloc <int>' format in '%s'", payload_str);
+      }
+      sl_wisun_coap_free(payload_str);
+  } else {
+    // Process /malloc" (checking already allocated nb_bytes)
+    snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "allocated %ld heap bytes. Heap used %d",
+             realloced_bytes,
+             app_heap_info_before.used_size
+             );
+  }
+}
+return app_coap_reply(coap_response, req_packet); }
+
 // CoAP resources init in resource handler (one block per URI)
 uint8_t app_coap_resources_init() {
   sl_wisun_coap_rhnd_resource_t coap_resource = { 0 };
@@ -848,7 +937,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "tag";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_device;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -856,7 +945,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "tag";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_chip;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -864,7 +953,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "txt";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_board;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -872,7 +961,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "text";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_device_type;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -880,7 +969,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "text";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_application;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -888,7 +977,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "text";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_version;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -904,7 +993,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "text";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_send_status_msg;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -912,7 +1001,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "dhms";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_running;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -920,7 +1009,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "tag";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_parent;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -928,7 +1017,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "json";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_neighbor;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -937,7 +1026,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "dhms";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_connected;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -945,7 +1034,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "array";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_join_states_sec;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -953,7 +1042,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "dhms";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_disconnected_total;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -961,7 +1050,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "int";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_connections;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -969,7 +1058,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "dhms";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_connected_total;
-  coap_resource.discoverable = true;
+  coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
@@ -977,6 +1066,14 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "ratio";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_availability;
+  coap_resource.discoverable = false;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/statistics/app/all";
+  coap_resource.data.resource_type = "json";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_all_app_statistics;
   coap_resource.discoverable = true;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
@@ -1002,14 +1099,6 @@ uint8_t app_coap_resources_init() {
 #endif /* HISTORY */
 
 #endif /* COAP_APP_STATISTICS */
-
-  coap_resource.data.uri_path = "/statistics/app/all";
-  coap_resource.data.resource_type = "json";
-  coap_resource.data.interface = "node";
-  coap_resource.auto_response = coap_callback_all_app_statistics;
-  coap_resource.discoverable = true;
-  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
-  count++;
 
 #ifdef    COAP_STACK_STATISTICS
   coap_resource.data.uri_path = "/statistics/stack/phy";
@@ -1137,6 +1226,14 @@ uint8_t app_coap_resources_init() {
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 #endif /* APP_WISUN_MULTICAST_OTA_H */
+
+  coap_resource.data.uri_path = "/realloc";
+  coap_resource.data.resource_type = "mem";
+  coap_resource.data.interface = "test";
+  coap_resource.auto_response = coap_callback_realloc;
+  coap_resource.discoverable = false;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
 
   printf("  %d/%d CoAP resources added to CoAP Resource handler\n", count, SL_WISUN_COAP_RESOURCE_HND_MAX_RESOURCES);
   return count;
