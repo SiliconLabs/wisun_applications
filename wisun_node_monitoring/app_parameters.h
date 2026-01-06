@@ -54,6 +54,10 @@
 #include "ltn_config.h"
 #endif
 
+#ifndef DEFAULT_NETWORK_INDEX
+  #define DEFAULT_NETWORK_INDEX 0
+#endif /* DEFAULT_NETWORK_INDEX */
+
 #ifndef   TX_POWER_DDBM
   #ifndef WISUN_CONFIG_TX_POWER
     #define TX_POWER_DDBM  0
@@ -85,6 +89,23 @@
 #ifndef   MAX_SECURITY_NEIGHBOR_COUNT
   #define MAX_SECURITY_NEIGHBOR_COUNT 500
 #endif /* MAX_SECURITY_NEIGHBOR_COUNT */
+
+#ifndef UDP_NOTIFICATION_DEST
+  #define UDP_NOTIFICATION_DEST  "fd00:6172:6d00::1" // fixed IPv6 string
+#endif /* UDP_NOTIFICATION_DEST */
+
+#ifndef COAP_NOTIFICATION_DEST
+  #define COAP_NOTIFICATION_DEST "fd00:6172:6d00::2" // fixed IPv6 string
+#endif /* COAP_NOTIFICATION_DEST */
+
+
+#ifndef UDP_NOTIFICATION_DEST_2
+  #define UDP_NOTIFICATION_DEST_2  "fd00:6172:6d00::3" // fixed IPv6 string
+#endif /* UDP_NOTIFICATION_DEST */
+
+#ifndef COAP_NOTIFICATION_DEST_2
+  #define COAP_NOTIFICATION_DEST_2 "fd00:6172:6d00::4" // fixed IPv6 string
+#endif /* COAP_NOTIFICATION_DEST */
 
 #define MAX_NETWORK_CONFIGS 3
 #define APP_UTIL_PRINTABLE_DATA_MAX_LENGTH 64
@@ -138,6 +159,8 @@ typedef struct {
   uint16_t lowpan_mtu;
   uint16_t ipv6_mru;
   uint8_t max_edfe_fragment_count;
+  char udp_notification_dest[41];
+  char coap_notification_dest[41];
 //  uint16_t socket_rx_buffer_size;
 //  char eap_identity[SL_WISUN_EAP_IDENTITY_SIZE+1];
 } app_settings_wisun_t;

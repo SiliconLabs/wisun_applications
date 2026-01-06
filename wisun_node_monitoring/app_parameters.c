@@ -88,6 +88,42 @@ static const osMutexAttr_t _app_parameters_mutex_attr = {
   .cb_size   = 0U
 };
 
+ 
+/* Copies token into out, removing ONE surrounding quote pair if present.
+ * Accepts: 
+ *          '2001:db8::1'
+ *          "2001:db8::1"
+ * Returns 0 on success, -1 on error/truncation.
+ */
+static int8_t unquote_ipv6(const char *in, char *out, size_t out_sz)
+{
+    size_t n;
+
+    if (!in || !out || out_sz == 0) return -1;
+
+    n = strlen(in);
+    if (n == 0) { out[0] = '\0'; return -2; }
+
+    /* Strip matching surrounding quotes */
+    if (n >= 2 && ((in[0] == '\'' && in[n - 1] == '\'') ||
+                   (in[0] == '\"' && in[n - 1] == '\"')))
+    {
+        in += 1;
+        n  -= 2;
+    }
+    else{
+        /* No surrounding quotes */
+        return -3;
+    }
+
+    if (n >= out_sz) return -4; /* would truncate */
+
+    memcpy(out, in, n);
+    out[n] = '\0';
+    return 0;
+}
+
+
 /* Mutex acquire */
 void app_parameter_mutex_acquire(void)
 {
@@ -103,6 +139,8 @@ void app_parameter_mutex_release(void)
 void print_network_parameters(int network_index) {
   int i = network_index;
   printfBothTime("network[%d] network_name     %s\n"           , i, network[i].network_name);
+  printfBothTime("network[%d] udp_notification_dest %s\n"      , i, network[i].udp_notification_dest);
+  printfBothTime("network[%d] coap_notification_dest %s\n"     , i, network[i].coap_notification_dest);
   printfBothTime("network[%d] network_size     %d\n"           , i, network[i].network_size);
   printfBothTime("network[%d] type             %ld\n"          , i, network[i].phy.type);
   printfBothTime("network[%d] reg_domain       %d\n"           , i, network[i].phy.config.fan11.reg_domain);
@@ -118,6 +156,8 @@ char* network_string(int i) {
   #define NETWORK_FORMAT_STR \
   "\"network\": \"%d\",\n" \
   "\"network_name\": \"%s\",\n" \
+  "\"udp_notification_dest\": \"%s\",\n" \
+  "\"coap_notification_dest\": \"%s\",\n" \
   "\"network_size\": \"%d\",\n" \
   "\"type\": \"%ld\",\n" \
   "\"reg_domain\": \"%d\",\n" \
@@ -130,6 +170,8 @@ char* network_string(int i) {
   snprintf(res_string, 1000, NETWORK_FORMAT_STR,
           i,
           network[i].network_name,
+          network[i].udp_notification_dest,
+          network[i].coap_notification_dest,
           network[i].network_size,
           network[i].phy.type,
           network[i].phy.config.fan11.reg_domain,
@@ -195,6 +237,8 @@ void set_app_parameters_defaults(int network_indexes) {
     if (network_indexes & (1 << i)) {
       printfBothTime("Network %d defaults\n", i);
       snprintf(network[i].network_name, SL_WISUN_NETWORK_NAME_SIZE, "%s%d", "network_", i);
+      snprintf(network[i].udp_notification_dest, 41, "%s", UDP_NOTIFICATION_DEST);
+      snprintf(network[i].coap_notification_dest, 41, "%s", COAP_NOTIFICATION_DEST);
       network[i].network_size                  = SL_WISUN_NETWORK_SIZE_MEDIUM;
       network[i].tx_power_ddbm                 = 200; // 200 = 'MAX' (it's higher than the possible max)
       network[i].uc_dwell_interval_ms          = 255; // 255 ms by default, see sl_wisun_set_unicast_settings
@@ -237,6 +281,10 @@ void set_app_parameters_defaults(int network_indexes) {
     network[i].phy.config.fan11.reg_domain   = WISUN_CONFIG_REGULATORY_DOMAIN;
     network[i].phy.config.fan11.chan_plan_id = WISUN_CONFIG_CHANNEL_PLAN_ID;
     network[i].phy.config.fan11.phy_mode_id  = WISUN_CONFIG_PHY_MODE_ID;
+    network[i].tx_power_ddbm                 = TX_POWER_DDBM;
+    network[i].max_child_count               = MAX_CHILD_COUNT;
+    network[i].max_neighbor_count            = MAX_NEIGHBOR_COUNT;
+    network[i].max_security_neighbor_count   = MAX_SECURITY_NEIGHBOR_COUNT;
   }
   // Network 1 differences from the defaults
   i = 1;
@@ -247,6 +295,27 @@ void set_app_parameters_defaults(int network_indexes) {
     network[i].phy.config.fan11.reg_domain   = SL_WISUN_REGULATORY_DOMAIN_EU;
     network[i].phy.config.fan11.chan_plan_id = 33;
     network[i].phy.config.fan11.phy_mode_id  = 3;
+    network[i].tx_power_ddbm                 = TX_POWER_DDBM;
+    network[i].max_child_count               = MAX_CHILD_COUNT;
+    network[i].max_neighbor_count            = MAX_NEIGHBOR_COUNT;
+    network[i].max_security_neighbor_count   = MAX_SECURITY_NEIGHBOR_COUNT;
+  }
+
+    // Network 2 differences from the defaults
+  i = 2;
+  if (network_indexes & (1 << i)) {
+    printfBothTime("Network %d defaults\n", i);
+    snprintf(network[i].network_name, SL_WISUN_NETWORK_NAME_SIZE, "%s", "rns-wisun-socbr");
+    snprintf(network[i].udp_notification_dest, 41, "%s", UDP_NOTIFICATION_DEST_2);
+    snprintf(network[i].coap_notification_dest, 41, "%s", COAP_NOTIFICATION_DEST_2);
+    network[i].network_size                  = WISUN_CONFIG_NETWORK_SIZE;
+    network[i].phy.config.fan11.reg_domain   = SL_WISUN_REGULATORY_DOMAIN_EU;
+    network[i].phy.config.fan11.chan_plan_id = 32;
+    network[i].phy.config.fan11.phy_mode_id  = 1;
+    network[i].tx_power_ddbm                 = TX_POWER_DDBM;
+    network[i].max_child_count               = MAX_CHILD_COUNT;
+    network[i].max_neighbor_count            = MAX_NEIGHBOR_COUNT;
+    network[i].max_security_neighbor_count   = MAX_SECURITY_NEIGHBOR_COUNT;
   }
   for (i = 0; i < MAX_NETWORK_CONFIGS; i++) {
     if (network_indexes & (1 << i)) {
@@ -272,6 +341,7 @@ sl_status_t init_app_parameters() {
         set_app_parameters_defaults(0);
         app_parameters.nb_boots   = 1;
         app_parameters.nb_crashes = 0;
+        app_parameters.network_index = DEFAULT_NETWORK_INDEX;
         status = save_app_parameters();
     }
     if (status == SL_STATUS_OK) {
@@ -366,6 +436,32 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
               sprintf(value_str, "\"network[%d].%s\": \"%s\"", index, parameter_name, network[index].network_name);
               printfBothTime("%s\n", value_str);
               return SL_STATUS_OK;
+          }
+        }
+        if  (!match) { match = (sl_strcasecmp(parameter_name, "udp_notif_dest") == 0);
+          if (match) {
+              if (unquote_ipv6(value_str, network[index].udp_notification_dest, 41) == 0) {
+                  sprintf(value_str, "\"network[%d].%s\": \"%s\"", index, parameter_name, network[index].udp_notification_dest);
+                  printfBothTime("%s\n", value_str);
+                  return SL_STATUS_OK;
+              } else {
+                  sprintf(value_str, "ERROR, Use quote around  IPV6: \"udp_notif_dest 0 'ff02::1'\"\n");
+                  printfBothTime("ERROR setting '%s': invalid IPv6 string '%s'! Use quotes\n", parameter_name, value_str);
+                  return SL_STATUS_INVALID_PARAMETER;
+              }
+          }
+        }
+        if  (!match) { match = (sl_strcasecmp(parameter_name, "coap_notif_dest") == 0);
+          if (match) {
+              if (unquote_ipv6(value_str, network[index].coap_notification_dest, 41) == 0) {
+                  sprintf(value_str, "\"network[%d].%s\": \"%s\"", index, parameter_name, network[index].coap_notification_dest);
+                  printfBothTime("%s\n", value_str);
+                  return SL_STATUS_OK;
+              } else {
+                  sprintf(value_str, "ERROR, Use quote around  IPV6: \"coap_notif_dest 0 'ff02::1'\"\n");
+                  printfBothTime("ERROR setting '%s': invalid IPv6 string '%s'! Use quotes\n", parameter_name, value_str);
+                  return SL_STATUS_INVALID_PARAMETER;
+              }
           }
         }
         if  (!match) { match = (sl_strcasecmp(parameter_name, "network_size") == 0);
@@ -475,6 +571,22 @@ sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, 
         if (match) {
             *value = (uint16_t)index;
             sprintf(value_str, "\"network[%d].%s\": \"%s\"", index, parameter_name, network[index].network_name);
+            printfBothTime("%s\n", value_str);
+            return SL_STATUS_OK;
+        }
+      }
+      if  (!match) { match = (sl_strcasecmp(parameter_name, "udp_notif_dest") == 0);
+        if (match) {
+            *value = (uint16_t)index;
+            sprintf(value_str, "\"network[%d].%s\": \"%s\"", index, parameter_name, network[index].udp_notification_dest);
+            printfBothTime("%s\n", value_str);
+            return SL_STATUS_OK;
+        }
+      }
+      if  (!match) { match = (sl_strcasecmp(parameter_name, "coap_notif_dest") == 0);
+        if (match) {
+            *value = (uint16_t)index;
+            sprintf(value_str, "\"network[%d].%s\": \"%s\"", index, parameter_name, network[index].coap_notification_dest);
             printfBothTime("%s\n", value_str);
             return SL_STATUS_OK;
         }
