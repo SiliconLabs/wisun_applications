@@ -979,8 +979,6 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
   list_rf_configs();
 #endif /* LIST_RF_CONFIGS */
 
-  printfBothTime("app_parameters.auto_send_sec %d\n", app_parameters.auto_send_sec);
-
 #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
   // LEDs indicate the 'version' in 2 steps
   leds_flash(START_FLASHES_A, 250);
@@ -1128,6 +1126,8 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
   refresh_heap = true;
 #endif /* APP_TRACK_HEAP */
 
+  printfBothTime("network[%d].auto_send_sec %d\n", app_parameters.network_index, network[app_parameters.network_index].auto_send_sec);
+
   osDelay(2UL);
 
   while (1) {
@@ -1194,7 +1194,7 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
     }
 
     // Print status message once then disable status
-    if ((connected_delay_sec % app_parameters.auto_send_sec == 0) || (send_asap)) {
+    if ((connected_delay_sec % network[app_parameters.network_index].auto_send_sec == 0) || (send_asap)) {
         if ((print_keep_alive == true) || (send_asap)) {
           print_and_send_messages (_status_json_string(""),
                     with_time, to_console, to_rtt, to_udp, to_coap);
@@ -1207,7 +1207,7 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
         }
     }
     // Enable status for next time
-    if (connected_delay_sec % app_parameters.auto_send_sec == 1) {
+    if (connected_delay_sec % network[app_parameters.network_index].auto_send_sec == 1) {
         if (print_keep_alive == false) {
             print_keep_alive = true;
         }

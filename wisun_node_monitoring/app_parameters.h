@@ -90,7 +90,7 @@
 
 /* network */
 #ifndef   NETWORK_NAMEs
-  #define NETWORK_NAMEs                   {               "small_EU_3_33",                   "medium_EU_1_34                         "large_EU_1_1" }
+  #define NETWORK_NAMEs                   {               "small_EU_3_33",                  "medium_EU_1_34",                         "large_EU_1_1" }
 #endif /* NETWORK_NAMEs */
 
 #ifndef   REG_DOMAINs

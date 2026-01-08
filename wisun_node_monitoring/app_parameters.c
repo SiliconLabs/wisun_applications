@@ -137,17 +137,18 @@ void app_parameter_mutex_release(void)
 void print_network_parameters(int network_index) {
   int i = network_index;
   printfBothTime("network[%d] network_name     %s\n"           , i, network[i].network_name);
-  printfBothTime("network[%d] udp_notification_dest  %s\n"     , i, network[i].udp_notification_dest);
-  printfBothTime("network[%d] coap_notification_dest %s\n"     , i, network[i].coap_notification_dest);
   printfBothTime("network[%d] network_size     %d\n"           , i, network[i].network_size);
   printfBothTime("network[%d] type             %ld\n"          , i, network[i].phy.type);
   printfBothTime("network[%d] reg_domain       %d\n"           , i, network[i].phy.config.fan11.reg_domain);
   printfBothTime("network[%d] phy_mode_id      %d\n"           , i, network[i].phy.config.fan11.phy_mode_id);
   printfBothTime("network[%d] chan_plan_id     %d\n"           , i, network[i].phy.config.fan11.chan_plan_id);
+  printfBothTime("network[%d] auto_send_sec               %d\n", i, network[i].auto_send_sec);
   printfBothTime("network[%d] tx_power_ddbm               %d\n", i, network[i].tx_power_ddbm);
   printfBothTime("network[%d] max_child_count             %d\n", i, network[i].max_child_count);
   printfBothTime("network[%d] max_neighbor_count          %d\n", i, network[i].max_neighbor_count);
   printfBothTime("network[%d] max_security_neighbor_count %d\n", i, network[i].max_security_neighbor_count);
+  printfBothTime("network[%d] udp_notification_dest  %s\n"     , i, network[i].udp_notification_dest);
+  printfBothTime("network[%d] coap_notification_dest %s\n"     , i, network[i].coap_notification_dest);
 }
 
 char* network_string(int i) {
@@ -188,7 +189,6 @@ void print_app_parameters() {
   printfBothTime("app_parameters.app_params_version          %ld\n", app_parameters.app_params_version);
   printfBothTime("app_parameters.nb_boots                    %d\n", app_parameters.nb_boots);
   printfBothTime("app_parameters.nb_crashes                  %d\n", app_parameters.nb_crashes);
-  printfBothTime("app_parameters.auto_send_sec               %d\n", app_parameters.auto_send_sec);
   printfBothTime("app_parameters.network_count               %d\n", app_parameters.network_count);
   printfBothTime("app_parameters.network_index               %d\n", app_parameters.network_index);
   for (i=0; i<MAX_NETWORK_CONFIGS; i++) {
@@ -200,7 +200,6 @@ char* app_parameters_string() {
   #define PARAMETERS_FORMAT_STR \
   "\"app_params_version\": \"%ld\",\n" \
   "\"nb_boots\": \"%d\",\n" \
-  "\"nb_crashes\": \"%d\",\n" \
   "\"auto_send_sec\": \"%d\",\n" \
   "\"network_count\": \"%d\",\n" \
   "\"network_index\": \"%d\""
@@ -209,7 +208,6 @@ char* app_parameters_string() {
           app_parameters.app_params_version,
           app_parameters.nb_boots,
           app_parameters.nb_crashes,
-          app_parameters.auto_send_sec,
           app_parameters.network_count,
           app_parameters.network_index);
   printf("[%d]%s\n", __LINE__, res_string);
@@ -517,7 +515,7 @@ sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, 
     if (match) { *value = (uint32_t)app_parameters.nb_crashes; }
   }
   if  (!match) { match = (sl_strcasecmp(parameter_name, "auto_send_sec") == 0);
-    if (match) { *value = (uint32_t)app_parameters.auto_send_sec; }
+    if (match) { *value = (uint32_t)network[app_parameters.network_index].auto_send_sec; }
   }
   if  (!match) { match = (sl_strcasecmp(parameter_name, "network_count") == 0);
     if (match) { *value = (uint32_t)app_parameters.network_count; }

@@ -706,10 +706,10 @@ sl_wisun_coap_packet_t * coap_callback_auto_send (
         sl_wisun_coap_free(payload_str);
     }
     if (res) {
-        app_parameters.auto_send_sec = (uint16_t)sec;
+        network[app_parameters.network_index]. = (uint16_t)sec;
     }
   }
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", app_parameters.auto_send_sec);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", network[app_parameters.network_index].);
 return app_coap_reply(coap_response, req_packet); }
 
 sl_wisun_coap_packet_t * coap_callback_trace_level (
