@@ -113,9 +113,9 @@
   #define PREFERRED_PAN_IDs               {                        0xffff,                            0xffff,                                0xffff }
 #endif /* PREFERRED_PAN_IDs */
 
-#ifndef   REGULATIONs
+#ifndef   REGULATION
   #define REGULATION  SL_WISUN_REGULATION_NONE
-#endif /* REGULATIONs */
+#endif /* REGULATION */
 
 #ifndef   REGULATION_WARNING_THRESHOLD
   #define REGULATION_WARNING_THRESHOLD 50
