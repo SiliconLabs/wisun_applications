@@ -88,9 +88,8 @@ static const osMutexAttr_t _app_parameters_mutex_attr = {
   .cb_size   = 0U
 };
 
- 
 /* Copies token into out, removing ONE surrounding quote pair if present.
- * Accepts: 
+ * Accepts:
  *          '2001:db8::1'
  *          "2001:db8::1"
  * Returns 0 on success, -1 on error/truncation.
@@ -123,7 +122,6 @@ static int8_t unquote_ipv6(const char *in, char *out, size_t out_sz)
     return 0;
 }
 
-
 /* Mutex acquire */
 void app_parameter_mutex_acquire(void)
 {
@@ -139,7 +137,7 @@ void app_parameter_mutex_release(void)
 void print_network_parameters(int network_index) {
   int i = network_index;
   printfBothTime("network[%d] network_name     %s\n"           , i, network[i].network_name);
-  printfBothTime("network[%d] udp_notification_dest %s\n"      , i, network[i].udp_notification_dest);
+  printfBothTime("network[%d] udp_notification_dest  %s\n"     , i, network[i].udp_notification_dest);
   printfBothTime("network[%d] coap_notification_dest %s\n"     , i, network[i].coap_notification_dest);
   printfBothTime("network[%d] network_size     %d\n"           , i, network[i].network_size);
   printfBothTime("network[%d] type             %ld\n"          , i, network[i].phy.type);
@@ -219,11 +217,30 @@ char* app_parameters_string() {
 }
 
 void set_app_parameters_defaults(int network_indexes) {
-  int i;
+  // settings 'arrays' defined per network
+  const char*                      NETWORK_NAME[MAX_NETWORK_CONFIGS] = NETWORK_NAMEs;
+  const sl_wisun_regulatory_domain_t REG_DOMAIN[MAX_NETWORK_CONFIGS] = REG_DOMAINs;
+  const uint8_t                     PHY_MODE_ID[MAX_NETWORK_CONFIGS] = PHY_MODE_IDs;
+  const uint8_t                    CHAN_PLAN_ID[MAX_NETWORK_CONFIGS] = CHAN_PLAN_IDs;
+  const sl_wisun_network_size_t    NETWORK_SIZE[MAX_NETWORK_CONFIGS] = NETWORK_SIZEs;
+  const uint16_t               PREFERRED_PAN_ID[MAX_NETWORK_CONFIGS] = PREFERRED_PAN_IDs;
+  const sl_wisun_device_type_t      DEVICE_TYPE[MAX_NETWORK_CONFIGS] = DEVICE_TYPEs;
+  const uint8_t                   TX_POWER_DDBM[MAX_NETWORK_CONFIGS] = TX_POWER_DDBMs;
+  const uint8_t                 MAX_CHILD_COUNT[MAX_NETWORK_CONFIGS] = MAX_CHILD_COUNTs;
+  const uint8_t              MAX_NEIGHBOR_COUNT[MAX_NETWORK_CONFIGS] = MAX_NEIGHBOR_COUNTs;
+  const uint16_t    MAX_SECURITY_NEIGHBOR_COUNT[MAX_NETWORK_CONFIGS] = MAX_SECURITY_NEIGHBOR_COUNTs;
+  const uint16_t                  AUTO_SEND_SEC[MAX_NETWORK_CONFIGS] = AUTO_SEND_SECs;
+  const char*      UDP_NOTIFICATION_DESTINATION[MAX_NETWORK_CONFIGS] = UDP_NOTIFICATION_DESTINATIONs;
+  const char*     COAP_NOTIFICATION_DESTINATION[MAX_NETWORK_CONFIGS] = COAP_NOTIFICATION_DESTINATIONs;
+
+  // settings defined once for all networks
   app_parameters.app_params_version          = NVM3_APP_PARAMS_VERSION;
-  app_parameters.auto_send_sec               = AUTO_SEND_SEC;
   app_parameters.network_count               = MAX_NETWORK_CONFIGS;
+
+  int i;
+
   printfBothTime("sizeof(app_wisun_parameters_t) %d\n", sizeof(app_wisun_parameters_t));
+
   // Prepare to init both if none is selected, selecting the first
   if (network_indexes == 0) {
       app_parameters.network_index = 0;
@@ -236,91 +253,47 @@ void set_app_parameters_defaults(int network_indexes) {
   for (i = 0; i < MAX_NETWORK_CONFIGS; i++) {
     if (network_indexes & (1 << i)) {
       printfBothTime("Network %d defaults\n", i);
-      snprintf(network[i].network_name, SL_WISUN_NETWORK_NAME_SIZE, "%s%d", "network_", i);
-      snprintf(network[i].udp_notification_dest, 41, "%s", UDP_NOTIFICATION_DEST);
-      snprintf(network[i].coap_notification_dest, 41, "%s", COAP_NOTIFICATION_DEST);
-      network[i].network_size                  = SL_WISUN_NETWORK_SIZE_MEDIUM;
-      network[i].tx_power_ddbm                 = 200; // 200 = 'MAX' (it's higher than the possible max)
-      network[i].uc_dwell_interval_ms          = 255; // 255 ms by default, see sl_wisun_set_unicast_settings
-      network[i].regulation                    = SL_WISUN_REGULATION_NONE;
-      network[i].regulation_warning_threshold  = 50; // see sl_wisun_set_regulation_tx_thresholds
-      network[i].regulation_alert_threshold    = 100;// see sl_wisun_set_regulation_tx_thresholds
-      network[i].device_type                   = SL_WISUN_ROUTER;
+      /* network */
+      snprintf(network[i].network_name, SL_WISUN_NETWORK_NAME_SIZE, "%s", NETWORK_NAME[i]);
       network[i].phy.type                      = SL_WISUN_PHY_CONFIG_FAN11;
-      network[i].phy.config.fan11.reg_domain   = SL_WISUN_REGULATORY_DOMAIN_EU;
-      network[i].phy.config.fan11.chan_plan_id = 1;
-      network[i].phy.config.fan11.phy_mode_id  = i;
-#ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
-      network[i].lfn_profile                   = SL_WISUN_LFN_PROFILE_BALANCED; // Only applicable for SL_WISUN_TYPE_LFN
-#endif /* SL_CATALOG_WISUN_FFN_DEVICE_SUPPORT_PRESENT */
-  #if       SL_RAIL_IEEE802154_SUPPORTS_G_MODE_SWITCH // see sl_wisun_set_pom_ie
-      network[i].rx_phy_mode_ids_count          = 0;
-      network[i].rx_phy_mode_ids[SL_WISUN_MAX_PHY_MODE_ID_COUNT];
-      network[i].rx_mdr_capable                = 0;
-  #endif /* SL_RAIL_IEEE802154_SUPPORTS_G_MODE_SWITCH */
-      network[i].max_child_count               = 22;  // see sl_wisun_config_neighbor_table
-      network[i].max_neighbor_count            = 32;  // see sl_wisun_config_neighbor_table
-      network[i].max_security_neighbor_count   = 300; // see sl_wisun_config_neighbor_table
-      network[i].preferred_pan_id              = 0xffff; // 0xffff = 'None'
+      network[i].phy.config.fan11.reg_domain   = REG_DOMAIN[i];
+      network[i].phy.config.fan11.phy_mode_id  = PHY_MODE_ID[i] ;
+      network[i].phy.config.fan11.chan_plan_id = CHAN_PLAN_ID[i];
+      network[i].network_size                  = NETWORK_SIZE[i];
+      network[i].preferred_pan_id              = PREFERRED_PAN_ID[i];
+      network[i].regulation                    = REGULATION;
+      network[i].regulation_warning_threshold  = REGULATION_WARNING_THRESHOLD; // see sl_wisun_set_regulation_tx_thresholds
+      network[i].regulation_alert_threshold    = REGULATION_ALERT_THRESHOLD;// see sl_wisun_set_regulation_tx_thresholds
 #ifdef     SL_WISUN_KEYCHAIN_H
       network[i].keychain_index                = 0;
       network[i].keychain                      = SL_WISUN_KEYCHAIN_AUTOMATIC;
 #endif /*  SL_WISUN_KEYCHAIN_H */
-      network[i].max_hop_count                 = 100;
+#if       SL_RAIL_IEEE802154_SUPPORTS_G_MODE_SWITCH // see sl_wisun_set_pom_ie
+      network[i].rx_phy_mode_ids_count          = 0;
+      network[i].rx_phy_mode_ids[SL_WISUN_MAX_PHY_MODE_ID_COUNT];
+      network[i].rx_mdr_capable                = 0;
+#endif /* SL_RAIL_IEEE802154_SUPPORTS_G_MODE_SWITCH */
+      /* device */
+      network[i].device_type                   = DEVICE_TYPE[i];
+      network[i].tx_power_ddbm                 = TX_POWER_DDBM[i]; // 200 = 'MAX' (it's higher than the possible max)
+      network[i].set_leaf                      = SET_LEAF; // see sl_wisun_set_leaf
+      network[i].max_hop_count                 = 100; // see sl_wisun_set_max_hop_count
+      network[i].uc_dwell_interval_ms          = 255; // 255 ms by default, see sl_wisun_set_unicast_settings
+#ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+      network[i].lfn_profile                   = SL_WISUN_LFN_PROFILE_BALANCED; // Only applicable for SL_WISUN_TYPE_LFN
+#endif /* SL_CATALOG_WISUN_FFN_DEVICE_SUPPORT_PRESENT */
+      network[i].max_child_count               = MAX_CHILD_COUNT[i];  // see sl_wisun_config_neighbor_table
+      network[i].max_neighbor_count            = MAX_NEIGHBOR_COUNT[i];  // see sl_wisun_config_neighbor_table
+      network[i].max_security_neighbor_count   = MAX_SECURITY_NEIGHBOR_COUNT[i]; // see sl_wisun_config_neighbor_table
+      /* Application */
+      network[i].auto_send_sec                 = AUTO_SEND_SEC[i];
       network[i].lowpan_mtu                    = 1576;
       network[i].ipv6_mru                      = 1504;
       network[i].max_edfe_fragment_count       = 5;
+      snprintf(network[i].udp_notification_dest , IPV6_STR_LEN, "%s", UDP_NOTIFICATION_DESTINATION[i] );
+      snprintf(network[i].coap_notification_dest, IPV6_STR_LEN, "%s", COAP_NOTIFICATION_DESTINATION[i]);
     }
-  }
-  // Network 0 differences from the defaults (from sl_wisun_config.h)
-  i = 0;
-  if (network_indexes & (1 << i)) {
-    printfBothTime("Network %d defaults (from autogen/sl_wisun_config.h)\n", i); // Only supporting FAN1.1
-    snprintf(network[i].network_name, SL_WISUN_NETWORK_NAME_SIZE, "%s", WISUN_CONFIG_NETWORK_NAME);
-    network[i].network_size                  = WISUN_CONFIG_NETWORK_SIZE;
-    network[i].phy.config.fan11.reg_domain   = WISUN_CONFIG_REGULATORY_DOMAIN;
-    network[i].phy.config.fan11.chan_plan_id = WISUN_CONFIG_CHANNEL_PLAN_ID;
-    network[i].phy.config.fan11.phy_mode_id  = WISUN_CONFIG_PHY_MODE_ID;
-    network[i].tx_power_ddbm                 = TX_POWER_DDBM;
-    network[i].max_child_count               = MAX_CHILD_COUNT;
-    network[i].max_neighbor_count            = MAX_NEIGHBOR_COUNT;
-    network[i].max_security_neighbor_count   = MAX_SECURITY_NEIGHBOR_COUNT;
-  }
-  // Network 1 differences from the defaults
-  i = 1;
-  if (network_indexes & (1 << i)) {
-    printfBothTime("Network %d defaults\n", i);
-    snprintf(network[i].network_name, SL_WISUN_NETWORK_NAME_SIZE, "%s", "small_EU_3_33");
-    network[i].network_size                  = SL_WISUN_NETWORK_SIZE_SMALL;
-    network[i].phy.config.fan11.reg_domain   = SL_WISUN_REGULATORY_DOMAIN_EU;
-    network[i].phy.config.fan11.chan_plan_id = 33;
-    network[i].phy.config.fan11.phy_mode_id  = 3;
-    network[i].tx_power_ddbm                 = TX_POWER_DDBM;
-    network[i].max_child_count               = MAX_CHILD_COUNT;
-    network[i].max_neighbor_count            = MAX_NEIGHBOR_COUNT;
-    network[i].max_security_neighbor_count   = MAX_SECURITY_NEIGHBOR_COUNT;
-  }
-
-    // Network 2 differences from the defaults
-  i = 2;
-  if (network_indexes & (1 << i)) {
-    printfBothTime("Network %d defaults\n", i);
-    snprintf(network[i].network_name, SL_WISUN_NETWORK_NAME_SIZE, "%s", "rns-wisun-socbr");
-    snprintf(network[i].udp_notification_dest, 41, "%s", UDP_NOTIFICATION_DEST_2);
-    snprintf(network[i].coap_notification_dest, 41, "%s", COAP_NOTIFICATION_DEST_2);
-    network[i].network_size                  = WISUN_CONFIG_NETWORK_SIZE;
-    network[i].phy.config.fan11.reg_domain   = SL_WISUN_REGULATORY_DOMAIN_EU;
-    network[i].phy.config.fan11.chan_plan_id = 32;
-    network[i].phy.config.fan11.phy_mode_id  = 1;
-    network[i].tx_power_ddbm                 = TX_POWER_DDBM;
-    network[i].max_child_count               = MAX_CHILD_COUNT;
-    network[i].max_neighbor_count            = MAX_NEIGHBOR_COUNT;
-    network[i].max_security_neighbor_count   = MAX_SECURITY_NEIGHBOR_COUNT;
-  }
-  for (i = 0; i < MAX_NETWORK_CONFIGS; i++) {
-    if (network_indexes & (1 << i)) {
-      print_network_parameters(i);
-    }
+    print_network_parameters(i);
   }
 }
 
@@ -360,7 +333,7 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
   printfBothTime("set_app_parameter(%s, index %d, value %ld, %s)\n", parameter_name, index, value, value_str);
 
   if  (!match) { match = (sl_strcasecmp(parameter_name, "auto_send_sec") == 0);
-    if (match) { app_parameters.auto_send_sec = (uint16_t)value; }
+    if (match) { network[app_parameters.network_index].auto_send_sec = (uint16_t)value; }
   }
   if  (!match) { match = (sl_strcasecmp(parameter_name, "network_index") == 0);
     if (match) {
@@ -427,7 +400,7 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
       }
     }
   }
-  if (!match) {
+  if  (!match) {
     // Network settings (require the network_index, provide as 'index')
     if (index < MAX_NETWORK_CONFIGS) {
         if  (!match) { match = (sl_strcasecmp(parameter_name, "network_name") == 0);
@@ -437,6 +410,9 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
               printfBothTime("%s\n", value_str);
               return SL_STATUS_OK;
           }
+        }
+        if  (!match) { match = (sl_strcasecmp(parameter_name, "auto_send_sec") == 0);
+          if (match) { network[index].auto_send_sec = (uint16_t)value; }
         }
         if  (!match) { match = (sl_strcasecmp(parameter_name, "udp_notif_dest") == 0);
           if (match) {
