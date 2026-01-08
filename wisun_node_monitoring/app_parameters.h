@@ -102,7 +102,7 @@
 #endif /* PHY_MODE_IDs */
 
 #ifndef   CHAN_PLAN_IDs
-  #define CHAN_PLAN_IDs                   {                            33,                                34,                                     1 }
+  #define CHAN_PLAN_IDs                   {                            33,                                34,                                    32 }
 #endif /* CHAN_PLAN_IDs */
 
 #ifndef   NETWORK_SIZEs

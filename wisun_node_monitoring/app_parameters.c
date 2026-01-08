@@ -200,7 +200,7 @@ char* app_parameters_string() {
   #define PARAMETERS_FORMAT_STR \
   "\"app_params_version\": \"%ld\",\n" \
   "\"nb_boots\": \"%d\",\n" \
-  "\"auto_send_sec\": \"%d\",\n" \
+  "\"nb_crashes\": \"%d\",\n" \
   "\"network_count\": \"%d\",\n" \
   "\"network_index\": \"%d\""
 
