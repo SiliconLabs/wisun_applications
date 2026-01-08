@@ -514,9 +514,7 @@ sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, 
   if  (!match) { match = (sl_strcasecmp(parameter_name, "nb_crashes") == 0);
     if (match) { *value = (uint32_t)app_parameters.nb_crashes; }
   }
-  if  (!match) { match = (sl_strcasecmp(parameter_name, "auto_send_sec") == 0);
-    if (match) { *value = (uint32_t)network[app_parameters.network_index].auto_send_sec; }
-  }
+
   if  (!match) { match = (sl_strcasecmp(parameter_name, "network_count") == 0);
     if (match) { *value = (uint32_t)app_parameters.network_count; }
   }
@@ -611,13 +609,15 @@ sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, 
           return SL_STATUS_OK;
       }
     }
-
-    if  (!match) { match = (sl_strcasecmp(parameter_name, "reboot") == 0);
-      if (match) {app_scheduler_action_get_remaining(value, NULL); }
-    }
-    if  (!match) { match = (sl_strcasecmp(parameter_name, "clear_credential_cache_and_reboot") == 0);
-      if (match) {app_scheduler_action_get_remaining(value, NULL); }
-    }
+  }
+  if  (!match) { match = (sl_strcasecmp(parameter_name, "auto_send_sec") == 0);
+    if (match) { *value = (uint32_t)network[app_parameters.network_index].auto_send_sec; }
+  }
+  if  (!match) { match = (sl_strcasecmp(parameter_name, "reboot") == 0);
+    if (match) {app_scheduler_action_get_remaining(value, NULL); }
+  }
+  if  (!match) { match = (sl_strcasecmp(parameter_name, "clear_credential_cache_and_reboot") == 0);
+    if (match) {app_scheduler_action_get_remaining(value, NULL); }
   }
   if  (!match) {
       sprintf(value_str, "ERROR getting '%s': unknown application parameter!", parameter_name);
