@@ -458,6 +458,7 @@ uint8_t app_join_network(uint8_t network_index) {
   sl_wisun_keychain_entry_t *trustedca = NULL;
   sl_wisun_keychain_credential_t *credential = NULL;
   uint16_t certificate_options;
+  const sl_wisun_regulation_params_t *regulation_params;
 
   app_settings_wisun_t this_network;
 
@@ -670,10 +671,26 @@ uint8_t app_join_network(uint8_t network_index) {
       ret = __LINE__; goto cleanup;
     }
   }
-
-  ret = sl_wisun_set_regulation((sl_wisun_regulation_t)this_network.regulation);
+  switch(this_network.regulation) {
+    case SL_WISUN_REGULATION_NONE:
+      regulation_params = &SL_WISUN_REGULATION_PARAMS_NONE;
+      break;
+    case SL_WISUN_REGULATION_ARIB:
+      regulation_params = &SL_WISUN_REGULATION_PARAMS_ARIB;
+      break;
+    case SL_WISUN_REGULATION_WPC:
+      regulation_params = &SL_WISUN_REGULATION_PARAMS_WPC;
+      break;
+    case SL_WISUN_REGULATION_ETSI:
+      regulation_params = &SL_WISUN_REGULATION_PARAMS_ETSI;
+      break;
+    default:
+      printfBothTime("[Failed: unsupported regulation]\r\n");
+      goto cleanup;
+  }
+  ret = sl_wisun_set_regulation_parameters(regulation_params);
   if (ret != SL_STATUS_OK) {
-    printfBothTime("[Failed: unable to set regional regulation: %lu]\r\n", ret);
+    printfBothTime("[Failed: unable to set regional regulation parameters: %lu]\r\n", ret);
     ret = __LINE__; goto cleanup;
   }
 
@@ -1262,7 +1279,11 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
     }
 #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
 
-    sl_wisun_app_core_util_dispatch_thread();
+    if (network[app_parameters.network_index].device_type == SL_WISUN_LFN) {
+      osDelay(1000UL);
+    } else {
+      osDelay(1UL);
+    }
   }
 }
 
