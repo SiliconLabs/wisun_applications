@@ -709,7 +709,7 @@ sl_wisun_coap_packet_t * coap_callback_auto_send (
         network[app_parameters.network_index]. = (uint16_t)sec;
     }
   }
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", network[app_parameters.network_index].);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", network[app_parameters.network_index].auto_send_sec);
 return app_coap_reply(coap_response, req_packet); }
 
 sl_wisun_coap_packet_t * coap_callback_trace_level (
