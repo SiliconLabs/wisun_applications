@@ -330,9 +330,6 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
 
   printfBothTime("set_app_parameter(%s, index %d, value %ld, %s)\n", parameter_name, index, value, value_str);
 
-  if  (!match) { match = (sl_strcasecmp(parameter_name, "auto_send_sec") == 0);
-    if (match) { network[app_parameters.network_index].auto_send_sec = (uint16_t)value; }
-  }
   if  (!match) { match = (sl_strcasecmp(parameter_name, "network_index") == 0);
     if (match) {
         app_parameters.network_index = (uint16_t)value;
@@ -489,6 +486,9 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
         printfBothTime("ERROR setting '%s': incorrect index %d (above %d)!\n", parameter_name, index, MAX_NETWORK_CONFIGS);
         return SL_STATUS_NOT_SUPPORTED;
     }
+  }
+  if  (!match) { match = (sl_strcasecmp(parameter_name, "auto_send_sec") == 0);
+    if (match) { network[app_parameters.network_index].auto_send_sec = (uint16_t)value; }
   }
   // completion
   if  (!match) {
