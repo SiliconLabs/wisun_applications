@@ -539,7 +539,7 @@ sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, 
         return SL_STATUS_OK;
     }
   }
-  if (!match) {
+  if  (!match) {
     if (index < MAX_NETWORK_CONFIGS) {
       if  (!match) { match = (sl_strcasecmp(parameter_name, "network_name") == 0);
         if (match) {
