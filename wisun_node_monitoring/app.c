@@ -574,7 +574,7 @@ uint8_t app_join_network(uint8_t network_index) {
                                            wisun_config_ca_certificate);
     if (ret != SL_STATUS_OK) {
       printf("[Failed: unable to set the trusted certificate: %lu]\n", ret);
-      return ret;
+      ret = __LINE__; goto cleanup;
     }
 
     // set the device certificate
@@ -583,7 +583,7 @@ uint8_t app_join_network(uint8_t network_index) {
                                           wisun_config_device_certificate);
     if (ret != SL_STATUS_OK) {
       printf("[Failed: unable to set the device certificate: %lu]\n", ret);
-      return ret;
+      ret = __LINE__; goto cleanup;
     }
 
     // set the device private key
@@ -594,7 +594,7 @@ uint8_t app_join_network(uint8_t network_index) {
                                           wisun_config_device_private_key);
     if (ret != SL_STATUS_OK) {
       printf("[Failed: unable to set the device private key: %lu]\n", ret);
-      return ret;
+      ret = __LINE__; goto cleanup;
     }
 
   } else {
@@ -686,7 +686,7 @@ uint8_t app_join_network(uint8_t network_index) {
       break;
     default:
       printfBothTime("[Failed: unsupported regulation]\r\n");
-      goto cleanup;
+      ret = __LINE__; goto cleanup;
   }
   ret = sl_wisun_set_regulation_parameters(regulation_params);
   if (ret != SL_STATUS_OK) {
@@ -739,7 +739,7 @@ uint8_t app_join_network(uint8_t network_index) {
                 app_parameters.network_index,
                 app_wisun_phy_to_str(&(network[app_parameters.network_index].phy)));
         }
-        goto cleanup;
+        ret = __LINE__; goto cleanup;
     }
   }
 
