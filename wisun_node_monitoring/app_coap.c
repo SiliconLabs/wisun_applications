@@ -806,7 +806,7 @@ sl_wisun_coap_packet_t * coap_callback_application_parameter (
 
         }
       // Free payload_str
-      sl_wisun_coap_free(payload_str);
+      sl_free(payload_str);
     }
   } else {
       snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
