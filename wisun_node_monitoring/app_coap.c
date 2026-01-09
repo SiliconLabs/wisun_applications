@@ -182,7 +182,7 @@ sl_wisun_coap_packet_t * coap_callback_all_infos (
             major, minor, patch, build,
             buf
   );
-  app_wisun_free((void*)buf);
+  sl_free((void*)buf);
   return app_coap_reply(coap_response, req_packet);
 }
 
@@ -262,7 +262,7 @@ sl_wisun_coap_packet_t * coap_callback_application (
     payload_str = sl_wisun_coap_get_payload_str(req_packet);
     if (payload_str != NULL){
         res = sscanf((char *)payload_str, "%39s", cmd);
-        sl_wisun_coap_free(payload_str);
+        sl_free(payload_str);
     }
 
     if (res) {
@@ -399,7 +399,7 @@ sl_wisun_coap_packet_t * coap_callback_leds_flash (
     payload_str = sl_wisun_coap_get_payload_str(req_packet);
     if (payload_str != NULL ){
         res = sscanf((char *)payload_str, "%hd %hd", &count, &delay_ms);
-        sl_wisun_coap_free(payload_str);
+        sl_free(payload_str);
     }
   }
   if (res != 2) {
@@ -703,7 +703,7 @@ sl_wisun_coap_packet_t * coap_callback_auto_send (
     payload_str = sl_wisun_coap_get_payload_str(req_packet);
     if (payload_str != NULL ){
         res = sscanf((char *)payload_str, "%d", &sec);
-        sl_wisun_coap_free(payload_str);
+        sl_free(payload_str);
     }
     if (res) {
         network[app_parameters.network_index]. = (uint16_t)sec;
@@ -741,7 +741,7 @@ sl_wisun_coap_packet_t * coap_callback_trace_level (
         ret = app_set_all_traces(level, true);
       }
     }
-    sl_wisun_coap_free(payload_str);
+    sl_free(payload_str);
   }
   if (ret == SL_STATUS_OK){
       snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", trace_level);
@@ -806,7 +806,7 @@ sl_wisun_coap_packet_t * coap_callback_application_parameter (
 
         }
       // Free payload_str
-      sl_wisun_coap_free(payload_str);
+      sl_free(payload_str);
     }
   } else {
       snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
@@ -824,7 +824,7 @@ sl_wisun_coap_packet_t * coap_callback_reporter_start (
       payload_str = sl_wisun_coap_get_payload_str(req_packet);
       if (payload_str != NULL ){
           app_start_reporter(network[app_parameters.network_index].udp_notification_dest, 1000, (char *)payload_str);
-          sl_wisun_coap_free(payload_str);
+          sl_free(payload_str);
       }
     } else {
         // if no payload, accept all lines
@@ -914,7 +914,7 @@ if (req_packet->payload_len) {
       } else {
           snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "incorrect 'malloc <int>' format in '%s'", payload_str);
       }
-      sl_wisun_coap_free(payload_str);
+      sl_free(payload_str);
   } else {
     // Process /malloc" (checking already allocated nb_bytes)
     snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "allocated %ld heap bytes. Heap used %d",
