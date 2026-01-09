@@ -1656,7 +1656,7 @@ sl_status_t _coap_notify(char* json_string)
 
   req_buff_size = sl_wisun_coap_builder_calc_size(&coap_notify_ch.pkt);
 
-  buff = (uint8_t *) sl_wisun_coap_malloc(req_buff_size);
+  buff = (uint8_t *) sl_malloc(req_buff_size);
   if (buff == NULL) {
     printfBothTime("_coap_notify() error on line %d: sl_wisun_coap_malloc buff(%d)\n", __LINE__,
                   req_buff_size);
@@ -1676,7 +1676,7 @@ sl_status_t _coap_notify(char* json_string)
           ret = SL_STATUS_TRANSMIT;
       }
   }
-  sl_wisun_coap_free(buff);
+  sl_free(buff);
   return ret;
 }
 
