@@ -118,6 +118,12 @@
   #define DEVICE_TYPEs                    {               SL_WISUN_ROUTER,                   SL_WISUN_ROUTER,                       SL_WISUN_ROUTER }
 #endif /* DEVICE_TYPEs */
 
+#ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+#ifndef   LFN_PROFILEs
+  #define LFN_PROFILEs                    { SL_WISUN_LFN_PROFILE_BALANCED,          SL_WISUN_LFN_PROFILE_ECO,             SL_WISUN_LFN_PROFILE_TEST }
+#endif /* LFN_PROFILEs */
+#endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
+
 #ifndef   TX_POWER_DDBMs
   #define TX_POWER_DDBMs                  {                             0,                                 0,                                     0 }
 #endif /* TX_POWER_DDBMs */

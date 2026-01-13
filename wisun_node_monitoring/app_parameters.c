@@ -138,10 +138,11 @@ void print_network_parameters(int network_index) {
   int i = network_index;
   printfBothTime("network[%d] network_name     %s\n"           , i, network[i].network_name);
   printfBothTime("network[%d] network_size     %d\n"           , i, network[i].network_size);
-  printfBothTime("network[%d] type             %ld\n"          , i, network[i].phy.type);
+  printfBothTime("network[%d] FAN type         %ld\n"          , i, network[i].phy.type);
   printfBothTime("network[%d] reg_domain       %d\n"           , i, network[i].phy.config.fan11.reg_domain);
   printfBothTime("network[%d] phy_mode_id      %d\n"           , i, network[i].phy.config.fan11.phy_mode_id);
   printfBothTime("network[%d] chan_plan_id     %d\n"           , i, network[i].phy.config.fan11.chan_plan_id);
+  printfBothTime("network[%d] device_type      %d\n"           , i, network[i].device_type);
   printfBothTime("network[%d] auto_send_sec               %d\n", i, network[i].auto_send_sec);
   printfBothTime("network[%d] tx_power_ddbm               %d\n", i, network[i].tx_power_ddbm);
   printfBothTime("network[%d] max_child_count             %d\n", i, network[i].max_child_count);
@@ -186,13 +187,16 @@ char* network_string(int i) {
 
 void print_app_parameters() {
   int i;
+  printf("\n");
   printfBothTime("app_parameters.app_params_version          %ld\n", app_parameters.app_params_version);
   printfBothTime("app_parameters.nb_boots                    %d\n", app_parameters.nb_boots);
   printfBothTime("app_parameters.nb_crashes                  %d\n", app_parameters.nb_crashes);
   printfBothTime("app_parameters.network_count               %d\n", app_parameters.network_count);
   printfBothTime("app_parameters.network_index               %d\n", app_parameters.network_index);
+  printf("\n");
   for (i=0; i<MAX_NETWORK_CONFIGS; i++) {
     print_network_parameters(i);
+    printf("\n");
   }
 }
 
@@ -223,6 +227,9 @@ void set_app_parameters_defaults(int network_indexes) {
   const sl_wisun_network_size_t    NETWORK_SIZE[MAX_NETWORK_CONFIGS] = NETWORK_SIZEs;
   const uint16_t               PREFERRED_PAN_ID[MAX_NETWORK_CONFIGS] = PREFERRED_PAN_IDs;
   const sl_wisun_device_type_t      DEVICE_TYPE[MAX_NETWORK_CONFIGS] = DEVICE_TYPEs;
+#ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+  const uint8_t                     LFN_PROFILE[MAX_NETWORK_CONFIGS] = LFN_PROFILEs;
+#endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
   const uint8_t                   TX_POWER_DDBM[MAX_NETWORK_CONFIGS] = TX_POWER_DDBMs;
   const uint8_t                 MAX_CHILD_COUNT[MAX_NETWORK_CONFIGS] = MAX_CHILD_COUNTs;
   const uint8_t              MAX_NEIGHBOR_COUNT[MAX_NETWORK_CONFIGS] = MAX_NEIGHBOR_COUNTs;
@@ -234,6 +241,7 @@ void set_app_parameters_defaults(int network_indexes) {
   // settings defined once for all networks
   app_parameters.app_params_version          = NVM3_APP_PARAMS_VERSION;
   app_parameters.network_count               = MAX_NETWORK_CONFIGS;
+  app_parameters.network_index = DEFAULT_NETWORK_INDEX;
 
   int i;
 
@@ -241,7 +249,6 @@ void set_app_parameters_defaults(int network_indexes) {
 
   // Prepare to init both if none is selected, selecting the first
   if (network_indexes == 0) {
-      app_parameters.network_index = 0;
       for (i=0; i<MAX_NETWORK_CONFIGS; i++) {
           network_indexes = network_indexes + (1 << i);
       }
@@ -273,13 +280,13 @@ void set_app_parameters_defaults(int network_indexes) {
 #endif /* SL_RAIL_IEEE802154_SUPPORTS_G_MODE_SWITCH */
       /* device */
       network[i].device_type                   = DEVICE_TYPE[i];
+#ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+      network[i].lfn_profile                   = LFN_PROFILE[i];
+#endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
       network[i].tx_power_ddbm                 = TX_POWER_DDBM[i]; // 200 = 'MAX' (it's higher than the possible max)
       network[i].set_leaf                      = SET_LEAF; // see sl_wisun_set_leaf
       network[i].max_hop_count                 = 100; // see sl_wisun_set_max_hop_count
       network[i].uc_dwell_interval_ms          = 255; // 255 ms by default, see sl_wisun_set_unicast_settings
-#ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
-      network[i].lfn_profile                   = SL_WISUN_LFN_PROFILE_BALANCED; // Only applicable for SL_WISUN_TYPE_LFN
-#endif /* SL_CATALOG_WISUN_FFN_DEVICE_SUPPORT_PRESENT */
       network[i].max_child_count               = MAX_CHILD_COUNT[i];  // see sl_wisun_config_neighbor_table
       network[i].max_neighbor_count            = MAX_NEIGHBOR_COUNT[i];  // see sl_wisun_config_neighbor_table
       network[i].max_security_neighbor_count   = MAX_SECURITY_NEIGHBOR_COUNT[i]; // see sl_wisun_config_neighbor_table
@@ -292,6 +299,7 @@ void set_app_parameters_defaults(int network_indexes) {
       snprintf(network[i].coap_notification_dest, IPV6_STR_LEN, "%s", COAP_NOTIFICATION_DESTINATION[i]);
     }
     print_network_parameters(i);
+    printf("\n");
   }
 }
 
@@ -309,17 +317,25 @@ sl_status_t init_app_parameters() {
     status = read_app_parameters();
     if (status != SL_STATUS_OK) {
         printfBothTime("set application parameters to default values\n");
-        set_app_parameters_defaults(0);
+        set_app_parameters_defaults(0x0000);
         app_parameters.nb_boots   = 1;
         app_parameters.nb_crashes = 0;
-        app_parameters.network_index = DEFAULT_NETWORK_INDEX;
         status = save_app_parameters();
-    }
-    if (status == SL_STATUS_OK) {
-        print_app_parameters();
+        if (status != SL_STATUS_OK) {
+            printfBothTime("Issue saving app_parameters: 0x%02x\n", (uint16_t)status);
+        }
     } else {
-        printfBothTime("Issue saving app_parameters: 0x%02x\n", (uint16_t)status);
+      #define VALIDATING 1
+      #if VALIDATING /* remove after validation */
+        printf("\n Delete code between lines 328 and 334 once it works!!!\n\n");
+        set_app_parameters_defaults(0x0000);
+        status = save_app_parameters();
+        if (status != SL_STATUS_OK) {
+            printfBothTime("Issue saving app_parameters: 0x%02x\n", (uint16_t)status);
+        }
+        #endif /* end of removed part*/
     }
+    print_app_parameters();
     app_parameter_mutex_release();
   }
   return status;
@@ -487,9 +503,6 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
         return SL_STATUS_NOT_SUPPORTED;
     }
   }
-  if  (!match) { match = (sl_strcasecmp(parameter_name, "auto_send_sec") == 0);
-    if (match) { network[app_parameters.network_index].auto_send_sec = (uint16_t)value; }
-  }
   // completion
   if  (!match) {
       sprintf(value_str, "ERROR setting '%s': unknown application parameter!\n", parameter_name);
@@ -547,6 +560,9 @@ sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, 
             return SL_STATUS_OK;
         }
       }
+      if  (!match) { match = (sl_strcasecmp(parameter_name, "auto_send_sec") == 0);
+        if (match) { *value = (uint32_t)network[index].auto_send_sec; }
+      }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "udp_notif_dest") == 0);
         if (match) {
             *value = (uint16_t)index;
@@ -602,16 +618,12 @@ sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, 
       if  (!match) { match = (sl_strcasecmp(parameter_name, "max_security_neighbor_count") == 0);
         if (match) { *value = (uint32_t)network[index].max_security_neighbor_count; }
       }
-
       if  (match) {
           sprintf(value_str, "\"network[%d].%s\": \"%ld\"", index, parameter_name, *value);
           printfBothTime("%s\n", value_str);
           return SL_STATUS_OK;
       }
     }
-  }
-  if  (!match) { match = (sl_strcasecmp(parameter_name, "auto_send_sec") == 0);
-    if (match) { *value = (uint32_t)network[app_parameters.network_index].auto_send_sec; }
   }
   if  (!match) { match = (sl_strcasecmp(parameter_name, "reboot") == 0);
     if (match) {app_scheduler_action_get_remaining(value, NULL); }

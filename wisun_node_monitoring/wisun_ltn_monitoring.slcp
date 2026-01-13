@@ -89,7 +89,7 @@ component:
   - id: sleeptimer
   - id: slist
   - id: wisun_config
-  - id: wisun_stack
+  - id: wisun_stack_ffn
   - id: wisun_stack_debug
   # Selecting all PHYs for the board/device/freq_range
   - id: wisun_default_radioconf
