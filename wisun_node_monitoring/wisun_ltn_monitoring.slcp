@@ -42,7 +42,12 @@ source:
 - {path: ../component/crash_handler/sl_wisun_crash_handler.c}
 
 include:
-
+- path: config
+  file_list:
+  - {path: ltn_config.h}
+- path: config/wisun
+  file_list:
+  - {path: ltn_wisun_settings.wisunconf}
 - path: .
   file_list:
   - {path: app_check_neighbors.h}
