@@ -70,6 +70,8 @@
 // -----------------------------------------------------------------------------
 void app_init(void)
 {
+  printf("========================================================\n");
+
   sl_wisun_crash_handler_init();
 
   app_coap_resources_init();
@@ -86,9 +88,9 @@ void app_init(void)
     .priority    = osPriorityNormal,
     .tz_module   = 0
   };
-  printf("%s/%s starting app_task              : APP_STACK_SIZE_BYTES                        %4ld\n",
+  printf("%s/%s starting app_task              : APP_STACK_SIZE_BYTES %4ld\n",
         __FILE__, __FUNCTION__,
-         APP_STACK_SIZE_BYTES);
+        APP_STACK_SIZE_BYTES);
   osThreadId_t app_thr_id = osThreadNew(app_task,
                                         NULL,
                                         &app_task_attr);

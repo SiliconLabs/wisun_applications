@@ -48,66 +48,124 @@
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
+#define IPV6_STR_LEN       41 // + trailing null
 #define NVM3_APP_KEY   0xf013
 
 #if __has_include("ltn_config.h")
-#include "ltn_config.h"
+  #include "ltn_config.h"
 #endif
 
-#ifndef DEFAULT_NETWORK_INDEX
-  #define DEFAULT_NETWORK_INDEX 0
-#endif /* DEFAULT_NETWORK_INDEX */
+#ifndef   START_FLASHES_A
+  #define START_FLASHES_A     3
+#endif /* START_FLASHES_A */
 
-#ifndef   TX_POWER_DDBM
-  #ifndef WISUN_CONFIG_TX_POWER
-    #define TX_POWER_DDBM  0
-  #else /* WISUN_CONFIG_TX_POWER */
-    #define TX_POWER_DDBM  WISUN_CONFIG_TX_POWER
-  #endif /* WISUN_CONFIG_TX_POWER */
-#endif /* TX_POWER_DDBM */
+#ifndef   START_FLASHES_B
+  #define START_FLASHES_B     5
+#endif /* START_FLASHES_B */
+
+#ifndef   APP_VERSION_STRING
+  #define APP_VERSION_STRING "F"
+#endif /* APP_VERSION_STRING */
+
 #ifndef   NVM3_APP_PARAMS_VERSION
   #define NVM3_APP_PARAMS_VERSION   10000
 #endif /* NVM3_APP_PARAMS_VERSION */
-#ifndef   AUTO_SEND_SEC
-  #define AUTO_SEND_SEC             15*60
-#endif /* AUTO_SEND_SEC */
-#ifndef   PREFERRED_PAN_ID
-  #define PREFERRED_PAN_ID         0xffff
-#endif /* PREFERRED_PAN_ID */
-#ifndef   DEVICE_TYPE
-  #define DEVICE_TYPE          SL_WISUN_ROUTER
-#endif /* DEVICE_TYPE */
+
+#ifndef   MAX_NETWORK_CONFIGS
+  #define MAX_NETWORK_CONFIGS 3
+#endif /* MAX_NETWORK_CONFIGS*/
+
+#ifndef   DEFAULT_NETWORK_INDEX
+  #define DEFAULT_NETWORK_INDEX 0
+#endif /* DEFAULT_NETWORK_INDEX */
+
+#ifndef   MULTICAST_OTA_STORE_IN_FLASH
+#define   MULTICAST_OTA_STORE_IN_FLASH 1
+#endif /* MULTICAST_OTA_STORE_IN_FLASH */
+
 #ifndef   SET_LEAF
-  #define SET_LEAF                      0
+#define   SET_LEAF 0
 #endif /* SET_LEAF */
-#ifndef   MAX_CHILD_COUNT
-  #define MAX_CHILD_COUNT              22
-#endif /* MAX_CHILD_COUNT */
-#ifndef   MAX_NEIGHBOR_COUNT
-  #define MAX_NEIGHBOR_COUNT           32
-#endif /* MAX_NEIGHBOR_COUNT */
-#ifndef   MAX_SECURITY_NEIGHBOR_COUNT
-  #define MAX_SECURITY_NEIGHBOR_COUNT 500
-#endif /* MAX_SECURITY_NEIGHBOR_COUNT */
-
-#ifndef UDP_NOTIFICATION_DEST
-  #define UDP_NOTIFICATION_DEST  "fd00:6172:6d00::1" // fixed IPv6 string
-#endif /* UDP_NOTIFICATION_DEST */
-
-#ifndef COAP_NOTIFICATION_DEST
-  #define COAP_NOTIFICATION_DEST "fd00:6172:6d00::2" // fixed IPv6 string
-#endif /* COAP_NOTIFICATION_DEST */
 
 
-#ifndef UDP_NOTIFICATION_DEST_2
-  #define UDP_NOTIFICATION_DEST_2  "fd00:6172:6d00::3" // fixed IPv6 string
-#endif /* UDP_NOTIFICATION_DEST */
+/* network */
+#ifndef   NETWORK_NAMEs
+  #define NETWORK_NAMEs                   {               "small_EU_3_33",                  "medium_EU_1_34",                         "large_EU_1_1" }
+#endif /* NETWORK_NAMEs */
 
-#ifndef COAP_NOTIFICATION_DEST_2
-  #define COAP_NOTIFICATION_DEST_2 "fd00:6172:6d00::4" // fixed IPv6 string
-#endif /* COAP_NOTIFICATION_DEST */
+#ifndef   REG_DOMAINs
+  #define REG_DOMAINs                     { SL_WISUN_REGULATORY_DOMAIN_EU,     SL_WISUN_REGULATORY_DOMAIN_EU,         SL_WISUN_REGULATORY_DOMAIN_EU }
+#endif /* REG_DOMAINs */
 
-#define MAX_NETWORK_CONFIGS 3
+#ifndef   PHY_MODE_IDs
+  #define PHY_MODE_IDs                    {                             3,                                 1,                                     1 }
+#endif /* PHY_MODE_IDs */
+
+#ifndef   CHAN_PLAN_IDs
+  #define CHAN_PLAN_IDs                   {                            33,                                34,                                    32 }
+#endif /* CHAN_PLAN_IDs */
+
+#ifndef   NETWORK_SIZEs
+  #define NETWORK_SIZEs                   {   SL_WISUN_NETWORK_SIZE_SMALL,      SL_WISUN_NETWORK_SIZE_MEDIUM,           SL_WISUN_NETWORK_SIZE_LARGE }
+#endif /* NETWORK_SIZEs */
+
+#ifndef   PREFERRED_PAN_IDs
+  #define PREFERRED_PAN_IDs               {                        0xffff,                            0xffff,                                0xffff }
+#endif /* PREFERRED_PAN_IDs */
+
+#ifndef   REGULATION
+  #define REGULATION  SL_WISUN_REGULATION_NONE
+#endif /* REGULATION */
+
+#ifndef   REGULATION_WARNING_THRESHOLD
+  #define REGULATION_WARNING_THRESHOLD 50
+#endif /* REGULATION_WARNING_THRESHOLD */
+
+#ifndef   REGULATION_ALERT_THRESHOLD
+  #define REGULATION_ALERT_THRESHOLD 100
+#endif /* REGULATION_ALERT_THRESHOLD */
+
+/* device */
+#ifndef   DEVICE_TYPEs
+  #define DEVICE_TYPEs                    {               SL_WISUN_ROUTER,                   SL_WISUN_ROUTER,                       SL_WISUN_ROUTER }
+#endif /* DEVICE_TYPEs */
+
+#ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+#ifndef   LFN_PROFILEs
+  #define LFN_PROFILEs                    {     SL_WISUN_LFN_PROFILE_TEST,          SL_WISUN_LFN_PROFILE_TEST,        SL_WISUN_LFN_PROFILE_BALANCED }
+#endif /* LFN_PROFILEs */
+#endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
+
+#ifndef   TX_POWER_DDBMs
+  #define TX_POWER_DDBMs                  {                             0,                                 1,                                     2 }
+#endif /* TX_POWER_DDBMs */
+
+#ifndef   MAX_CHILD_COUNTs
+  #define MAX_CHILD_COUNTs                {                            22,                                22,                                    22 }
+#endif /* MAX_CHILD_COUNTs */
+
+#ifndef   MAX_NEIGHBOR_COUNTs
+  #define MAX_NEIGHBOR_COUNTs             {                            32,                                32,                                    32 }
+#endif /* MAX_NEIGHBOR_COUNTs */
+
+#ifndef   MAX_SECURITY_NEIGHBOR_COUNTs
+  #define MAX_SECURITY_NEIGHBOR_COUNTs    {                           500,                               500,                                   500 }
+#endif /* MAX_SECURITY_NEIGHBOR_COUNTs */
+
+/* Application */
+#ifndef   AUTO_SEND_SECs
+  #define AUTO_SEND_SECs                  {                        (1*60),                            (5*60),                               (15*60) }
+#endif /* AUTO_SEND_SECs */
+
+#ifndef   UDP_NOTIFICATION_DESTINATIONs
+  #define UDP_NOTIFICATION_DESTINATIONs   {           "fd00:6172:6d00::1",               "fd00:6172:6d00::1",                   "fd00:6172:6d00::1" }
+#endif /* UDP_NOTIFICATION_DESTINATIONs */
+
+#ifndef   COAP_NOTIFICATION_DESTINATIONs
+  #define COAP_NOTIFICATION_DESTINATIONs  {           "fd00:6172:6d00::2",               "fd00:6172:6d00::2",                   "fd00:6172:6d00::2" }
+#endif /* COAP_NOTIFICATION_DESTINATIONs */
+
+
 #define APP_UTIL_PRINTABLE_DATA_MAX_LENGTH 64
 
 // app_settings_wisun_t structure similar to Wi-SUN SoC CLI (only FAN1.1 support)
@@ -118,6 +176,7 @@ typedef struct {
 //  uint16_t operating_mode;
   uint8_t network_size;
   int16_t tx_power_ddbm;
+  int16_t auto_send_sec;
   uint8_t uc_dwell_interval_ms;
 //  uint16_t number_of_channels;
 //  uint32_t ch0_frequency;
@@ -147,20 +206,20 @@ typedef struct {
   * Each entry in the neighbor table consumes about 450 bytes of RAM.
   * Each entry in the security neighbor table consumes about 50 bytes of RAM.
   */
-  uint8_t max_neighbor_count;
-  uint8_t max_child_count;
+  uint8_t  max_neighbor_count;
+  uint8_t  max_child_count;
   uint16_t max_security_neighbor_count;
   uint16_t preferred_pan_id;
-  uint8_t keychain;
-  uint8_t keychain_index;
+  uint8_t  keychain;
+  uint8_t  keychain_index;
 //  uint8_t direct_connect_pmk[SL_WISUN_PMK_LEN];
-  uint8_t max_hop_count;
+  uint8_t  max_hop_count;
   uint8_t  set_leaf;             // LEAF mode flag
   uint16_t lowpan_mtu;
   uint16_t ipv6_mru;
-  uint8_t max_edfe_fragment_count;
-  char udp_notification_dest[41];
-  char coap_notification_dest[41];
+  uint8_t  max_edfe_fragment_count;
+  char udp_notification_dest[IPV6_STR_LEN];
+  char coap_notification_dest[IPV6_STR_LEN];
 //  uint16_t socket_rx_buffer_size;
 //  char eap_identity[SL_WISUN_EAP_IDENTITY_SIZE+1];
 } app_settings_wisun_t;
@@ -209,8 +268,8 @@ void        print_network_parameters(int network_index);
 char*       network_string(int i);
 void        print_app_parameters();
 char*       app_parameters_string();
-void        set_app_parameters_defaults();
-sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, char* value_str);
+void        set_app_parameters_defaults(int network_indexes);
+sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t  value, char* value_str);
 sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, char* value_str);
 
 #endif  // APP_PARAMETERS_H

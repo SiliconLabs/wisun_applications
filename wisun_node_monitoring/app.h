@@ -53,9 +53,7 @@ extern "C" {
 
 #if __has_include("ltn_config.h")
 #include "ltn_config.h"
-#  pragma message("?? Using settings from app_config.h")
-#else
-#  pragma message("?? app_config.h not found. Using default config")
+#  pragma message("Using settings from ltn_config.h (Silabs internal)")
 #endif
 
 // -----------------------------------------------------------------------------
@@ -87,7 +85,6 @@ extern "C" {
 #ifdef    WITH_DIRECT_CONNECT
   #include "app_direct_connect.h"
 #endif /* WITH_DIRECT_CONNECT */
-
 
 // -----------------------------------------------------------------------------
 //                                Global Variables
