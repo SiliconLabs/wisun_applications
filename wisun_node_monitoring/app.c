@@ -47,6 +47,10 @@
 #include "sl_string.h"
 #include "sl_memory_manager.h"
 
+#if __has_include("sl_power_manager.h")
+  #include "sl_power_manager.h"
+#endif
+
 #include "sl_wisun_api.h"
 #include "sl_wisun_app_core.h"
 #include "sl_wisun_types.h"
@@ -445,6 +449,87 @@ static uint16_t _get_cert_str_len(const uint8_t *cert, const uint16_t max_cert_l
   return n;
 }
 
+#ifdef   SL_CATALOG_POWER_MANAGER_PRESENT
+/** Power Manager Energy Mode Transition checking
+ * Inclusion (if Power Manager Component is installed):
+#if __has_include("sl_power_manager.h")
+  #include "sl_power_manager.h"
+#endif
+ * Usage:
+  1) call init_power_manager_stats() once at init time
+  2) call print_power_manager_pm_transitions() to print the EM transitions table (count of transitions)
+      Example output:;
+EM transitions
+            to EM0   to EM1   to EM2
+from EM0:        0       57     1155 
+from EM1:     1086        0      105 
+from EM2:      126     1134        0
+  3) call print_power_manager_delays() to print the time spent in each Energy Mode
+      Example output:;
+EM Ticks:   2166947    (      66.130 sec: 0-00:01:06)
+ in EM0:     515284    (      15.725 sec: 0-00:00:15   23.8 %)
+ in EM1:      34487    (       1.052 sec: 0-00:00:01    1.6 %)
+ in EM2:    1617176    (      49.352 sec: 0-00:00:49   74.6 %)  
+*/
+
+  uint32_t pm_transitions[3][3];
+  uint32_t pm_ticks_in_EM[3] = { 0, 0, 0 };
+  uint32_t pm_tick_freq_hz;
+  uint64_t pm_tick_64, previous_pm_tick_64;
+
+  #define EM_EVENT_MASK_ALL      ( \
+    SL_POWER_MANAGER_EVENT_TRANSITION_LEAVING_EM0 | \
+    SL_POWER_MANAGER_EVENT_TRANSITION_LEAVING_EM1 | \
+    SL_POWER_MANAGER_EVENT_TRANSITION_LEAVING_EM2 | \
+    SL_POWER_MANAGER_EVENT_TRANSITION_ENTERING_EM0 | \
+    SL_POWER_MANAGER_EVENT_TRANSITION_ENTERING_EM1 | \
+    SL_POWER_MANAGER_EVENT_TRANSITION_ENTERING_EM2 \
+)
+
+  void my_power_manager_callback(
+    sl_power_manager_em_t from,
+    sl_power_manager_em_t to) {
+      pm_transitions[from][to]++;
+      previous_pm_tick_64 = pm_tick_64;
+      pm_tick_64 = sl_sleeptimer_get_tick_count64();
+      pm_ticks_in_EM[from] += pm_tick_64 - previous_pm_tick_64;
+  }
+
+  sl_power_manager_em_transition_event_handle_t event_handle;
+  sl_power_manager_em_transition_event_info_t   event_info = {
+    .event_mask = EM_EVENT_MASK_ALL,
+    .on_event = my_power_manager_callback,
+  };
+
+  void init_power_manager_stats(void) {
+    sl_power_manager_subscribe_em_transition_event(&event_handle, &event_info);
+    pm_tick_freq_hz = sl_sleeptimer_get_timer_frequency();
+    pm_tick_64 = previous_pm_tick_64 = sl_sleeptimer_get_tick_count64();
+    printf("Power Manager: following Energy Modes transitions\n");
+  }
+
+  void print_power_manager_pm_transitions(void) {
+    printf("EM transitions\n            to EM0   to EM1   to EM2\nfrom EM0: %8ld %8ld %8ld \nfrom EM1: %8ld %8ld %8ld \nfrom EM2: %8ld %8ld %8ld\n",
+      pm_transitions[0][0], pm_transitions[0][1], pm_transitions[0][2],
+      pm_transitions[1][0], pm_transitions[1][1], pm_transitions[1][2],
+      pm_transitions[2][0], pm_transitions[2][1], pm_transitions[2][2]
+    );
+  }
+
+  void print_power_manager_delays(void) {
+    uint64_t total_ticks = pm_ticks_in_EM[0] + pm_ticks_in_EM[1] + pm_ticks_in_EM[2];
+    printf("EM Ticks:%10lld    (%12.03f sec: %s)\n",
+      total_ticks,    (float)total_ticks/pm_tick_freq_hz,      dhms((sl_sleeptimer_timestamp_64_t)(total_ticks / pm_tick_freq_hz)));
+    printf(" in EM0: %10ld    (%12.03f sec: %s %6.01f %%)\n",
+      pm_ticks_in_EM[0], (float)pm_ticks_in_EM[0] / pm_tick_freq_hz, dhms((sl_sleeptimer_timestamp_64_t)((float)pm_ticks_in_EM[0] / pm_tick_freq_hz)), (float)pm_ticks_in_EM[0] / total_ticks * 100 );
+    printf(" in EM1: %10ld    (%12.03f sec: %s %6.01f %%)\n",
+      pm_ticks_in_EM[1], (float)pm_ticks_in_EM[1] / pm_tick_freq_hz, dhms((sl_sleeptimer_timestamp_64_t)((float)pm_ticks_in_EM[1] / pm_tick_freq_hz)), (float)pm_ticks_in_EM[1] / total_ticks * 100 );
+    printf(" in EM2: %10ld    (%12.03f sec: %s %6.01f %%)\n",
+      pm_ticks_in_EM[2], (float)pm_ticks_in_EM[2] / pm_tick_freq_hz, dhms((sl_sleeptimer_timestamp_64_t)((float)pm_ticks_in_EM[2] / pm_tick_freq_hz)), (float)pm_ticks_in_EM[2] / total_ticks * 100 );
+  }
+#endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
+
+
 uint8_t app_join_network(uint8_t network_index) {
   sl_status_t ret;
   sl_wisun_connection_params_t connection_params;
@@ -487,6 +572,7 @@ uint8_t app_join_network(uint8_t network_index) {
   }
 
   // Set device_type based on application settings
+#ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
   if (this_network.device_type == SL_WISUN_LFN ) {
       sprintf(device_type, "LFN (null profile)");
       switch (this_network.lfn_profile) {
@@ -507,7 +593,9 @@ uint8_t app_join_network(uint8_t network_index) {
           break;
         }
       }
-  } else if (this_network.device_type == SL_WISUN_ROUTER ) {
+  }
+#endif /* SL_CATALOG_WISUN_FFN_DEVICE_SUPPORT_PRESENT */
+  if (this_network.device_type == SL_WISUN_ROUTER ) {
 #ifdef   SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
       sprintf(device_type, "FFN with LFN support");
 #else /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
@@ -767,6 +855,10 @@ uint8_t app_join_network(uint8_t network_index) {
     ret = __LINE__; goto cleanup;
   }
 */
+  printfBothTime("Network[%d]: \"%s\": %s]\r\n",
+        app_parameters.network_index,
+        this_network.network_name,
+        app_wisun_phy_to_str(&(network[app_parameters.network_index].phy)));
   ret = sl_wisun_join((const uint8_t *)this_network.network_name, &this_network.phy);
   if (ret == SL_STATUS_OK) {
     printfBothTime("[Connecting to Network[%d]: \"%s\": %s]\r\n",
@@ -870,10 +962,16 @@ void app_task(void *args)
   BootloaderStorageInformation_t storage_info;
 #endif  /* SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT */
 
-  app_timestamp_init();
-  init_app_parameters();
 
-  with_time = to_console = to_rtt = true;
+  app_timestamp_init();
+
+#ifdef   SL_CATALOG_POWER_MANAGER_PRESENT
+  init_power_manager_stats();
+#endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
+
+init_app_parameters();
+
+with_time = to_console = to_rtt = true;
   to_udp = to_coap = false;
 
 #ifdef    APP_CHECK_PREVIOUS_CRASH
@@ -913,8 +1011,11 @@ void app_task(void *args)
   printfBothTime("%s\n", application);
   printfBothTime("%s\n", version);
 
-  printfBothTime("Network %s\n",
+  printfBothTime("Network[%d] %s\n",
+    app_parameters.network_index,
     network[app_parameters.network_index].network_name);
+
+
 #ifdef    SL_CATALOG_APP_OS_STAT_PRESENT
 #ifdef APP_OS_STAT_UPDATE_PERIOD_TIME_MS
 printfBothTime("with app_os_stat every %d ms\n", APP_OS_STAT_UPDATE_PERIOD_TIME_MS);
@@ -1037,11 +1138,15 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
       if (join_res == SL_STATUS_OK) {
         if (now % 60 == 0) {
             printfBothTime("Waiting for %s connection to network[%d]: \"%s\": %s. join_state %d\n",
-                       device_type,
-                       app_parameters.network_index,
-                       network[app_parameters.network_index].network_name,
-                       app_wisun_phy_to_str(&network[app_parameters.network_index].phy),
-                       join_state);
+                      device_type,
+                      app_parameters.network_index,
+                      network[app_parameters.network_index].network_name,
+                      app_wisun_phy_to_str(&network[app_parameters.network_index].phy),
+                      join_state);
+#ifdef   SL_CATALOG_POWER_MANAGER_PRESENT
+            print_power_manager_pm_transitions();
+            print_power_manager_delays();
+#endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
         }
       } else {
         if (join_res != SL_STATUS_OK) {
@@ -1149,8 +1254,14 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
   osDelay(2UL);
 
   if (network[app_parameters.network_index].device_type == SL_WISUN_LFN) {
+  #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
     set_leds(0, 0);
+  #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
   }
+#ifdef   SL_CATALOG_POWER_MANAGER_PRESENT
+  print_power_manager_pm_transitions();
+  print_power_manager_delays();
+#endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
   while (1) {
     ///////////////////////////////////////////////////////////////////////////
     // Put your application code here!                                       //
@@ -1221,6 +1332,10 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
     // Print status message once then disable status
     if ((connected_delay_sec % network[app_parameters.network_index].auto_send_sec == 0) || (send_asap)) {
         if ((print_keep_alive == true) || (send_asap)) {
+#ifdef   SL_CATALOG_POWER_MANAGER_PRESENT
+          print_power_manager_pm_transitions();
+          print_power_manager_delays();
+#endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
           print_and_send_messages (_status_json_string(""),
                     with_time, to_console, to_rtt, to_udp, to_coap);
           print_keep_alive = false;

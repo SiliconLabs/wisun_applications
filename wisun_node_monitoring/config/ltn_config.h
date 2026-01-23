@@ -56,15 +56,15 @@
 #endif /* APP_VERSION_STRING */
 
 #ifndef   NVM3_APP_PARAMS_VERSION
-  #define NVM3_APP_PARAMS_VERSION   10000
+  #define NVM3_APP_PARAMS_VERSION   10001
 #endif /* NVM3_APP_PARAMS_VERSION */
 
 #ifndef   MAX_NETWORK_CONFIGS
-  #define MAX_NETWORK_CONFIGS 3
+  #define MAX_NETWORK_CONFIGS 4
 #endif /* MAX_NETWORK_CONFIGS*/
 
 #ifndef   DEFAULT_NETWORK_INDEX
-  #define DEFAULT_NETWORK_INDEX 0
+  #define DEFAULT_NETWORK_INDEX 1
 #endif /* DEFAULT_NETWORK_INDEX */
 
 #ifndef   MULTICAST_OTA_STORE_IN_FLASH
@@ -78,27 +78,27 @@
 
 /* network */
 #ifndef   NETWORK_NAMEs
-  #define NETWORK_NAMEs                   {          "large_test_network",                   "rns-wisun-197",                       "rns-wisun-200" }
+  #define NETWORK_NAMEs                   {          "large_test_network",                   "rns-wisun-197",                       "rns-wisun-197" ,                       "rns-wisun-197" }
 #endif /* NETWORK_NAMEs */
 
 #ifndef   REG_DOMAINs
-  #define REG_DOMAINs                     { SL_WISUN_REGULATORY_DOMAIN_EU,     SL_WISUN_REGULATORY_DOMAIN_EU,         SL_WISUN_REGULATORY_DOMAIN_EU }
+  #define REG_DOMAINs                     { SL_WISUN_REGULATORY_DOMAIN_EU,     SL_WISUN_REGULATORY_DOMAIN_EU,         SL_WISUN_REGULATORY_DOMAIN_NA ,         SL_WISUN_REGULATORY_DOMAIN_EU }
 #endif /* REG_DOMAINs */
 
 #ifndef   PHY_MODE_IDs
-  #define PHY_MODE_IDs                    {                             3,                                 1,                                     1 }
+  #define PHY_MODE_IDs                    {                             3,                                 1,                                    54 ,                                     1 }
 #endif /* PHY_MODE_IDs */
 
 #ifndef   CHAN_PLAN_IDs
-  #define CHAN_PLAN_IDs                   {                            33,                                34,                                    32 }
+  #define CHAN_PLAN_IDs                   {                            33,                                34,                                     4 ,                                    34 }
 #endif /* CHAN_PLAN_IDs */
 
 #ifndef   NETWORK_SIZEs
-  #define NETWORK_SIZEs                   {   SL_WISUN_NETWORK_SIZE_LARGE,      SL_WISUN_NETWORK_SIZE_MEDIUM,           SL_WISUN_NETWORK_SIZE_SMALL }
+  #define NETWORK_SIZEs                   {   SL_WISUN_NETWORK_SIZE_LARGE,      SL_WISUN_NETWORK_SIZE_MEDIUM,           SL_WISUN_NETWORK_SIZE_SMALL ,           SL_WISUN_NETWORK_SIZE_SMALL }
 #endif /* NETWORK_SIZEs */
 
 #ifndef   PREFERRED_PAN_IDs
-  #define PREFERRED_PAN_IDs               {                        0xffff,                            0xffff,                                0xffff }
+  #define PREFERRED_PAN_IDs               {                        0xffff,                            0xffff,                                0xffff ,                                0xffff }
 #endif /* PREFERRED_PAN_IDs */
 
 #ifndef   REGULATION
@@ -115,42 +115,42 @@
 
 /* device */
 #ifndef   DEVICE_TYPEs
-  #define DEVICE_TYPEs                    {               SL_WISUN_ROUTER,                   SL_WISUN_ROUTER,                       SL_WISUN_ROUTER }
+  #define DEVICE_TYPEs                    {               SL_WISUN_ROUTER,                      SL_WISUN_LFN,                       SL_WISUN_ROUTER ,                       SL_WISUN_ROUTER }
 #endif /* DEVICE_TYPEs */
 
 #ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
 #ifndef   LFN_PROFILEs
-  #define LFN_PROFILEs                    { SL_WISUN_LFN_PROFILE_BALANCED,          SL_WISUN_LFN_PROFILE_ECO,             SL_WISUN_LFN_PROFILE_TEST }
+  #define LFN_PROFILEs                    {      SL_WISUN_LFN_PROFILE_ECO,          SL_WISUN_LFN_PROFILE_TEST,        SL_WISUN_LFN_PROFILE_BALANCED ,        SL_WISUN_LFN_PROFILE_BALANCED }
 #endif /* LFN_PROFILEs */
 #endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
 
 #ifndef   TX_POWER_DDBMs
-  #define TX_POWER_DDBMs                  {                             0,                                 0,                                     0 }
+  #define TX_POWER_DDBMs                  {                             0,                                 0,                                     0 ,                                     0 }
 #endif /* TX_POWER_DDBMs */
 
 #ifndef   MAX_CHILD_COUNTs
-  #define MAX_CHILD_COUNTs                {                            22,                                22,                                    22 }
+  #define MAX_CHILD_COUNTs                {                            22,                                22,                                    22 ,                                    22 }
 #endif /* MAX_CHILD_COUNTs */
 
 #ifndef   MAX_NEIGHBOR_COUNTs
-  #define MAX_NEIGHBOR_COUNTs             {                            32,                                32,                                    32 }
+  #define MAX_NEIGHBOR_COUNTs             {                            32,                                32,                                    32 ,                                    32 }
 #endif /* MAX_NEIGHBOR_COUNTs */
 
 #ifndef   MAX_SECURITY_NEIGHBOR_COUNTs
-  #define MAX_SECURITY_NEIGHBOR_COUNTs    {                           500,                               500,                                   500 }
+  #define MAX_SECURITY_NEIGHBOR_COUNTs    {                           500,                               500,                                   500 ,                                   500 }
 #endif /* MAX_SECURITY_NEIGHBOR_COUNTs */
 
 /* Application */
 #ifndef   AUTO_SEND_SECs
-  #define AUTO_SEND_SECs                  {                       (15*60),                            (1*60),                                (5*60) }
+  #define AUTO_SEND_SECs                  {                       (15*60),                            (1*60),                                (5*60) ,                                (1*60) }
 #endif /* AUTO_SEND_SECs */
 
 #ifndef   UDP_NOTIFICATION_DESTINATIONs
-  #define UDP_NOTIFICATION_DESTINATIONs   {           "fd00:6172:6d00::1",               "fd00:6172:6d00::1",     "2001:db8:0:2:d47:e4c8:60ad:b4ab" }
+  #define UDP_NOTIFICATION_DESTINATIONs   {           "fd00:6172:6d00::1",               "fd00:6172:6d00::1",     "2001:db8:0:2:d47:e4c8:60ad:b4ab" ,                    "fd00:6172:6d00::1"}
 #endif /* UDP_NOTIFICATION_DESTINATIONs */
 
 #ifndef   COAP_NOTIFICATION_DESTINATIONs
-  #define COAP_NOTIFICATION_DESTINATIONs  {           "fd00:6172:6d00::2",               "fd00:6172:6d00::2",     "2001:db8:0:2:d47:e4c8:60ad:b4ab" }
+  #define COAP_NOTIFICATION_DESTINATIONs  {           "fd00:6172:6d00::2",               "fd00:6172:6d00::2",     "2001:db8:0:2:d47:e4c8:60ad:b4ab" ,                    "fd00:6172:6d00::2"}
 #endif /* COAP_NOTIFICATION_DESTINATIONs */
 
 #endif /* LTN_CONFIG_H */

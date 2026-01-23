@@ -239,9 +239,9 @@ void set_app_parameters_defaults(int network_indexes) {
   const char*     COAP_NOTIFICATION_DESTINATION[MAX_NETWORK_CONFIGS] = COAP_NOTIFICATION_DESTINATIONs;
 
   // settings defined once for all networks
-  app_parameters.app_params_version          = NVM3_APP_PARAMS_VERSION;
-  app_parameters.network_count               = MAX_NETWORK_CONFIGS;
-  app_parameters.network_index = DEFAULT_NETWORK_INDEX;
+  app_parameters.app_params_version = NVM3_APP_PARAMS_VERSION;
+  app_parameters.network_count      = MAX_NETWORK_CONFIGS;
+  app_parameters.network_index      = DEFAULT_NETWORK_INDEX;
 
   int i;
 
@@ -647,31 +647,37 @@ sl_status_t read_app_parameters()   {
   int i;
   status = nvm3_readData(nvm3_defaultHandle, NVM3_APP_KEY, &app_parameters, sizeof(app_parameters));
   if (status == SL_STATUS_OK) {
-      printfBothTime("read_app_parameters(): There are %d networks (key 0x%04X, %d bytes)\n",
-                     app_parameters.network_count, NVM3_APP_KEY, sizeof(app_parameters));
+      printfBothTime("read_app_parameters(): There are %d networks in NVM (key 0x%04X, %d bytes)\n",
+                    app_parameters.network_count, NVM3_APP_KEY, sizeof(app_parameters));
+      if (app_parameters.network_count != MAX_NETWORK_CONFIGS) {
+          printfBothTime("WARNING: read_app_parameters(): app_parameters.network_count (%d) != MAX_NETWORK_CONFIGS (%d)\n",
+                      app_parameters.network_count, MAX_NETWORK_CONFIGS);
+          status = SL_STATUS_INVALID_PARAMETER;
+          return status;
+      }
       for (i=0; i<MAX_NETWORK_CONFIGS; i++) {
           status = nvm3_readData(nvm3_defaultHandle, NVM3_APP_KEY+1+i, &network[i], sizeof(app_settings_wisun_t));
           if (status != SL_STATUS_OK) {
               printfBothTime("nvm3_readData(nvm3_defaultHandle, 0x%04x, app_parameters, %d) returned 0x%04lX\n",
-                           NVM3_APP_KEY+1+i, sizeof(app_settings_wisun_t), status);
+                          NVM3_APP_KEY+1+i, sizeof(app_settings_wisun_t), status);
           } else {
               printfBothTime("read_app_parameters(): network %d settings read from nvm3 (key 0x%04x, %d bytes)\n",
-                           i, NVM3_APP_KEY+1+i, sizeof(app_settings_wisun_t));
+                          i, NVM3_APP_KEY+1+i, sizeof(app_settings_wisun_t));
           }
       }
   }
   if (status != SL_STATUS_OK) {
       if (status == SL_STATUS_NOT_FOUND) {
           printfBothTime("nvm3_readData(nvm3_defaultHandle, 0x%04x, app_parameters, %d) returned 0x%04lX/NOT_FOUND, (The 0x%04x key is not set yet)\n",
-                       NVM3_APP_KEY, sizeof(app_parameters), status, NVM3_APP_KEY);
+                      NVM3_APP_KEY, sizeof(app_parameters), status, NVM3_APP_KEY);
       } else {
           if (status == SL_STATUS_NVM3_READ_DATA_SIZE) {
               printfBothTime("nvm3_readData(nvm3_defaultHandle, 0x%04x, app_parameters, %d) returned 0x%04lX/SL_STATUS_NVM3_READ_DATA_SIZE, (Trying to read with a length different from actual object size)\n",
-                           NVM3_APP_KEY, sizeof(app_parameters), status);
+                          NVM3_APP_KEY, sizeof(app_parameters), status);
           } else {
                      // What to do here? Assert?
               printfBothTime("nvm3_readData(nvm3_defaultHandle, 0x%04x, app_parameters, %d) returned 0x%04lX, (check sl_status.h)\n",
-                       NVM3_APP_KEY, sizeof(app_parameters), status);
+                      NVM3_APP_KEY, sizeof(app_parameters), status);
           }
       }
   }

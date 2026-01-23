@@ -54,8 +54,6 @@ extern "C" {
 #if __has_include("ltn_config.h")
 #include "ltn_config.h"
 #  pragma message("Using settings from ltn_config.h (Silabs internal)")
-#else
-#  pragma message("Using default config")
 #endif
 
 // -----------------------------------------------------------------------------
