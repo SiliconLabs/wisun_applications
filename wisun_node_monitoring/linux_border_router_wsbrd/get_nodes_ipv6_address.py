@@ -17,9 +17,21 @@ NOTES:
 """
 
 bus = SystemBus()
-proxy = bus.get("com.silabs.Wisun.BorderRouter", "/com/silabs/Wisun/BorderRouter")
-
-nodes = proxy.Nodes
+try:
+    SERVICE =  "com.silabs.Wisun.BorderRouter"
+    OBJECT  = "/com/silabs/Wisun/BorderRouter"
+    proxy = bus.get(SERVICE, OBJECT)
+    nodes = proxy.Nodes
+except Exception as e:
+    try:
+        SERVICE =  "com.silabs.Wisun.SocBorderRouterAgent"
+        OBJECT  = "/com/silabs/Wisun/SocBorderRouterAgent"
+        proxy = bus.get(SERVICE, OBJECT)
+        nodes = dict()
+        nodes[0] = dict()
+        nodes[0][1] = list()
+    except Exception as e:
+        print(f" proxy exception for SERVICE {SERVICE} OBJECT {OBJECT}: {e}")
 
 def sliceIPv6(source):
     return [source[i : i + 4] for i in range(0, len(source), 4)]

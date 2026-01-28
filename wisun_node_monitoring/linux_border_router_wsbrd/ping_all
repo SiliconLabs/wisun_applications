@@ -13,20 +13,31 @@ fi
 
 count=0
 responded=0
+max_elapsed=0
+max_ipv6="none"
 
 for ipv6 in $ipv6s
 do
-    dev=$(echo $ipv6 | cut -d ':' -f 8)
     cmd="ping -6 -w 3 -c 1 ${ipv6} ${args} "
     echo -n "${cmd} : "
+    start_time="$(date -u +%s.%N)"
     res=$( ${cmd} )
+    end_time="$(date -u +%s.%N)"
+    elapsed="$( echo $end_time - $start_time | bc )"
     count=$(($count+1))
     time=$( echo ${res} | grep -oP ' time=[0-9]*.[0-9]* ms')
     received=$( echo ${res} | grep -oP ' [0-9]* received')
-    echo "${received}  ${time}"
     if [ "${time}" != "" ]; then
       responded=$(($responded+1))
+      test=$(echo "${elapsed} > ${max_elapsed}" | bc)
+      if [ "${test}" = "1" ]; then
+        max_elapsed=${elapsed}
+        max_ipv6=$ipv6
+      fi
+    else
+      time="--timeout--"
     fi
+    echo "${received}  ${time}"
 done
 
-echo $count devices at $(date +"%H:%M:%S"). $responded responded.
+printf "$count devices at $(date +"%H:%M:%S"). $responded responded. max response time %6.03f sec from $max_ipv6\n" $max_elapsed

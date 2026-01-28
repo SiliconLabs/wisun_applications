@@ -13,6 +13,7 @@ import sys
 import platform
 import datetime
 import traceback
+import json
 
 LOG_FILE                  = 'wsbrd_topology.log'
 
@@ -22,6 +23,7 @@ Prints the IPv6 address of each node connected to the running WSBRD instance.
 
 USAGE:
     wsbrd_topology.py <ipv6 or tag> <output_mode>
+    wsbrd_topology.py  tag           dot
     wsbrd_topology.py  ipv6          dot
     wsbrd_topology.py  ipv6          svg
     wsbrd_topology.py  tag          json
@@ -152,18 +154,29 @@ def read_graph():
         ipv6 = prettyIPv6(bytes(rpl_node[0]).hex())
         tag = IPv6_to_tag(ipv6)
         LFN_flag = rpl_node[1]
-        if tag not in list(nodes):
-            nodes[tag] = dict()
-        nodes[tag]['ipv6'] = ipv6
-        nodes[tag]['is_LFN'] = ('False' == LFN_flag)
-        if len(rpl_node) > 2:
-            parents_list = rpl_node[2]
-            if len(parents_list) > 0:
-                primary_parent = parents_list[0]
-                parent_ipv6 = prettyIPv6( bytes(primary_parent).hex() )
-                parent_tag  = IPv6_to_tag(parent_ipv6)
+        if index_mode == 'ipv6':
+            index = ipv6
+        else:
+            index = tag
+        if index not in list(nodes):
+            nodes[index] = dict()
+        #print(f"index_mode {index_mode}: index {index}")
+        nodes[index]['ipv6'] = ipv6
+        nodes[index]['is_LFN'] = ('False' == LFN_flag)
+        parents_list = rpl_node[2]
+        if len(parents_list) == 0:
+            #print(f"    #{ipv6} has no parent")
+            pass
+        else:
+            primary_parent = parents_list[0]
+            parent_ipv6 = prettyIPv6( bytes(primary_parent).hex() )
+            parent_tag  = IPv6_to_tag(parent_ipv6)
+            if index_mode == 'ipv6':
+                parent = parent_ipv6
+            else:
                 parent = parent_tag
-                nodes[tag]['parent'] = parent
+            #print(f"index_mode {index_mode}: index {index}  parent {parent}")
+            nodes[index]['parent'] = parent
 
 
 def read_nodes_properties():
@@ -172,11 +185,15 @@ def read_nodes_properties():
     for node_props in dbus_properties:
         eui64 = bytes(node_props[0]).hex()
         tag = EUI64_to_tag(eui64)
-        if tag not in list(nodes):
-            nodes[tag] = dict()
+        if index_mode == 'ipv6':
+            index = eui64
+        else:
+            index = tag
+        if index not in list(nodes):
+            nodes[index] = dict()
         nodes_property_dict = node_props[1]
         for p in list(nodes_property_dict):
-            nodes[tag][p] = nodes_property_dict[p]
+            nodes[index][p] = nodes_property_dict[p]
 
 
 def fill_dot():
@@ -198,9 +215,9 @@ def fill_dot():
     network_info = ""
 
     network_name   = os_command("wsbrd_cli status | grep network_name").split()[1]
-    phy_mode_id    = os_command("wsbrd_cli status | grep phy_mode_id")
-    chan_plan_id   = os_command("wsbrd_cli status | grep chan_plan_id")
-    pan_id         = os_command("wsbrd_cli status | grep panid")
+    phy_mode_id    = os_command("wsbrd_cli status | grep phy_mode_id").strip()
+    chan_plan_id   = os_command("wsbrd_cli status | grep chan_plan_id").strip()
+    pan_id         = os_command("wsbrd_cli status | grep panid").strip()
     network_uptime = os_command("ps -C wsbrd,wsbrd-fuzz -o etime").split('\n')[1].strip()
     dot_nodes += f'    "{RCP}" [shape="circle" fillcolor="gold"] \n'
 
@@ -276,7 +293,7 @@ def fill_dot():
     network_info += f'wsbrd running for {network_uptime}\\n'
     network_info += f'{routed_devices} routed_devices (green)\\n{non_routed_devices} non_routed_devices (orange)\\n\\{long_lost_devices} long_lost_devices (red)'
 
-    dot_nodes += f'    network     [label="{network_info}" shape=rectangle] \n'
+    dot_nodes += f'    "network" [label="{network_info}" shape=rectangle] \n'
     dot_content = dot_header + dot_nodes + dot_edges + dot_footer
     return dot_content
 
@@ -290,6 +307,10 @@ read_graph()
 read_nodes_properties()
 #list_nodes()
 
-dot_content = fill_dot()
-print(dot_content)
+if output_mode == 'dot':
+    dot_content = fill_dot()
+    print(dot_content)
+
+if output_mode == 'json':
+    print(json.dumps(nodes, indent=4))
 

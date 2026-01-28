@@ -33,6 +33,18 @@ ENABLE_SILENT=0
 PING=0
 PAUSE=0
 
+if command -v coap-client >/dev/null 2>&1; then
+    coap_client_cmd="coap-client"
+else
+  if command -v coap-client-notls >/dev/null 2>&1; then
+    coap_client_cmd="coap-client-notls"
+  else
+    echo "coap-client and coap-client-notls not found. Install one of these before running the script."
+    exit 1
+  fi
+fi
+
+
 # Command line parameters
 while true; do
     case "$1" in
@@ -108,7 +120,7 @@ trace()
 
 coap_cmd()
 {
-  cmd="coap-client -m get -N -B ${B} -t text coap://[${1}]:5683/cli/iperf -e \"${2}\""
+  cmd="${coap_client_cmd} -m get -N -B ${B} -t text coap://[${1}]:5683/cli/iperf -e \"${2}\""
 
   if [ "$SILENT" = "1" ];
   then
@@ -129,7 +141,7 @@ coap_cmd()
 
 coap_cmd_grep_id()
 {
-  cmd="coap-client -m get -N -B ${B} -t text coap://[${1}]:5683/cli/iperf -e '${2}'"
+  cmd="${coap_client_cmd} -m get -N -B ${B} -t text coap://[${1}]:5683/cli/iperf -e '${2}'"
 
   coap_cmd_res=$(eval $cmd && wait)
 
