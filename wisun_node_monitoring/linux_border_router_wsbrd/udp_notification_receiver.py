@@ -18,9 +18,10 @@ newline = " "
 now = datetime.datetime.now()
 now_str = str(now.strftime('%Y-%m-%d %H:%M:%S'))
 
+space = " "
+
 if (len(sys.argv) > 2):
   newline = sys.argv[2]
-  space = ""
 
 if (len(sys.argv) > 3):
   monitoring_path = sys.argv[3]
@@ -56,11 +57,10 @@ while True:
 
   try:
     message_string = data.decode("utf-8").replace(" ", space).replace("\n", newline)
+    print (f"[{now_str}] Rx {PORT}: {newline}", message_string, flush=True)
   except Exception as e:
     print(f"Exception {e} (from {addr})", flush=True)
     print(traceback.format_exc())
-
-  print (f"[{now_str}] Rx {PORT}: {newline}", message_string, flush=True)
 
   if monitoring_path:
     try:
