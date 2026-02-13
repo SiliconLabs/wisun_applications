@@ -195,6 +195,7 @@ void print_app_parameters() {
   printfBothTime("app_parameters.network_count               %d\n", app_parameters.network_count);
   printfBothTime("app_parameters.network_index               %d\n", app_parameters.network_index);
   printf("\n");
+  printf("network parameters (from app_parameters.h)\n");
   for (i=0; i<MAX_NETWORK_CONFIGS; i++) {
     print_network_parameters(i);
     printf("\n");
@@ -260,12 +261,20 @@ void set_app_parameters_defaults(int network_indexes) {
     if (network_indexes & (1 << i)) {
       printfBothTime("Network %d defaults\n", i);
       /* network */
-      snprintf(network[i].network_name, SL_WISUN_NETWORK_NAME_SIZE, "%s", NETWORK_NAME[i]);
+      if (i == DEFAULT_NETWORK_INDEX) {
+        snprintf(network[i].network_name, SL_WISUN_NETWORK_NAME_SIZE, "%s", WISUN_CONFIG_NETWORK_NAME);
+        network[i].phy.config.fan11.reg_domain   = WISUN_CONFIG_REGULATORY_DOMAIN;
+        network[i].phy.config.fan11.phy_mode_id  = WISUN_CONFIG_PHY_MODE_ID;
+        network[i].phy.config.fan11.chan_plan_id = WISUN_CONFIG_CHANNEL_PLAN_ID;
+        network[i].network_size                  = WISUN_CONFIG_NETWORK_SIZE;
+      } else {
+        snprintf(network[i].network_name, SL_WISUN_NETWORK_NAME_SIZE, "%s", NETWORK_NAME[i]);
+        network[i].phy.config.fan11.reg_domain   = REG_DOMAIN[i];
+        network[i].phy.config.fan11.phy_mode_id  = PHY_MODE_ID[i] ;
+        network[i].phy.config.fan11.chan_plan_id = CHAN_PLAN_ID[i];
+        network[i].network_size                  = NETWORK_SIZE[i];
+      }
       network[i].phy.type                      = SL_WISUN_PHY_CONFIG_FAN11;
-      network[i].phy.config.fan11.reg_domain   = REG_DOMAIN[i];
-      network[i].phy.config.fan11.phy_mode_id  = PHY_MODE_ID[i] ;
-      network[i].phy.config.fan11.chan_plan_id = CHAN_PLAN_ID[i];
-      network[i].network_size                  = NETWORK_SIZE[i];
       network[i].preferred_pan_id              = PREFERRED_PAN_ID[i];
       network[i].regulation                    = REGULATION;
       network[i].regulation_warning_threshold  = REGULATION_WARNING_THRESHOLD; // see sl_wisun_set_regulation_tx_thresholds
@@ -280,7 +289,15 @@ void set_app_parameters_defaults(int network_indexes) {
       network[i].rx_mdr_capable                = 0;
 #endif /* SL_RAIL_IEEE802154_SUPPORTS_G_MODE_SWITCH */
       /* device */
-      network[i].device_type                   = DEVICE_TYPE[i];
+      if (i == DEFAULT_NETWORK_INDEX) {
+        #ifdef    WISUN_CONFIG_DEVICE_TYPE
+          network[i].device_type                   = WISUN_CONFIG_DEVICE_TYPE;
+        #else  /* WISUN_CONFIG_DEVICE_TYPE */
+          network[i].device_type                   = DEVICE_TYPE[i];
+        #endif /* WISUN_CONFIG_DEVICE_TYPE */
+      } else {
+        network[i].device_type                   = DEVICE_TYPE[i];
+      }
 #ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
       network[i].lfn_profile                   = LFN_PROFILE[i];
 #endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
@@ -330,16 +347,6 @@ sl_status_t init_app_parameters() {
         if (status != SL_STATUS_OK) {
             printfBothTime("Issue saving app_parameters: 0x%02x\n", (uint16_t)status);
         }
-    } else {
-      #define VALIDATING 0
-      #if VALIDATING /* remove after validation */
-        printf("\n Delete code between lines 328 and 334 once it works!!!\n\n");
-        set_app_parameters_defaults(0x0000);
-        status = save_app_parameters();
-        if (status != SL_STATUS_OK) {
-            printfBothTime("Issue saving app_parameters: 0x%02x\n", (uint16_t)status);
-        }
-        #endif /* end of removed part*/
     }
     print_app_parameters();
     app_parameter_mutex_release();
