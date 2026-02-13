@@ -1094,6 +1094,7 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
 #endif /* AUTO_CLEAR_CREDENTIAL_CACHE */
 
 #ifdef    LIST_RF_CONFIGS
+  printf("RAIL PHYs (as in config/rail/radio_settings.radioconf, from Wi-SUN Radio Configurator)\n");
   list_rf_configs();
 #endif /* LIST_RF_CONFIGS */
 
@@ -1152,6 +1153,7 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
         if (join_res != SL_STATUS_OK) {
             if (join_res == SL_STATUS_FAIL) {
                 printfBothTime("Invalid PHY\n");
+                printfBothTime("Check that this PHY is listed as a RAIL PHY (see above)\n");
             } else {
                 printfBothTime("Check the traces and the app_join_network() code around line %d\n", join_res);
             }
