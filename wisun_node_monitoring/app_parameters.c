@@ -54,6 +54,7 @@
 #include "app_timestamp.h"
 #include "app_rtt_traces.h"
 #include "app_action_scheduler.h"
+#include "nvm3_default_config.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -309,6 +310,11 @@ sl_status_t init_app_parameters() {
   _app_parameters_mutex = osMutexNew(&_app_parameters_mutex_attr);
   assert(_app_parameters_mutex != NULL);
 
+  _Static_assert(
+      sizeof(app_settings_wisun_t) <= NVM3_DEFAULT_MAX_OBJECT_SIZE,
+      "app_settings_wisun_t exceeds NVM3_DEFAULT_MAX_OBJECT_SIZE"
+  );
+
   status = nvm3_initDefault();
   if (status != SL_STATUS_OK) {
     printfBothTime("ERROR initializing NVM3\n");
@@ -325,7 +331,7 @@ sl_status_t init_app_parameters() {
             printfBothTime("Issue saving app_parameters: 0x%02x\n", (uint16_t)status);
         }
     } else {
-      #define VALIDATING 1
+      #define VALIDATING 0
       #if VALIDATING /* remove after validation */
         printf("\n Delete code between lines 328 and 334 once it works!!!\n\n");
         set_app_parameters_defaults(0x0000);

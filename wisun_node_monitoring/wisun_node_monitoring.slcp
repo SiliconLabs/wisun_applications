@@ -97,6 +97,7 @@ define:
   - name: DEBUG_EFM_USER
 
 configuration:
+- {name: NVM3_DEFAULT_MAX_OBJECT_SIZE, value: 300}
 - {name: SL_WISUN_COAP_RESOURCE_HND_STACK_SIZE_WORD, value: 1024}
 - {name: SL_WISUN_COAP_RESOURCE_HND_MAX_RESOURCES, value: 50U}
 - {name: SL_WISUN_OTA_DFU_AUTO_INSTALL_ENABLED, value: 0U}
