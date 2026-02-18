@@ -23,12 +23,31 @@ The Silicon Labs Wi-SUN stack allows for a wide variety applications to be built
 - [Wi-SUN Node Monitoring](https://github.com/SiliconLabs/wisun_applications_staging/tree/main/wisun_node_monitoring): An extendable node monitoring application providing information on the device/board/application and connected statistics. It can be easily extended to monitor sensors and control actuators.
 - [Wi-SUN SoC CSMP Agent Skeleton](/wisun_soc_csmp_agent/): A reference implementation of the CSMP agent sample application skeleton that can be built using the [csmp-agent-lib](https://github.com/CiscoDevNet/csmp-agent-lib) build system, to allow a node to connect to FND.
 
-## Add the 'Wi-SUN Applications' Repository to Simplicity Studio 5 ##
+## Add the 'Wi-SUN Applications' to Simplicity Studio 5 ##
 
-1. Download and install [Simplicity Studio 5](https://www.silabs.com/developers/simplicity-studio).
+In Simplicity Studio 5 **External Repositories** are used with content cloned by Simplicity Studio 5.
+
+1. Download and install [Simplicity Studio 5](https://www.silabs.com/software-and-tools/simplicity-studio/simplicity-studio-version-5).
 2. On Simplicity Studio 5, go to **Window -> Preferences -> Simplicity Studio -> External Repos**.
 3. Click **[Add]**. In the **URI** field, copy & paste the following link: `https://github.com/SiliconLabs/wisun_applications.git`
 4. Click **[Next]** then **[Finish]** and **[Apply and Close]**.
+
+## Add the 'Wi-SUN Applications' to Simplicity Studio 6 ##
+
+In Simplicity Studio 6 **Extensions** are used with local content already available, whether it comes from a `.zip`, a git clone, or any other source. Simplicity Studio 6 doesn't clone repositories for Extensions.
+
+### Prerequisites ###
+
+- `git` installed locally
+
+### Adding the Extension ###
+
+1. Clone the [wisun_applications](`https://github.com/SiliconLabs/wisun_applications.git`) repository on your machine: `git clone  https://github.com/SiliconLabs/wisun_applications.git`
+   - This will create a `wisun_applications` subfolder and fill it with the GitHub files.
+2. Download and install [Simplicity Studio 6](https://www.silabs.com/developers/simplicity-studio).
+3. On Simplicity Studio 6, go to **SETTINGS -> SDKs**.
+4. Click **[ADD EXTENSION]**. In the **BROWSE** dialog, browse to your local folder and press 'Select Folder'
+5. Tick the selection box on the 'Wi-SUN Applications' line, then press 'Finish'
 
 ## Create the Wi-SUN Applications Example Projects ##
 
