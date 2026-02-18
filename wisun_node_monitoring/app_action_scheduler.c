@@ -66,17 +66,14 @@ static osEventFlagsId_t  g_scheduler_flags;
 
 #define APP_SCHEDULER_FLAG_EXECUTE   (1U << 0)
 
-// Optional: tune stack size/prio as needed.
-static uint8_t g_scheduler_task_stack[512];
-
 static const osThreadAttr_t g_scheduler_task_attr = {
   .name       = "scheduler_action",
   .attr_bits   = osThreadDetached,
   .cb_mem      = NULL,
   .cb_size     = 0,
   .stack_mem  = NULL,
-  .stack_size = 512,
-  .priority   = osPriorityAboveNormal,
+  .stack_size = 512, // Optional: tune stack size as needed.
+  .priority   = osPriorityAboveNormal, // Optional: tune stack prio as needed.
   .tz_module   = 0
 };
 
