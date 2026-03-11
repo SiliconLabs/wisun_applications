@@ -106,23 +106,23 @@ sl_status_t app_direct_connect(bool is_enabled)
     psa_set_key_algorithm  (&pmk_key_attributes, PSA_ALG_HMAC(PSA_ALG_SHA_1));
     ret = psa_import_key   (&pmk_key_attributes, direct_connect_pmk, SL_WISUN_PMK_LEN, &app_direct_connect_pmk_key_id);
     if (ret != PSA_SUCCESS) {
-        printfBothTime("PMK import failed: psa_import_key: %"PRIu32"\r\n", ret);
+        printfBoth("PMK import failed: psa_import_key: %"PRIu32"\r\n", ret);
       status = SL_STATUS_FAIL;
       goto error_handler;
     }
 
     status = sl_wisun_set_direct_connect_pmk(app_direct_connect_pmk_key_id);
     if (status != SL_STATUS_OK) {
-        printfBothTime("PMK import failed: sl_wisun_set_direct_connect_pmk: %"PRIu32"\r\n", ret);
+        printfBoth("PMK import failed: sl_wisun_set_direct_connect_pmk: %"PRIu32"\r\n", ret);
       goto error_handler;
     }
   }
 
   status = sl_wisun_set_direct_connect_state(is_enabled);
   if (status != SL_STATUS_OK) {
-      printfBothTime("Failed: sl_wisun_set_direct_connect_state(%d): %"PRIu32"\r\n", is_enabled, status);
+      printfBoth("Failed: sl_wisun_set_direct_connect_state(%d): %"PRIu32"\r\n", is_enabled, status);
   } else {
-      printfBothTime("Direct Connect %s\r\n", is_enabled ? "enabled" : "disabled");
+      printfBoth("Direct Connect %s\r\n", is_enabled ? "enabled" : "disabled");
   }
 
 error_handler:

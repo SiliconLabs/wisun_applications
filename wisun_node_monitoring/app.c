@@ -427,7 +427,7 @@ void leds_flash(uint16_t count, uint16_t delay_ms) {
   uint16_t i;
   uint32_t  ticks;
   ticks = (uint32_t)1.0*delay_ms;
-  printfTime("leds_flash(%d, %d)\n", count, delay_ms);
+  printf("leds_flash(%d, %d)\n", count, delay_ms);
   for (i=0; i<count; i++) {
       set_leds(0, 0);
       osDelay(ticks);
@@ -608,25 +608,31 @@ uint8_t app_join_network(uint8_t network_index) {
     device_type);
 
   if (this_network.device_type == SL_WISUN_ROUTER) {
-    switch (this_network.network_size) {
-      case SL_WISUN_NETWORK_SIZE_SMALL:
-        connection_params = SL_WISUN_PARAMS_PROFILE_SMALL;
-        break;
-      case SL_WISUN_NETWORK_SIZE_MEDIUM:
-        connection_params = SL_WISUN_PARAMS_PROFILE_MEDIUM;
-        break;
-      case SL_WISUN_NETWORK_SIZE_LARGE:
-        connection_params = SL_WISUN_PARAMS_PROFILE_LARGE;
-        break;
-      case SL_WISUN_NETWORK_SIZE_TEST:
-        connection_params = SL_WISUN_PARAMS_PROFILE_TEST;
-        break;
-      case SL_WISUN_NETWORK_SIZE_CERTIFICATION:
-        connection_params = SL_WISUN_PARAMS_PROFILE_CERTIF;
-        break;
-      default:
-        printfBothTime("[Failed: unsupported network size %d ]\r\n", this_network.network_size);
-        ret = __LINE__; goto cleanup;
+    if (this_network.use_special_connect_param)
+    {
+      printfBothTime("=== use_special_connect_param true, set connection param to SL_WISUN_PARAMS_PROFILE_SPECIAL ====\r\n");
+      connection_params = SL_WISUN_PARAMS_PROFILE_SPECIAL;
+    } else {
+      switch (this_network.network_size) {
+        case SL_WISUN_NETWORK_SIZE_SMALL:
+          connection_params = SL_WISUN_PARAMS_PROFILE_SMALL;
+          break;
+        case SL_WISUN_NETWORK_SIZE_MEDIUM:
+          connection_params = SL_WISUN_PARAMS_PROFILE_MEDIUM;
+          break;
+        case SL_WISUN_NETWORK_SIZE_LARGE:
+          connection_params = SL_WISUN_PARAMS_PROFILE_LARGE;
+          break;
+        case SL_WISUN_NETWORK_SIZE_TEST:
+          connection_params = SL_WISUN_PARAMS_PROFILE_TEST;
+          break;
+        case SL_WISUN_NETWORK_SIZE_CERTIFICATION:
+          connection_params = SL_WISUN_PARAMS_PROFILE_CERTIF;
+          break;
+        default:
+          printfBothTime("[Failed: unsupported network size %d ]\r\n", this_network.network_size);
+          ret = __LINE__; goto cleanup;
+      }
     }
     connection_params.traffic.lowpan_mtu = this_network.lowpan_mtu;
     connection_params.traffic.ipv6_mru = this_network.ipv6_mru;
@@ -683,9 +689,9 @@ uint8_t app_join_network(uint8_t network_index) {
     ret = __LINE__; goto cleanup;
   }
 
-  ret = sl_wisun_set_fan_tps_version(this_network.phy.type);
+  ret = sl_wisun_set_fan_tps_version(this_network.fan_version);
   if (ret != SL_STATUS_OK) {
-    printf("[Failed: unable to set FAN TPS version %ld: %lu]\r\n", this_network.phy.type, ret);
+    printf("[Failed: unable to set FAN TPS version %d: %lu]\r\n", this_network.fan_version, ret);
     ret = __LINE__; goto cleanup;
   }
 
@@ -962,8 +968,8 @@ void app_task(void *args)
   BootloaderStorageInformation_t storage_info;
 #endif  /* SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT */
 
-
-  app_timestamp_init();
+/* Init app timestamp, timestamp uses in printf */
+app_timestamp_init();
 
 #ifdef   SL_CATALOG_POWER_MANAGER_PRESENT
   init_power_manager_stats();
@@ -979,7 +985,7 @@ with_time = to_console = to_rtt = true;
   if (strlen(crash_info_string)) {
       app_parameters.nb_crashes++;
       save_app_parameters();
-      printfBothTime("Info on previous crash: %s\n", crash_info_string);
+      printfBoth("Info on previous crash: %s\n", crash_info_string);
   }
 #endif /* APP_CHECK_PREVIOUS_CRASH */
 
@@ -1008,23 +1014,23 @@ with_time = to_console = to_rtt = true;
   snprintf(version, 80, "Compiled on %s at %s (no bootloader)", __DATE__, __TIME__);
 #endif /* SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT */
 
-  printfBothTime("%s\n", application);
-  printfBothTime("%s\n", version);
+  printfBoth("%s\n", application);
+  printfBoth("%s\n", version);
 
-  printfBothTime("Network[%d] %s\n",
+  printfBoth("Network[%d] %s\n",
     app_parameters.network_index,
     network[app_parameters.network_index].network_name);
 
 
 #ifdef    SL_CATALOG_APP_OS_STAT_PRESENT
 #ifdef APP_OS_STAT_UPDATE_PERIOD_TIME_MS
-printfBothTime("with app_os_stat every %d ms\n", APP_OS_STAT_UPDATE_PERIOD_TIME_MS);
+printfBoth("with app_os_stat every %d ms\n", APP_OS_STAT_UPDATE_PERIOD_TIME_MS);
 #endif /* APP_OS_STAT_UPDATE_PERIOD_TIME_MS */
 #endif /* SL_CATALOG_APP_OS_STAT_PRESENT */
-printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
+printfBoth("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
     network[app_parameters.network_index].network_size));
 #ifdef    WISUN_CONFIG_BROADCAST_RETRIES
-  printfBothTime("Broadcast Retries %d\n", WISUN_CONFIG_BROADCAST_RETRIES);
+  printfBoth("Broadcast Retries %d\n", WISUN_CONFIG_BROADCAST_RETRIES);
 #endif /* WISUN_CONFIG_BROADCAST_RETRIES */
   TRACES_WHILE_CONNECTING;
 
@@ -1033,48 +1039,48 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
 #endif /* HISTORY */
 
   #ifdef    SL_CATALOG_WISUN_COAP_PRESENT
-    printfBothTime("With     CoAP Support\n");
+    printfBoth("With     CoAP Support\n");
   #endif /* SL_CATALOG_WISUN_COAP_PRESENT */
 
   #ifdef    SL_CATALOG_WISUN_OTA_DFU_PRESENT
-    printfBothTime("With     OTA DFU Support\n");
+    printfBoth("With     OTA DFU Support\n");
   #endif /* SL_CATALOG_WISUN_OTA_DFU_PRESENT */
 
   #ifdef WITH_TCP_SERVER
-    printfBothTime("With     TCP Server %s\n", DEFINE_string(WITH_TCP_SERVER));
+    printfBoth("With     TCP Server %s\n", DEFINE_string(WITH_TCP_SERVER));
   #endif /* WITH_TCP_SERVER */
 
   #ifdef WITH_UDP_SERVER
-    printfBothTime("With     UDP Server %s\n", DEFINE_string(WITH_UDP_SERVER));
+    printfBoth("With     UDP Server %s\n", DEFINE_string(WITH_UDP_SERVER));
   #endif /* WITH_UDP_SERVER */
 
   #ifdef WITH_DIRECT_CONNECT
-    printfBothTime("With     Direct Connect\n");
+    printfBoth("With     Direct Connect\n");
   #endif /* WITH_DIRECT_CONNECT */
 
   // Set device_tag to last 2 bytes of MAC address
   sl_wisun_get_mac_address(&device_mac);
   sprintf(device_mac_string, "%s", app_wisun_mac_addr_to_str(&device_mac));
   sprintf(device_tag, "%02x%02x", device_mac.address[6], device_mac.address[7]);
-  printfBothTime("device MAC %s\n", device_mac_string);
-  printfBothTime("device_tag %s\n", device_tag);
+  printfBoth("device MAC %s\n", device_mac_string);
+  printfBoth("device_tag %s\n", device_tag);
 
 #ifdef    SL_CATALOG_SIMPLE_BUTTON_PRESENT
   B0 = ( sl_button_get_state(&sl_button_btn0) == SL_SIMPLE_BUTTON_PRESSED );
   B1 = ( sl_button_get_state(&sl_button_btn1) == SL_SIMPLE_BUTTON_PRESSED );
   startup_option = (B1 << 1) + B0;
-  printfBothTime("Startup option %d ('%d%d')\n", startup_option, B1, B0);
+  printfBoth("Startup option %d ('%d%d')\n", startup_option, B1, B0);
   check_buttons = true;
   if (startup_option > 0) {
     if (startup_option <= 3) {
-      printfBothTime("Changing network_index from %d to %d based on buttons\n",
+      printfBoth("Changing network_index from %d to %d based on buttons\n",
                       app_parameters.network_index, startup_option);
       app_parameters.network_index = startup_option;
     }
   }
 #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
 
-  printfBothTime("device_type %s\n", device_type);
+  printfBoth("device_type %s\n", device_type);
 
 #ifdef    WITH_DIRECT_CONNECT
   if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
@@ -1090,7 +1096,7 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
 
 #ifdef    AUTO_CLEAR_CREDENTIAL_CACHE
   sl_wisun_clear_credential_cache();
-  printfBothTime("Cleared credential cache\n");
+  printfBoth("Cleared credential cache\n");
 #endif /* AUTO_CLEAR_CREDENTIAL_CACHE */
 
 #ifdef    LIST_RF_CONFIGS
@@ -1113,6 +1119,9 @@ printfBothTime("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
   // If LEDs stay at 0: check selected PHY vs Radio Config
   set_leds(0, 0);
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+
+  /* Reset app_timestamp after application init (LED & button useless time)  */
+  app_timestamp = 0;
 
 #ifdef WITH_TCP_SERVER
   init_tcp_server();

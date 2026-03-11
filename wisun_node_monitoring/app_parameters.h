@@ -44,6 +44,7 @@
 #include <stdlib.h>
 
 #include "nvm3_default.h"
+#include "sl_wisun_connection_params_api.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -68,7 +69,11 @@
 #endif /* APP_VERSION_STRING */
 
 #ifndef   NVM3_APP_PARAMS_VERSION
-  #define NVM3_APP_PARAMS_VERSION   10000
+  /* Increment when there is a disruptive change to the parameters stored in NVM.                                               */
+  /* For example: adding a new parameter or changing the order of parameters in app_settings_wisun_t or app_wisun_parameters_t. */
+  /* After updating the application with a new NVM3_APP_PARAMS_VERSION,                                                         */
+  /*    the parameters will be reset to the new default values (when the code detects a change in NVM3_APP_PARAMS_VERSION)      */
+  #define NVM3_APP_PARAMS_VERSION   10010
 #endif /* NVM3_APP_PARAMS_VERSION */
 
 #ifndef   MAX_NETWORK_CONFIGS
@@ -105,6 +110,9 @@
   #define CHAN_PLAN_IDs                   {                            33,                                34,                                    32 }
 #endif /* CHAN_PLAN_IDs */
 
+#ifndef   SPECIAL_CONNECT_PARAMs
+  #define SPECIAL_CONNECT_PARAMs          {                            0,                                 0,                                     0 }
+#endif /* SPECIAL_CONNECT_PARAMs */
 #ifndef   NETWORK_SIZEs
   #define NETWORK_SIZEs                   {   SL_WISUN_NETWORK_SIZE_SMALL,      SL_WISUN_NETWORK_SIZE_MEDIUM,           SL_WISUN_NETWORK_SIZE_LARGE }
 #endif /* NETWORK_SIZEs */
@@ -129,6 +137,10 @@
 #ifndef   DEVICE_TYPEs
   #define DEVICE_TYPEs                    {               SL_WISUN_ROUTER,                   SL_WISUN_ROUTER,                       SL_WISUN_ROUTER }
 #endif /* DEVICE_TYPEs */
+
+#ifndef   FAN_VERSIONs
+  #define FAN_VERSIONs                    {      SL_WISUN_FAN_VERSION_1_1,           SL_WISUN_FAN_VERSION_1_1,             SL_WISUN_FAN_VERSION_1_1 }
+#endif /* FAN_VERSIONs */
 
 #ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
 #ifndef   LFN_PROFILEs
@@ -166,7 +178,143 @@
 #endif /* COAP_NOTIFICATION_DESTINATIONs */
 
 
+#ifndef SL_WISUN_PARAMS_PROFILE_SPECIAL
+/// Special Profile for network
+static const sl_wisun_connection_params_t sl_wisun_params_profile_special = {
+  .version = SL_WISUN_PARAMS_API_VERSION,
+  .discovery = {
+    .trickle_pa = {
+      .imin_s = 10,
+      .imax_s = 60,
+      .k = 1
+    },
+    .trickle_pas = {
+      .imin_s = 10,
+      .imax_s = 60,
+      .k = 1
+    },
+    .eapol_target_min_sens = DBM_TO_RSL_RANGE(-60),
+    .allow_skip = true
+  },
+  .configuration = {
+    .trickle_pc = {
+      .imin_s = 10,
+      .imax_s = 60,
+      .k = 1
+    },
+    .trickle_pcs = {
+      .imin_s = 10,
+      .imax_s = 60,
+      .k = 1
+    }
+  },
+  .eapol = {
+    .sec_prot_trickle = {
+      .imin_s = 0,
+      .imax_s = 0,
+      .k = 0,
+    },
+    .pmk_lifetime_m = 0,
+    .ptk_lifetime_m = 0,
+    .sec_prot_retry_timeout_s = 0,
+    .initial_key_min_s = 0,
+    .initial_key_max_s = 60,
+    .initial_key_retry_min_s = 60,
+    .initial_key_retry_max_s = 0,
+    .initial_key_retry_max_limit_s = 180,
+    .temp_min_timeout_s = 0,
+    .gtk_request_imin_m = 0,
+    .gtk_request_imax_m = 0,
+    .gtk_max_mismatch_m = 64,
+    .lgtk_max_mismatch_m = 60,
+    .sec_prot_trickle_expirations = 0,
+    .initial_key_retry_limit = 3,
+    .allow_skip = true
+  },
+  .rpl = {
+    .dao_txalg = {
+      .rand = 0.1f,
+      .max_delay_s = 1,
+      .irt_s = 15,
+      .mrt_s = 0,
+      .mrd_s = 0,
+      .mrc = 3,
+    },
+    .dis_max_delay_first_s = 2,
+    .dis_max_delay_s = 300,
+    .init_parent_selection_s = 10,
+    .etx_probe_period_max_s = 15,
+    .address_registration_lifetime_s = 2220,
+    .etx_samples_init = 2,
+    .etx_samples_refresh = 4,
+    .candidate_parents_max = 5,
+    .parents_max = 2,
+  },
+  .mpl = {
+    .trickle = {
+      .imin_s = 1,
+      .imax_s = 10,
+      .k = 8,
+    },
+    .seed_set_entry_lifetime_s = 180,
+    .trickle_expirations = 2,
+    .seed_id_type = 0,
+  },
+  .dhcp = {
+    .sol_txalg = {
+      .rand = 0.1f,
+      .max_delay_s = 10,
+      .irt_s = 10,
+      .mrt_s = HOUR_TO_SEC(1),
+      .mrd_s = 0,
+      .mrc = 3,
+    },
+  },
+  .lfn_parent = {
+    .lfn_pan_timeout_m = 0,
+    .lfn_lpc_retry_count = 5,
+    .lfn_na_wait_duration_m = 0,
+  },
+  .misc = {
+    .temp_link_min_timeout_s = 260,
+    .pan_timeout_m = 30,
+  },
+  .direct_connect_eapol = {
+    .pmk_lifetime_m = 0,
+    .ptk_lifetime_m = 0,
+    .sec_prot_retry_timeout_s = 0,
+    .initial_key_min_s = 0,
+    .initial_key_max_s = 3,
+    .initial_key_retry_min_s = 10,
+    .initial_key_retry_max_s = 0,
+    .initial_key_retry_max_limit_s = 30,
+    .gtk_request_imin_m = 0,
+    .gtk_request_imax_m = 0,
+    .gtk_max_mismatch_m = 64,
+    .initial_key_retry_limit = 3,
+    .allow_skip = false
+  },
+  .traffic = {
+    .lowpan_mtu = 1576,
+    .ipv6_mru = 1504,
+    .max_edfe_fragment_count = 5,
+  },
+  .mac = {
+    .backoff_period_us = 0, // calculate from PHY by default
+    .min_be = 3,
+    .max_be = 5,
+    .max_cca_retries = 8,
+    .max_frame_retries = 7,
+  }
+};
+#define SL_WISUN_PARAMS_PROFILE_SPECIAL sl_wisun_params_profile_special
+#endif /* SL_WISUN_PARAMS_PROFILE_SPECIAL */
+
 #define APP_UTIL_PRINTABLE_DATA_MAX_LENGTH 64
+
+
+
+
 
 // app_settings_wisun_t structure similar to Wi-SUN SoC CLI (only FAN1.1 support)
 typedef struct {
@@ -174,6 +322,7 @@ typedef struct {
   char network_name[SL_WISUN_NETWORK_NAME_SIZE+1];
 //  uint8_t operating_class;
 //  uint16_t operating_mode;
+  bool use_special_connect_param;  //if set to 1, apply specific connection param
   uint8_t network_size;
   int16_t tx_power_ddbm;
   int16_t auto_send_sec;
@@ -186,6 +335,7 @@ typedef struct {
   int8_t regulation_warning_threshold;
   int8_t regulation_alert_threshold;
   sl_wisun_device_type_t device_type;
+  sl_wisun_fan_version_t fan_version;
   sl_wisun_phy_config_t phy;
 //  uint8_t fec;
 #if       SL_RAIL_IEEE802154_SUPPORTS_G_MODE_SWITCH // see sl_wisun_set_pom_ie
@@ -241,6 +391,10 @@ typedef struct {
   uint16_t auto_send_sec;        // Notification period in seconds
   uint8_t  network_count;        // Number of network settings
   uint8_t  network_index;        // Selector for network settings
+  uint16_t newtork_struct_size;   // Store sizeof(app_wisun_network_settings_t)
+                                 // Read at boot, set all parameters to defaults if
+                                 //   sizeof(app_wisun_network_settings_t) != newtork_struct_size
+                                 //    This is to avoid missmatching after application update
 } app_wisun_parameters_t;
 
 extern app_settings_wisun_t network[MAX_NETWORK_CONFIGS];

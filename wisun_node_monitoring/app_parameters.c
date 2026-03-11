@@ -137,20 +137,22 @@ void app_parameter_mutex_release(void)
 
 void print_network_parameters(int network_index) {
   int i = network_index;
-  printfBothTime("network[%d] network_name     %s\n"           , i, network[i].network_name);
-  printfBothTime("network[%d] network_size     %d\n"           , i, network[i].network_size);
-  printfBothTime("network[%d] FAN type         %ld\n"          , i, network[i].phy.type);
-  printfBothTime("network[%d] reg_domain       %d\n"           , i, network[i].phy.config.fan11.reg_domain);
-  printfBothTime("network[%d] phy_mode_id      %d\n"           , i, network[i].phy.config.fan11.phy_mode_id);
-  printfBothTime("network[%d] chan_plan_id     %d\n"           , i, network[i].phy.config.fan11.chan_plan_id);
-  printfBothTime("network[%d] device_type      %d\n"           , i, network[i].device_type);
-  printfBothTime("network[%d] auto_send_sec               %d\n", i, network[i].auto_send_sec);
-  printfBothTime("network[%d] tx_power_ddbm               %d\n", i, network[i].tx_power_ddbm);
-  printfBothTime("network[%d] max_child_count             %d\n", i, network[i].max_child_count);
-  printfBothTime("network[%d] max_neighbor_count          %d\n", i, network[i].max_neighbor_count);
-  printfBothTime("network[%d] max_security_neighbor_count %d\n", i, network[i].max_security_neighbor_count);
-  printfBothTime("network[%d] udp_notification_dest  %s\n"     , i, network[i].udp_notification_dest);
-  printfBothTime("network[%d] coap_notification_dest %s\n"     , i, network[i].coap_notification_dest);
+  printfBoth("network[%d] network_name     %s\n"           , i, network[i].network_name);
+  printfBoth("network[%d] use_special_connect_param     %d\n"       , i, network[i].use_special_connect_param);
+  printfBoth("network[%d] network_size     %d\n"           , i, network[i].network_size);
+  printfBoth("network[%d] Phy type         %ld\n"          , i, network[i].phy.type);
+  printfBoth("network[%d] reg_domain       %d\n"           , i, network[i].phy.config.fan11.reg_domain);
+  printfBoth("network[%d] phy_mode_id      %d\n"           , i, network[i].phy.config.fan11.phy_mode_id);
+  printfBoth("network[%d] chan_plan_id     %d\n"           , i, network[i].phy.config.fan11.chan_plan_id);
+  printfBoth("network[%d] device_type      %d\n"           , i, network[i].device_type);
+  printfBoth("network[%d] fan_version      %d\n"           , i, network[i].fan_version);
+  printfBoth("network[%d] auto_send_sec               %d\n", i, network[i].auto_send_sec);
+  printfBoth("network[%d] tx_power_ddbm               %d\n", i, network[i].tx_power_ddbm);
+  printfBoth("network[%d] max_child_count             %d\n", i, network[i].max_child_count);
+  printfBoth("network[%d] max_neighbor_count          %d\n", i, network[i].max_neighbor_count);
+  printfBoth("network[%d] max_security_neighbor_count %d\n", i, network[i].max_security_neighbor_count);
+  printfBoth("network[%d] udp_notification_dest  %s\n"     , i, network[i].udp_notification_dest);
+  printfBoth("network[%d] coap_notification_dest %s\n"     , i, network[i].coap_notification_dest);
 }
 
 char* network_string(int i) {
@@ -159,8 +161,9 @@ char* network_string(int i) {
   "\"network_name\": \"%s\",\n" \
   "\"udp_notification_dest\": \"%s\",\n" \
   "\"coap_notification_dest\": \"%s\",\n" \
+  "\"use_special_connect_param\": \"%d\",\n" \
   "\"network_size\": \"%d\",\n" \
-  "\"type\": \"%ld\",\n" \
+  "\"phy_type\": \"%ld\",\n" \
   "\"reg_domain\": \"%d\",\n" \
   "\"phy_mode_id\": \"%d\",\n" \
   "\"chan_plan_id\": \"%d\",\n" \
@@ -173,6 +176,7 @@ char* network_string(int i) {
           network[i].network_name,
           network[i].udp_notification_dest,
           network[i].coap_notification_dest,
+          network[i].use_special_connect_param,
           network[i].network_size,
           network[i].phy.type,
           network[i].phy.config.fan11.reg_domain,
@@ -189,11 +193,12 @@ char* network_string(int i) {
 void print_app_parameters() {
   int i;
   printf("\n");
-  printfBothTime("app_parameters.app_params_version          %ld\n", app_parameters.app_params_version);
-  printfBothTime("app_parameters.nb_boots                    %d\n", app_parameters.nb_boots);
-  printfBothTime("app_parameters.nb_crashes                  %d\n", app_parameters.nb_crashes);
-  printfBothTime("app_parameters.network_count               %d\n", app_parameters.network_count);
-  printfBothTime("app_parameters.network_index               %d\n", app_parameters.network_index);
+  printfBoth("app_parameters.app_params_version          %ld\n", app_parameters.app_params_version);
+  printfBoth("app_parameters.nb_boots                    %d\n", app_parameters.nb_boots);
+  printfBoth("app_parameters.nb_crashes                  %d\n", app_parameters.nb_crashes);
+  printfBoth("app_parameters.network_count               %d\n", app_parameters.network_count);
+  printfBoth("app_parameters.network_index               %d\n", app_parameters.network_index);
+  printfBoth("app_parameters.newtork_struct_size         %d\n", app_parameters.newtork_struct_size);
   printf("\n");
   printf("network parameters (from app_parameters.h)\n");
   for (i=0; i<MAX_NETWORK_CONFIGS; i++) {
@@ -208,14 +213,16 @@ char* app_parameters_string() {
   "\"nb_boots\": \"%d\",\n" \
   "\"nb_crashes\": \"%d\",\n" \
   "\"network_count\": \"%d\",\n" \
-  "\"network_index\": \"%d\""
+  "\"network_index\": \"%d\", \n" \
+  "\"newtork_struct_size\": \"%d\"" \
 
   snprintf(res_string, 1000, PARAMETERS_FORMAT_STR,
           app_parameters.app_params_version,
           app_parameters.nb_boots,
           app_parameters.nb_crashes,
           app_parameters.network_count,
-          app_parameters.network_index);
+          app_parameters.network_index,
+          app_parameters.newtork_struct_size);
   printf("[%d]%s\n", __LINE__, res_string);
   return res_string;
 }
@@ -226,9 +233,11 @@ void set_app_parameters_defaults(int network_indexes) {
   const sl_wisun_regulatory_domain_t REG_DOMAIN[MAX_NETWORK_CONFIGS] = REG_DOMAINs;
   const uint8_t                     PHY_MODE_ID[MAX_NETWORK_CONFIGS] = PHY_MODE_IDs;
   const uint8_t                    CHAN_PLAN_ID[MAX_NETWORK_CONFIGS] = CHAN_PLAN_IDs;
+  const uint8_t           SPECIAL_CONNECT_PARAM[MAX_NETWORK_CONFIGS] = SPECIAL_CONNECT_PARAMs;
   const sl_wisun_network_size_t    NETWORK_SIZE[MAX_NETWORK_CONFIGS] = NETWORK_SIZEs;
   const uint16_t               PREFERRED_PAN_ID[MAX_NETWORK_CONFIGS] = PREFERRED_PAN_IDs;
   const sl_wisun_device_type_t      DEVICE_TYPE[MAX_NETWORK_CONFIGS] = DEVICE_TYPEs;
+  const sl_wisun_fan_version_t      FAN_VERSION[MAX_NETWORK_CONFIGS] = FAN_VERSIONs;
 #ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
   const uint8_t                     LFN_PROFILE[MAX_NETWORK_CONFIGS] = LFN_PROFILEs;
 #endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
@@ -244,22 +253,23 @@ void set_app_parameters_defaults(int network_indexes) {
   app_parameters.app_params_version = NVM3_APP_PARAMS_VERSION;
   app_parameters.network_count      = MAX_NETWORK_CONFIGS;
   app_parameters.network_index      = DEFAULT_NETWORK_INDEX;
+  app_parameters.newtork_struct_size = sizeof(app_settings_wisun_t);
 
   int i;
 
-  printfBothTime("sizeof(app_wisun_parameters_t) %d\n", sizeof(app_wisun_parameters_t));
+  printfBoth("sizeof(app_wisun_parameters_t) %d\n", sizeof(app_wisun_parameters_t));
 
   // Prepare to init both if none is selected, selecting the first
   if (network_indexes == 0) {
       for (i=0; i<MAX_NETWORK_CONFIGS; i++) {
           network_indexes = network_indexes + (1 << i);
       }
-      printfBothTime("network_indexes 0x%02x\n", network_indexes);
+      printfBoth("network_indexes 0x%02x\n", network_indexes);
   }
   // fill all networks, so that only diffs are required later on
   for (i = 0; i < MAX_NETWORK_CONFIGS; i++) {
     if (network_indexes & (1 << i)) {
-      printfBothTime("Network %d defaults\n", i);
+      printfBoth("Network %d defaults\n", i);
       /* network */
       if (i == DEFAULT_NETWORK_INDEX) {
         snprintf(network[i].network_name, SL_WISUN_NETWORK_NAME_SIZE, "%s", WISUN_CONFIG_NETWORK_NAME);
@@ -274,6 +284,7 @@ void set_app_parameters_defaults(int network_indexes) {
         network[i].phy.config.fan11.chan_plan_id = CHAN_PLAN_ID[i];
         network[i].network_size                  = NETWORK_SIZE[i];
       }
+      network[i].use_special_connect_param             = SPECIAL_CONNECT_PARAM[i];
       network[i].phy.type                      = SL_WISUN_PHY_CONFIG_FAN11;
       network[i].preferred_pan_id              = PREFERRED_PAN_ID[i];
       network[i].regulation                    = REGULATION;
@@ -301,6 +312,7 @@ void set_app_parameters_defaults(int network_indexes) {
 #ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
       network[i].lfn_profile                   = LFN_PROFILE[i];
 #endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
+      network[i].fan_version                   = FAN_VERSION[i];
       network[i].tx_power_ddbm                 = TX_POWER_DDBM[i]; // 200 = 'MAX' (it's higher than the possible max)
       network[i].set_leaf                      = SET_LEAF; // see sl_wisun_set_leaf
       network[i].max_hop_count                 = 100; // see sl_wisun_set_max_hop_count
@@ -334,18 +346,18 @@ sl_status_t init_app_parameters() {
 
   status = nvm3_initDefault();
   if (status != SL_STATUS_OK) {
-    printfBothTime("ERROR initializing NVM3\n");
+    printfBoth("ERROR initializing NVM3\n");
   } else {
     app_parameter_mutex_acquire();
     status = read_app_parameters();
     if (status != SL_STATUS_OK) {
-        printfBothTime("set application parameters to default values\n");
+        printfBoth("set application parameters to default values\n");
         set_app_parameters_defaults(0x0000);
         app_parameters.nb_boots   = 1;
         app_parameters.nb_crashes = 0;
         status = save_app_parameters();
         if (status != SL_STATUS_OK) {
-            printfBothTime("Issue saving app_parameters: 0x%02x\n", (uint16_t)status);
+            printfBoth("Issue saving app_parameters: 0x%02x\n", (uint16_t)status);
         }
     }
     print_app_parameters();
@@ -464,6 +476,9 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
               }
           }
         }
+        if  (!match) { match = (sl_strcasecmp(parameter_name, "use_special_connect_param") == 0);
+          if (match) { network[index].use_special_connect_param = (uint8_t)value; }
+        }
         if  (!match) { match = (sl_strcasecmp(parameter_name, "network_size") == 0);
           if (match) { network[index].network_size = (uint8_t)value; }
         }
@@ -472,6 +487,9 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
         }
         if  (!match) { match = (sl_strcasecmp(parameter_name, "device_type") == 0);
           if (match) { network[index].device_type = (sl_wisun_device_type_t)value; }
+        }
+        if  (!match) { match = (sl_strcasecmp(parameter_name, "fan_version") == 0);
+          if (match) { network[index].fan_version = (sl_wisun_fan_version_t)value; }
         }
         if  (!match) { match = (sl_strcasecmp(parameter_name, "preferred_pan_id") == 0);
           if (match) { network[index].preferred_pan_id = (uint16_t)value; }
@@ -592,6 +610,9 @@ sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, 
             return SL_STATUS_OK;
         }
       }
+      if  (!match) { match = (sl_strcasecmp(parameter_name, "use_special_connect_param") == 0);
+        if (match) { *value = (uint32_t)network[index].use_special_connect_param; }
+      }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "network_size") == 0);
         if (match) { *value = (uint32_t)network[index].network_size; }
       }
@@ -600,6 +621,9 @@ sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, 
       }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "device_type") == 0);
         if (match) { *value = (uint32_t)network[index].device_type; }
+      }
+      if  (!match) { match = (sl_strcasecmp(parameter_name, "fan_version") == 0);
+        if (match) { *value = (uint32_t)network[index].fan_version; }
       }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "preferred_pan_id") == 0);
         if (match) { *value = (uint32_t)network[index].preferred_pan_id; }
@@ -660,36 +684,51 @@ sl_status_t read_app_parameters()   {
   int i;
   status = nvm3_readData(nvm3_defaultHandle, NVM3_APP_KEY, &app_parameters, sizeof(app_parameters));
   if (status == SL_STATUS_OK) {
-      printfBothTime("read_app_parameters(): There are %d networks in NVM (key 0x%04X, %d bytes)\n",
+      printfBoth("read_app_parameters(): There are %d networks in NVM (key 0x%04X, %d bytes)\n",
                     app_parameters.network_count, NVM3_APP_KEY, sizeof(app_parameters));
       if (app_parameters.network_count != MAX_NETWORK_CONFIGS) {
-          printfBothTime("WARNING: read_app_parameters(): app_parameters.network_count (%d) != MAX_NETWORK_CONFIGS (%d)\n",
+          printfBoth("WARNING: read_app_parameters(): app_parameters.network_count (%d) != MAX_NETWORK_CONFIGS (%d)\n",
                       app_parameters.network_count, MAX_NETWORK_CONFIGS);
           status = SL_STATUS_INVALID_PARAMETER;
           return status;
       }
+
+      if (app_parameters.app_params_version != NVM3_APP_PARAMS_VERSION) {
+          printfBoth("WARNING: read_app_parameters(): app_parameters.app_params_version (%ld) != NVM3_APP_PARAMS_VERSION (%ld)\n",
+                      app_parameters.app_params_version, (uint32_t)NVM3_APP_PARAMS_VERSION);
+          status = SL_STATUS_INVALID_PARAMETER;
+          return status;
+      }
+
+      if (app_parameters.newtork_struct_size != (uint16_t)sizeof(app_settings_wisun_t)) {
+          printfBoth("WARNING: read_app_parameters(): app_parameters.newtork_struct_size (%d) != sizeof(app_settings_wisun_t) (%d)\n",
+                      app_parameters.newtork_struct_size, (uint16_t)sizeof(app_settings_wisun_t));
+          status = SL_STATUS_INVALID_PARAMETER;
+          return status;
+      }
+
       for (i=0; i<MAX_NETWORK_CONFIGS; i++) {
           status = nvm3_readData(nvm3_defaultHandle, NVM3_APP_KEY+1+i, &network[i], sizeof(app_settings_wisun_t));
           if (status != SL_STATUS_OK) {
-              printfBothTime("nvm3_readData(nvm3_defaultHandle, 0x%04x, app_parameters, %d) returned 0x%04lX\n",
+              printfBoth("nvm3_readData(nvm3_defaultHandle, 0x%04x, app_parameters, %d) returned 0x%04lX\n",
                           NVM3_APP_KEY+1+i, sizeof(app_settings_wisun_t), status);
           } else {
-              printfBothTime("read_app_parameters(): network %d settings read from nvm3 (key 0x%04x, %d bytes)\n",
+              printfBoth("read_app_parameters(): network %d settings read from nvm3 (key 0x%04x, %d bytes)\n",
                           i, NVM3_APP_KEY+1+i, sizeof(app_settings_wisun_t));
           }
       }
   }
   if (status != SL_STATUS_OK) {
       if (status == SL_STATUS_NOT_FOUND) {
-          printfBothTime("nvm3_readData(nvm3_defaultHandle, 0x%04x, app_parameters, %d) returned 0x%04lX/NOT_FOUND, (The 0x%04x key is not set yet)\n",
+          printfBoth("nvm3_readData(nvm3_defaultHandle, 0x%04x, app_parameters, %d) returned 0x%04lX/NOT_FOUND, (The 0x%04x key is not set yet)\n",
                       NVM3_APP_KEY, sizeof(app_parameters), status, NVM3_APP_KEY);
       } else {
           if (status == SL_STATUS_NVM3_READ_DATA_SIZE) {
-              printfBothTime("nvm3_readData(nvm3_defaultHandle, 0x%04x, app_parameters, %d) returned 0x%04lX/SL_STATUS_NVM3_READ_DATA_SIZE, (Trying to read with a length different from actual object size)\n",
+              printfBoth("nvm3_readData(nvm3_defaultHandle, 0x%04x, app_parameters, %d) returned 0x%04lX/SL_STATUS_NVM3_READ_DATA_SIZE, (Trying to read with a length different from actual object size)\n",
                           NVM3_APP_KEY, sizeof(app_parameters), status);
           } else {
                      // What to do here? Assert?
-              printfBothTime("nvm3_readData(nvm3_defaultHandle, 0x%04x, app_parameters, %d) returned 0x%04lX, (check sl_status.h)\n",
+              printfBoth("nvm3_readData(nvm3_defaultHandle, 0x%04x, app_parameters, %d) returned 0x%04lX, (check sl_status.h)\n",
                       NVM3_APP_KEY, sizeof(app_parameters), status);
           }
       }
@@ -703,20 +742,20 @@ sl_status_t save_app_parameters()   {
   status = nvm3_writeData(nvm3_defaultHandle, NVM3_APP_KEY, &app_parameters, sizeof(app_parameters));
   if (status != SL_STATUS_OK) {
       // What to do here? Assert?
-      printfBothTime("nvm3_writeData(nvm3_defaultHandle, 0x%04x, app_parameters, %d bytes) returned 0x%04lX, (check sl_status.h)\n",
+      printfBoth("nvm3_writeData(nvm3_defaultHandle, 0x%04x, app_parameters, %d bytes) returned 0x%04lX, (check sl_status.h)\n",
                      NVM3_APP_KEY, sizeof(app_parameters), status);
   } else {
       for (i=0; i<MAX_NETWORK_CONFIGS; i++) {
           status = nvm3_writeData(nvm3_defaultHandle, NVM3_APP_KEY+1+i, &network[i], sizeof(app_settings_wisun_t));
           if (status != SL_STATUS_OK) {
-              printfBothTime("nvm3_writeData(nvm3_defaultHandle, 0x%04x, app_parameters, %d) returned 0x%04lX\n",
+              printfBoth("nvm3_writeData(nvm3_defaultHandle, 0x%04x, app_parameters, %d) returned 0x%04lX\n",
                            NVM3_APP_KEY+1+i, sizeof(app_settings_wisun_t), status);
           } else {
-              printfBothTime("network %d parameters saved to nvm3 (key 0x%04x, %d bytes)\n",
+              printfBoth("network %d parameters saved to nvm3 (key 0x%04x, %d bytes)\n",
                            i, NVM3_APP_KEY+1+i, sizeof(app_settings_wisun_t));
           }
       }
-      printfBothTime("application parameters saved (%d networks)\n", i);
+      printfBoth("application parameters saved (%d networks)\n", i);
   }
   return status;
 }
@@ -727,20 +766,20 @@ sl_status_t delete_app_parameters() {
   status = nvm3_deleteObject(nvm3_defaultHandle, NVM3_APP_KEY);
   if (status != SL_STATUS_OK) {
       // What to do here? Assert?
-      printfBothTime("nvm3_deleteObject(nvm3_defaultHandle, 0x%04x) returned 0x%04lX, (check sl_status.h)\n",
+      printfBoth("nvm3_deleteObject(nvm3_defaultHandle, 0x%04x) returned 0x%04lX, (check sl_status.h)\n",
                      NVM3_APP_KEY, status);
   } else {
       for (i=0; i<MAX_NETWORK_CONFIGS; i++) {
           status = nvm3_deleteObject(nvm3_defaultHandle, NVM3_APP_KEY+1+i);
           if (status != SL_STATUS_OK) {
-              printfBothTime("nvm3_deleteObject(nvm3_defaultHandle, 0x%04x) returned 0x%04lX\n",
+              printfBoth("nvm3_deleteObject(nvm3_defaultHandle, 0x%04x) returned 0x%04lX\n",
                            NVM3_APP_KEY+1+i, status);
           } else {
-              printfBothTime("nvm3_deleteObject(nvm3_defaultHandle, 0x%04x) returned 0x%04lX\n",
+              printfBoth("nvm3_deleteObject(nvm3_defaultHandle, 0x%04x) returned 0x%04lX\n",
                            NVM3_APP_KEY+1+i, status);
           }
       }
-      printfBothTime("application parameters deleted (%d networks)\n", i);
+      printfBoth("application parameters deleted (%d networks)\n", i);
   }
   return status;
 }
