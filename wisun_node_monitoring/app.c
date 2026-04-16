@@ -37,78 +37,81 @@
 //                                   Includes
 // -----------------------------------------------------------------------------
 #include <stdio.h>
-#include <stdlib.h>
+#pragma message ("Build date: " __DATE__ " " __TIME__)
 
-#include "os.h"
 #include "printf.h"
+#include "sl_assert.h"
+#include "sl_memory_manager.h"
+#include "sl_memory_manager_region_config.h"
+#include "sl_string.h"
+
+#include "sl_wisun_api.h"
+#include "sl_wisun_keychain.h"
+#include "sl_wisun_app_core_util.h"
+#include "sl_wisun_trace_util.h"
+#include "sl_wisun_types.h"
+#include "sl_wisun_version.h"
+
 #include "app.h"
 
-#include "sl_assert.h"
-#include "sl_string.h"
-#include "sl_memory_manager.h"
+#if __has_include("app_list_configs.h")
+  /* app_list_configs.c/.h can be added/removed from the project */
+  #include "app_list_configs.h"
+#endif
 
-#if __has_include("sl_power_manager.h")
+#if __has_include("app_crash_handler.h")
+  /* sl_wisun_crash_handler.h comes with the Wi-SUN Crash Handler component */
+  #include "app_crash_handler.h"
+#endif
+
+#if __has_include("sl_board_control.h")
+  #include "sl_board_control.h"
+#endif
+
+#ifdef SL_CATALOG_POWER_MANAGER_PRESENT
+  /* sl_power_manager.h comes with the Power Manager component */
   #include "sl_power_manager.h"
 #endif
 
-#include "sl_wisun_api.h"
-#include "sl_wisun_app_core.h"
-#include "sl_wisun_types.h"
-#include "sl_wisun_version.h"
-#include "sl_wisun_keychain.h"
-#include "sl_wisun_trace_util.h"
-#include "sl_wisun_crash_handler.h"
-#include "sl_wisun_event_mgr.h"
-#include "sl_wisun_config.h"
-#include "sl_wisun_coap.h"
-#include "sl_wisun_coap_config.h"
-
-#include "app_parameters.h"
- /* Increase SL_APPLICATION_VERSION in app_properties_config.h to use DELTA DFU */
- #include "app_properties_config.h"
+#ifdef SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT
+  /* btl_interface.h comes with the Bootloader Application Interface component */
+  #include "btl_interface.h"
+  /* config/app_properties_config.h comes with the Bootloader Application Interface component */
+  /* Increase SL_APPLICATION_VERSION in config/app_properties_config.h to use DELTA DFU */
+  #include "app_properties_config.h"
+#endif
 
 #ifdef    SL_CATALOG_SIMPLE_BUTTON_PRESENT
-#include "sl_simple_button_instances.h"
+  /* config/sl_simple_button_instances.h comes with the Simple Button component */
+  #include "sl_simple_button_instances.h"
 #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
 
 #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
- #include "sl_simple_led_instances.h"
- void *led0;
- void *led1;
+  /* config/sl_simple_led_instances.h comes with the Simple Button component */
+  #include "sl_simple_led_instances.h"
+  void *led0;
+  void *led1;
 
- #ifndef START_FLASHES_A
-  #define START_FLASHES_A 6
- #endif /* START_FLASHES_A */
+  #ifndef START_FLASHES_A
+    #define START_FLASHES_A 6
+   #endif /* START_FLASHES_A */
   #ifndef START_FLASHES_B
-   #define START_FLASHES_B  SL_APPLICATION_VERSION
+    #define START_FLASHES_B  SL_APPLICATION_VERSION
   #endif /* START_FLASHES_B */
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
-#ifndef APP_VERSION_STRING
+#ifndef   APP_VERSION_STRING
   #define APP_VERSION_STRING "V6.2"
 #endif /* APP_VERSION_STRING */
 
-#include "app_coap.h"
-#include "app_check_neighbors.h"
-
-#ifdef    SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT
-#include "btl_interface.h"
-#endif  /* SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT */
-
-#ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
-  sl_wisun_lfn_params_t lfn_params;
-#endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
+#ifdef    SL_WISUN_CRASH_HANDLER_H
+  #define PREVIOUS_CRASH_FORMAT_STRING ""
+#else  /* SL_WISUN_CRASH_HANDLER_H */
+  #define PREVIOUS_CRASH_FORMAT_STRING ""
+#endif /* SL_WISUN_CRASH_HANDLER_H */
 
 #define   APP_TRACK_HEAP
-//#define   APP_TRACK_HEAP_DIFF
-#define   APP_CHECK_PREVIOUS_CRASH
-
-#ifdef    APP_CHECK_PREVIOUS_CRASH
-  #define PREVIOUS_CRASH_FORMAT_STRING ""
-#else  /* APP_CHECK_PREVIOUS_CRASH */
-  #define PREVIOUS_CRASH_FORMAT_STRING ""
-#endif /* APP_CHECK_PREVIOUS_CRASH */
-
+#define   APP_TRACK_HEAP_DIFF
 #ifdef    APP_TRACK_HEAP
   #define TRACK_HEAP_FORMAT_STRING "\"heap_used\":\"%.2f\",\n"
   #define TRACK_HEAP_VALUE         1.0*app_heap_info.used_size / (app_heap_info.total_size / 100),
@@ -133,18 +136,26 @@
   #include "sl_wisun_ota_dfu_config.h"
 #endif /* SL_CATALOG_WISUN_OTA_DFU_PRESENT */
 
-#ifdef WITH_TCP_SERVER
-  #include "app_tcp_server.h"
-#endif /* WITH_TCP_SERVER */
+#if __has_include("app_tcp_server.h")
+  #ifdef WITH_TCP_SERVER
+    #include "app_tcp_server.h"
+  #endif /* WITH_TCP_SERVER */
+#endif
 
-#ifdef WITH_UDP_SERVER
-  #include "app_udp_server.h"
-#endif /* WITH_UDP_SERVER */
+#if __has_include("app_udp_server.h")
+  #ifdef WITH_UDP_SERVER
+    #include "app_udp_server.h"
+  #endif /* WITH_UDP_SERVER */
+#endif
 
-#define   LIST_RF_CONFIGS
-#ifdef    LIST_RF_CONFIGS
-  #include "app_list_configs.h"
-#endif /* LIST_RF_CONFIGS */
+#if __has_include("lfn_checks.h")
+  /* lfn_checks.h is used only for LFN, to check low-power settings */
+  #include "lfn_checks.h"
+#endif
+
+#ifdef    APP_DIRECT_CONNECT_H
+  #define WITH_DIRECT_CONNECT
+#endif /* APP_DIRECT_CONNECT_H */
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -155,7 +166,8 @@
 #define IF_ERROR_RETURN(ret, ...)            if (ret != SL_STATUS_OK) {printfBothTime("\n"); printfBoth(__VA_ARGS__); return ret;}
 #define IF_ERROR_INCR(ret, error_count, ...) if (ret != SL_STATUS_OK) {printfBothTime("\n"); printfBoth(__VA_ARGS__); error_count++;}
 
-#define TRACES_WHILE_CONNECTING \
+#ifdef    APP_RTT_TRACES_H
+  #define TRACES_WHILE_CONNECTING \
     app_set_all_traces(SL_WISUN_TRACE_LEVEL_INFO, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_SOCK   , SL_WISUN_TRACE_LEVEL_INFO , true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_BOOT   , SL_WISUN_TRACE_LEVEL_DEBUG, true); \
@@ -166,7 +178,7 @@
     app_set_trace(SL_WISUN_TRACE_GROUP_MAC    , SL_WISUN_TRACE_LEVEL_WARN , true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_FSM    , SL_WISUN_TRACE_LEVEL_WARN , true);
 
-#define TRACES_WHEN_CONNECTED \
+  #define TRACES_WHEN_CONNECTED \
     app_set_all_traces(SL_WISUN_TRACE_LEVEL_INFO, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_ERROR, true); \
@@ -174,6 +186,10 @@
     app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_MAC    , SL_WISUN_TRACE_LEVEL_WARN , true); \
     app_set_trace(SL_WISUN_TRACE_GROUP_FSM    , SL_WISUN_TRACE_LEVEL_WARN , true);
+#else  /* APP_RTT_TRACES_H */
+  #define TRACES_WHILE_CONNECTING /* empty */
+  #define TRACES_WHEN_CONNECTED   /* empty */
+#endif /* APP_RTT_TRACES_H */
 
 #ifdef    HISTORY
 #define APPEND_TO_HISTORY(...) { \
@@ -181,7 +197,7 @@
   snprintf(history_string + history_len, \
     SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE - history_len, \
     __VA_ARGS__); \
-    printfBothTime(__VA_ARGS__); }
+    printfBoth(__VA_ARGS__); }
 #endif /* HISTORY */
 
 // JSON common format strings
@@ -189,11 +205,16 @@
 
 #define END_JSON   "}\n"
 
+#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+  uint8_t change_leds;
+  uint8_t previous_change_leds;
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+
 #define DEVICE_CHIP_ITEMS \
   device_global_ipv6_string,\
   device_tag,\
   chip,\
-  device_type,\
+  device_type_string,\
   device_mac_string
 
 #define DEVICE_CHIP_JSON_FORMAT \
@@ -233,7 +254,7 @@
   "\"running\":\"%s\",\n"
 
 #define MSG_COUNT_JSON_FORMAT \
-  "\"msg_count\":\"%lld\",\n"
+  "\"msg_count\":\"%ld\",\n"
 
 #ifdef  _SILICON_LABS_32B_SERIES_1             /** Product Series Identifier */
   #ifdef _SILICON_LABS_32B_SERIES_1_CONFIG_2   /** Product Config Identifier */
@@ -258,7 +279,10 @@
 //                          Static Function Declarations
 // -----------------------------------------------------------------------------
 void        _join_state_custom_callback(sl_wisun_evt_t *evt);
+
+#ifdef    APP_CHECK_NEIGHBORS_H 
 void        _check_neighbors(void);
+#endif /* APP_CHECK_NEIGHBORS_H */
 char*       _connection_json_string();
 char*       _status_json_string (char * start_text);
 char        device_mac_string[40];
@@ -266,24 +290,36 @@ sl_wisun_network_info_t network_info;
 sl_wisun_mac_address_t _get_parent_mac_address_and_update_parent_info(void);
 sl_status_t _select_destinations(void);
 sl_status_t _open_udp_sockets(void);
+
+#ifdef    SL_WISUN_COAP_H
 sl_status_t _coap_notify(char* json_string);
+#endif /* SL_WISUN_COAP_H */
+
+uint8_t print_and_send_messages (char *in_msg, bool _with_time,
+                            bool _to_console, bool _to_rtt, bool _to_udp, bool _to_coap);
 
 // -----------------------------------------------------------------------------
 //                                Global Variables
 // -----------------------------------------------------------------------------
 uint16_t connection_count = 0;       // number of connections (moving to Join State 5)
 uint16_t network_connection_count = 0; // number of network connections (moving to Join State 5 from min Join State 3)
-uint64_t connect_time_sec;           // time stamp of Wisun connect call
+uint64_t join_call_time_sec;         // time stamp of Wisun join call
 uint64_t connection_time_sec;        // last connection time stamp
 uint64_t disconnection_time_sec;     // last disconnection time stamp
 uint64_t connected_total_sec = 0;    // total time connected
 uint64_t disconnected_total_sec = 0; // total time disconnected
-uint64_t msg_count = 0;              // number of messages sent
+uint32_t msg_count = 0;              // number of messages sent
 sl_wisun_neighbor_info_t parent_info;   // local storage of the parent info
 sl_wisun_neighbor_info_t secondary_info;// local storage of the secondary parent info
-uint16_t preferred_pan_id = 0xffff;  // Preferred PAN Id (0xffff for 'none')
 uint8_t  min_join_state   = 0;       // Used to log Join State changes and check how 'low' it goes
+bool with_time, to_console, to_rtt, to_udp, to_coap;
 bool     send_asap;                  // Used to trigger sending the status as soon as possible
+uint16_t join_res = 0;
+uint64_t now = 0;
+uint64_t connection_timestamp;
+uint64_t connected_delay_sec;
+uint64_t next_status_sec;
+uint16_t loop;
 
 #ifdef    APP_TRACK_HEAP
 sl_memory_heap_info_t app_heap_info;
@@ -293,7 +329,7 @@ size_t app_previous_heap_free;
 bool   refresh_heap;
 #endif /* APP_TRACK_HEAP */
 
-bool print_keep_alive = true;
+bool time_to_send_status = true;
 
 char chip[8];
 char device_tag[8];
@@ -301,7 +337,7 @@ char parent_tag[8];
 char secondary_tag[8];
 char application[100];
 char version[80];
-char device_type[25];
+char device_type_string[25];
 uint32_t parent_rsl_in  = 0;
 uint32_t parent_rsl_out = 0;
 
@@ -318,9 +354,11 @@ static  uint64_t app_join_state_sec[6];
         uint64_t app_join_state_delay_sec[6];
 static uint16_t previous_join_state = 0;
 char json_string[SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE];
+
 #ifdef    HISTORY
 char history_string[SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE];
 #endif /* HISTORY */
+
 sl_wisun_mac_address_t device_mac;
 sl_wisun_mac_address_t parent_mac;
 sl_wisun_mac_address_t secondary_mac;
@@ -345,7 +383,6 @@ sl_wisun_socket_id_t coap_notification_socket_id = 0;
 char udp_msg[1024];
 char coap_msg[1024];
 
-uint16_t msg_len;
 uint8_t  trace_level = SL_WISUN_TRACE_LEVEL_INFO;    // Trace level for all trace groups
 
 // UDP ports
@@ -363,6 +400,7 @@ uint8_t  trace_level = SL_WISUN_TRACE_LEVEL_INFO;    // Trace level for all trac
 #endif /* SL_SIMPLE_BUTTON_INSTANCES_H */
 
 // CoAP Notification channel structure definition
+#ifdef   SL_WISUN_COAP_H
 typedef struct sl_wisun_coap_notify_ch {
   /// Notification socket
   int32_t sockid;
@@ -378,6 +416,7 @@ static sl_wisun_coap_notify_ch_t coap_notify_ch = {
   .addr = { 0U },
   .pkt = { 0U },
 };
+#endif /* SL_WISUN_COAP_H */
 
 // -----------------------------------------------------------------------------
 //                          Public Function Definitions
@@ -449,7 +488,7 @@ static uint16_t _get_cert_str_len(const uint8_t *cert, const uint16_t max_cert_l
   return n;
 }
 
-#ifdef   SL_CATALOG_POWER_MANAGER_PRESENT
+#ifdef    SL_CATALOG_POWER_MANAGER_PRESENT
 /** Power Manager Energy Mode Transition checking
  * Inclusion (if Power Manager Component is installed):
 #if __has_include("sl_power_manager.h")
@@ -469,7 +508,7 @@ from EM2:      126     1134        0
 EM Ticks:   2166947    (      66.130 sec: 0-00:01:06)
  in EM0:     515284    (      15.725 sec: 0-00:00:15   23.8 %)
  in EM1:      34487    (       1.052 sec: 0-00:00:01    1.6 %)
- in EM2:    1617176    (      49.352 sec: 0-00:00:49   74.6 %)  
+ in EM2:    1617176    (      49.352 sec: 0-00:00:49   74.6 %)
 */
 
   uint32_t pm_transitions[3][3];
@@ -478,12 +517,18 @@ EM Ticks:   2166947    (      66.130 sec: 0-00:01:06)
   uint64_t pm_tick_64, previous_pm_tick_64;
 
   #define EM_EVENT_MASK_ALL      ( \
-    SL_POWER_MANAGER_EVENT_TRANSITION_LEAVING_EM0 | \
-    SL_POWER_MANAGER_EVENT_TRANSITION_LEAVING_EM1 | \
-    SL_POWER_MANAGER_EVENT_TRANSITION_LEAVING_EM2 | \
+    SL_POWER_MANAGER_EVENT_TRANSITION_LEAVING_EM0  | \
+    SL_POWER_MANAGER_EVENT_TRANSITION_LEAVING_EM1  | \
+    SL_POWER_MANAGER_EVENT_TRANSITION_LEAVING_EM2  | \
     SL_POWER_MANAGER_EVENT_TRANSITION_ENTERING_EM0 | \
     SL_POWER_MANAGER_EVENT_TRANSITION_ENTERING_EM1 | \
     SL_POWER_MANAGER_EVENT_TRANSITION_ENTERING_EM2 \
+)
+
+  #define EM_EVENT_MASK_MIN      ( \
+    SL_POWER_MANAGER_EVENT_TRANSITION_LEAVING_EM2  | \
+    SL_POWER_MANAGER_EVENT_TRANSITION_ENTERING_EM0 | \
+    SL_POWER_MANAGER_EVENT_TRANSITION_ENTERING_EM1 | \
 )
 
   void my_power_manager_callback(
@@ -508,8 +553,19 @@ EM Ticks:   2166947    (      66.130 sec: 0-00:01:06)
     printf("Power Manager: following Energy Modes transitions\n");
   }
 
+  void clear_power_manager_stats(void) {
+    pm_tick_64 = previous_pm_tick_64 = sl_sleeptimer_get_tick_count64();
+    for (uint16_t l=0; l<3; l++) {
+      pm_ticks_in_EM[l] = 0;
+      for (uint16_t c=0; c<3; c++) {
+        pm_transitions[l][c] = 0;
+      }
+    }
+    printf("Power Manager: cleared stats\n");
+  }
+
   void print_power_manager_pm_transitions(void) {
-    printf("EM transitions\n            to EM0   to EM1   to EM2\nfrom EM0: %8ld %8ld %8ld \nfrom EM1: %8ld %8ld %8ld \nfrom EM2: %8ld %8ld %8ld\n",
+    printfTime("EM transitions\n            to EM0   to EM1   to EM2\nfrom EM0: %8ld %8ld %8ld \nfrom EM1: %8ld %8ld %8ld \nfrom EM2: %8ld %8ld %8ld\n",
       pm_transitions[0][0], pm_transitions[0][1], pm_transitions[0][2],
       pm_transitions[1][0], pm_transitions[1][1], pm_transitions[1][2],
       pm_transitions[2][0], pm_transitions[2][1], pm_transitions[2][2]
@@ -518,24 +574,25 @@ EM Ticks:   2166947    (      66.130 sec: 0-00:01:06)
 
   void print_power_manager_delays(void) {
     uint64_t total_ticks = pm_ticks_in_EM[0] + pm_ticks_in_EM[1] + pm_ticks_in_EM[2];
-    printf("EM Ticks:%10lld    (%12.03f sec: %s)\n",
+    printfTime("EM Ticks:%10lld    (%12.03f sec: %s)\n",
       total_ticks,    (float)total_ticks/pm_tick_freq_hz,      dhms((sl_sleeptimer_timestamp_64_t)(total_ticks / pm_tick_freq_hz)));
-    printf(" in EM0: %10ld    (%12.03f sec: %s %6.01f %%)\n",
+    printfTime(" in EM0: %10ld    (%12.03f sec: %s %6.01f %%)\n",
       pm_ticks_in_EM[0], (float)pm_ticks_in_EM[0] / pm_tick_freq_hz, dhms((sl_sleeptimer_timestamp_64_t)((float)pm_ticks_in_EM[0] / pm_tick_freq_hz)), (float)pm_ticks_in_EM[0] / total_ticks * 100 );
-    printf(" in EM1: %10ld    (%12.03f sec: %s %6.01f %%)\n",
+    printfTime(" in EM1: %10ld    (%12.03f sec: %s %6.01f %%)\n",
       pm_ticks_in_EM[1], (float)pm_ticks_in_EM[1] / pm_tick_freq_hz, dhms((sl_sleeptimer_timestamp_64_t)((float)pm_ticks_in_EM[1] / pm_tick_freq_hz)), (float)pm_ticks_in_EM[1] / total_ticks * 100 );
-    printf(" in EM2: %10ld    (%12.03f sec: %s %6.01f %%)\n",
+    printfTime(" in EM2: %10ld    (%12.03f sec: %s %6.01f %%)\n",
       pm_ticks_in_EM[2], (float)pm_ticks_in_EM[2] / pm_tick_freq_hz, dhms((sl_sleeptimer_timestamp_64_t)((float)pm_ticks_in_EM[2] / pm_tick_freq_hz)), (float)pm_ticks_in_EM[2] / total_ticks * 100 );
   }
 #endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
-
 
 uint8_t app_join_network(uint8_t network_index) {
   sl_status_t ret;
   sl_wisun_connection_params_t connection_params;
   sl_wisun_join_state_t join_state;
   //sl_wisun_channel_mask_t channel_mask;
-  //sl_wisun_lfn_params_t lfn_params;
+#ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+  sl_wisun_lfn_params_t lfn_params;
+#endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
   uint8_t phy_mode_id_count, is_mdr_command_capable;
   uint8_t phy_mode_id[SL_WISUN_MAX_PHY_MODE_ID_COUNT];
   uint8_t *phy_mode_id_p, *phy_mode_id_count_p;
@@ -561,56 +618,57 @@ uint8_t app_join_network(uint8_t network_index) {
   app_parameters.network_index = network_index % MAX_NETWORK_CONFIGS;
   this_network = network[app_parameters.network_index];
   if (join_state != SL_WISUN_JOIN_STATE_DISCONNECTED) {
-    printfBothTime("Not disconnected: disconnecting...\r\n");
+    printfBoth("Not disconnected: disconnecting...\r\n");
     sl_wisun_disconnect();
   }
 
   ret = sl_wisun_set_device_type((sl_wisun_device_type_t)this_network.device_type);
   if (ret != SL_STATUS_OK) {
-    printfBothTime("[Failed: unable to set device type to %d: %lu]\r\n", this_network.device_type, ret);
+    printfBoth("[Failed: unable to set device type to %d: %lu]\r\n", this_network.device_type, ret);
     ret = __LINE__; goto cleanup;
   }
 
   // Set device_type based on application settings
 #ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
   if (this_network.device_type == SL_WISUN_LFN ) {
-      sprintf(device_type, "LFN (null profile)");
+      sprintf(device_type_string, "LFN (null profile)");
       switch (this_network.lfn_profile) {
         case SL_WISUN_LFN_PROFILE_TEST: {
-          sprintf(device_type, "LFN (Test Profile)");
+          sprintf(device_type_string, "LFN (Test Profile)");
           break;
         }
         case SL_WISUN_LFN_PROFILE_BALANCED: {
-          sprintf(device_type, "LFN (Balanced Profile)");
+          sprintf(device_type_string, "LFN (Balanced Profile)");
           break;
         }
         case SL_WISUN_LFN_PROFILE_ECO: {
-          sprintf(device_type, "LFN (Eco Profile)");
+          sprintf(device_type_string, "LFN (Eco Profile)");
           break;
         }
         default: {
-          sprintf(device_type, "LFN (NO Profile)");
+          sprintf(device_type_string, "LFN (NO Profile)");
           break;
         }
       }
   }
 #endif /* SL_CATALOG_WISUN_FFN_DEVICE_SUPPORT_PRESENT */
+#ifdef    SL_CATALOG_WISUN_FFN_DEVICE_SUPPORT_PRESENT
   if (this_network.device_type == SL_WISUN_ROUTER ) {
-#ifdef   SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
-      sprintf(device_type, "FFN with LFN support");
-#else /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
-    sprintf(device_type, "FFN with No LFN support");
-#endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
+    sprintf(device_type_string, "FFN with LFN support");
   }
-  printfBothTime("network[%d].device_type %d (%s)\r\n",
+#endif /* SL_CATALOG_WISUN_FFN_DEVICE_SUPPORT_PRESENT */
+  printfBoth("network[%d].device_type %d (%s)\r\n",
     app_parameters.network_index,
     this_network.device_type,
-    device_type);
+    device_type_string);
 
+#ifdef TRACK_HEAP_PER_THREAD
+    printfBoth("TRACK_HEAP_PER_THREAD\n");
+#endif /* TRACK_HEAP_PER_THREAD */
   if (this_network.device_type == SL_WISUN_ROUTER) {
     if (this_network.use_special_connect_param)
     {
-      printfBothTime("=== use_special_connect_param true, set connection param to SL_WISUN_PARAMS_PROFILE_SPECIAL ====\r\n");
+      printfBoth("=== use_special_connect_param true, set connection param to SL_WISUN_PARAMS_PROFILE_SPECIAL ====\r\n");
       connection_params = SL_WISUN_PARAMS_PROFILE_SPECIAL;
     } else {
       switch (this_network.network_size) {
@@ -630,31 +688,36 @@ uint8_t app_join_network(uint8_t network_index) {
           connection_params = SL_WISUN_PARAMS_PROFILE_CERTIF;
           break;
         default:
-          printfBothTime("[Failed: unsupported network size %d ]\r\n", this_network.network_size);
+          printfBoth("[Failed: unsupported network size %d ]\r\n", this_network.network_size);
           ret = __LINE__; goto cleanup;
       }
+      connection_params.traffic.lowpan_mtu = this_network.lowpan_mtu;
+      connection_params.traffic.ipv6_mru = this_network.ipv6_mru;
+      connection_params.traffic.max_edfe_fragment_count = this_network.max_edfe_fragment_count;
+      connection_params.mac.min_be = this_network.mac.min_be;
+      connection_params.mac.max_be = this_network.mac.max_be;
+      connection_params.mac.backoff_period_us = this_network.mac.backoff_period_us;
+      connection_params.mac.max_cca_retries = this_network.mac.max_cca_retries;
+      connection_params.mac.max_frame_retries = this_network.mac.max_frame_retries;
     }
-    connection_params.traffic.lowpan_mtu = this_network.lowpan_mtu;
-    connection_params.traffic.ipv6_mru = this_network.ipv6_mru;
-    connection_params.traffic.max_edfe_fragment_count = this_network.max_edfe_fragment_count;
 
     ret = sl_wisun_set_connection_parameters(&connection_params);
     if (ret != SL_STATUS_OK) {
-      printfBothTime("[Failed: unable to set connection parameters: %lu]\r\n", ret);
+      printfBoth("[Failed: unable to set connection parameters: %lu]\r\n", ret);
       ret = __LINE__; goto cleanup;
     }
   }
 
   ret = sl_wisun_config_neighbor_table(this_network.max_child_count, this_network.max_neighbor_count, this_network.max_security_neighbor_count);
   if (ret != SL_STATUS_OK) {
-    printfBothTime("[Failed: unable to set neighbor table sizes (%d, %d, %d): %lu]\r\n", this_network.max_child_count, this_network.max_neighbor_count, this_network.max_security_neighbor_count, ret);
+    printfBoth("[Failed: unable to set neighbor table sizes (%d, %d, %d): %lu]\r\n", this_network.max_child_count, this_network.max_neighbor_count, this_network.max_security_neighbor_count, ret);
     ret = __LINE__; goto cleanup;
   }
 
   if (this_network.device_type == SL_WISUN_ROUTER) {
     ret = sl_wisun_set_preferred_pan(this_network.preferred_pan_id);
     if (ret != SL_STATUS_OK) {
-      printfBothTime("[Failed: unable to set preferred PAN: %lu]\r\n", ret);
+      printfBoth("[Failed: unable to set preferred PAN: %lu]\r\n", ret);
       ret = __LINE__; goto cleanup;
     }
   }
@@ -672,20 +735,25 @@ uint8_t app_join_network(uint8_t network_index) {
         lfn_params = SL_WISUN_PARAMS_LFN_ECO;
         break;
       default:
-        printfBothTime("[Failed: unsupported LFN profile %d]\r\n", this_network.lfn_profile);
+        printfBoth("[Failed: unsupported LFN profile %d]\r\n", this_network.lfn_profile);
         ret = __LINE__; goto cleanup;
     }
     ret = sl_wisun_set_lfn_parameters(&lfn_params);
     if (ret != SL_STATUS_OK) {
-      printfBothTime("[Failed: unable to set LFN parameters: %lu]\r\n", ret);
+      printfBoth("[Failed: unable to set LFN parameters: %lu]\r\n", ret);
       ret = __LINE__; goto cleanup;
     }
   }
 #endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
 
+  ret = sl_wisun_set_rx_fifo_size(this_network.rx_fifo_size);
+  if (ret != SL_STATUS_OK) {
+    printfBoth("[Failed: unable to set RX FIFO size to %"PRId16": %lu]\r\n", this_network.rx_fifo_size, ret);
+  }
+
   ret = sl_wisun_set_tx_power_ddbm(this_network.tx_power_ddbm);
   if (ret != SL_STATUS_OK) {
-    printfBothTime("[Failed: unable to set TX power to %d: %lu]\r\n", this_network.tx_power_ddbm, ret);
+    printfBoth("[Failed: unable to set TX power to %d: %lu]\r\n", this_network.tx_power_ddbm, ret);
     ret = __LINE__; goto cleanup;
   }
 
@@ -702,15 +770,15 @@ uint8_t app_join_network(uint8_t network_index) {
 #endif   /* WISUN_CONFIG_DDP */
   certificate_options = SL_WISUN_CERTIFICATE_OPTION_IS_REF;
   if (trustedca_count == 0) {
-    printfBothTime("No trusted CA keychain, init from builtin credentials\r\n");
+    printfBoth("No trusted CA keychain, init from builtin credentials\r\n");
     const uint32_t max_cert_str_len = 2048U;
 
     // set the trusted certificate
     ret = sl_wisun_set_trusted_certificate(SL_WISUN_CERTIFICATE_OPTION_IS_REF,
-                                           _get_cert_str_len(wisun_config_ca_certificate, max_cert_str_len) + 1,
-                                           wisun_config_ca_certificate);
+                                          _get_cert_str_len(wisun_config_ca_certificate, max_cert_str_len) + 1,
+                                          wisun_config_ca_certificate);
     if (ret != SL_STATUS_OK) {
-      printf("[Failed: unable to set the trusted certificate: %lu]\n", ret);
+      printfBoth("[Failed: unable to set the trusted certificate: %lu]\n", ret);
       ret = __LINE__; goto cleanup;
     }
 
@@ -719,7 +787,7 @@ uint8_t app_join_network(uint8_t network_index) {
                                           _get_cert_str_len(wisun_config_device_certificate, max_cert_str_len) + 1,
                                           wisun_config_device_certificate);
     if (ret != SL_STATUS_OK) {
-      printf("[Failed: unable to set the device certificate: %lu]\n", ret);
+      printfBoth("[Failed: unable to set the device certificate: %lu]\n", ret);
       ret = __LINE__; goto cleanup;
     }
 
@@ -730,12 +798,12 @@ uint8_t app_join_network(uint8_t network_index) {
                                           _get_cert_str_len(wisun_config_device_private_key, max_cert_str_len) + 1,
                                           wisun_config_device_private_key);
     if (ret != SL_STATUS_OK) {
-      printf("[Failed: unable to set the device private key: %lu]\n", ret);
+      printfBoth("[Failed: unable to set the device private key: %lu]\n", ret);
       ret = __LINE__; goto cleanup;
     }
 
   } else {
-    printfBothTime("%d trusted CA keychains\r\n", trustedca_count);
+    printfBoth("%d trusted CA keychains\r\n", trustedca_count);
     for (idx = 0; idx < trustedca_count; ++idx) {
       trustedca = sl_wisun_keychain_get_trustedca(idx);
       if (!trustedca) {
@@ -749,10 +817,10 @@ uint8_t app_join_network(uint8_t network_index) {
       }
 
       ret = sl_wisun_set_trusted_certificate(certificate_options,
-                                             trustedca->data_length,
-                                             trustedca->data);
+                                            trustedca->data_length,
+                                            trustedca->data);
       if (ret != SL_STATUS_OK) {
-        printfBothTime("[Failed: unable to set the trusted certificate: %lu]\r\n", ret);
+        printfBoth("[Failed: unable to set the trusted certificate: %lu]\r\n", ret);
         ret = __LINE__; goto cleanup;
       }
 
@@ -763,7 +831,7 @@ uint8_t app_join_network(uint8_t network_index) {
 
     credential = sl_wisun_keychain_get_credential((sl_wisun_keychain_t)this_network.keychain, this_network.keychain_index);
     if (!credential) {
-      printfBothTime("[Failed: unable to load credential for keychain %d]\r\n", this_network.keychain_index);
+      printfBoth("[Failed: unable to load credential for keychain %d]\r\n", this_network.keychain_index);
       //ret = __LINE__; goto cleanup;
     }
     if (credential->certificate.keychain == SL_WISUN_KEYCHAIN_NVM) {
@@ -776,7 +844,7 @@ uint8_t app_join_network(uint8_t network_index) {
                                           credential->certificate.data_length,
                                           credential->certificate.data);
     if (ret != SL_STATUS_OK) {
-      printfBothTime("[Failed: unable to set the device certificate: %lu]\r\n", ret);
+      printfBoth("[Failed: unable to set the device certificate: %lu]\r\n", ret);
       ret = __LINE__; goto cleanup;
     }
 
@@ -788,7 +856,7 @@ uint8_t app_join_network(uint8_t network_index) {
       ret = sl_wisun_set_device_private_key_id(credential->pk.u.key_id);
     }
     if (ret != SL_STATUS_OK) {
-      printfBothTime("[Failed: unable to set the device private key: %lu]\r\n", ret);
+      printfBoth("[Failed: unable to set the device private key: %lu]\r\n", ret);
       ret = __LINE__; goto cleanup;
     }
   }
@@ -797,17 +865,18 @@ uint8_t app_join_network(uint8_t network_index) {
   ret = app_settings_get_channel_mask(this_network.allowed_channels, &channel_mask);
   ret = sl_wisun_set_channel_mask(&channel_mask);
   if (ret != SL_STATUS_OK) {
-    printfBothTime("[Failed: unable to set channel mask: %lu]\r\n", ret);
+    printfBoth("[Failed: unable to set channel mask: %lu]\r\n", ret);
     res = __LINE__; goto cleanup;
   }
 */
   if (this_network.device_type == SL_WISUN_ROUTER) {
     ret = sl_wisun_set_unicast_settings(this_network.uc_dwell_interval_ms);
     if (ret != SL_STATUS_OK) {
-      printfBothTime("[Failed: unable to set unicast settings: %lu]\r\n", ret);
+      printfBoth("[Failed: unable to set unicast settings: %lu]\r\n", ret);
       ret = __LINE__; goto cleanup;
     }
   }
+
   switch(this_network.regulation) {
     case SL_WISUN_REGULATION_NONE:
       regulation_params = &SL_WISUN_REGULATION_PARAMS_NONE;
@@ -822,19 +891,19 @@ uint8_t app_join_network(uint8_t network_index) {
       regulation_params = &SL_WISUN_REGULATION_PARAMS_ETSI;
       break;
     default:
-      printfBothTime("[Failed: unsupported regulation]\r\n");
+      printfBoth("[Failed: unsupported regulation]\r\n");
       ret = __LINE__; goto cleanup;
   }
   ret = sl_wisun_set_regulation_parameters(regulation_params);
   if (ret != SL_STATUS_OK) {
-    printfBothTime("[Failed: unable to set regional regulation parameters: %lu]\r\n", ret);
+    printfBoth("[Failed: unable to set regional regulation parameters: %lu]\r\n", ret);
     ret = __LINE__; goto cleanup;
   }
 
   ret = sl_wisun_set_regulation_tx_thresholds(this_network.regulation_warning_threshold,
                                               this_network.regulation_alert_threshold);
   if (ret != SL_STATUS_OK) {
-    printfBothTime("[Failed: unable to set regulation TX thresholds: %lu]\r\n", ret);
+    printfBoth("[Failed: unable to set regulation TX thresholds: %lu]\r\n", ret);
   }
 
 #if 0
@@ -845,23 +914,23 @@ uint8_t app_join_network(uint8_t network_index) {
   }
 #endif
 
-  #if SLI_WISUN_DISABLE_SECURITY
+#if       SLI_WISUN_DISABLE_SECURITY
   ret = sl_wisun_set_security_state(app_security_state);
   if (ret != SL_STATUS_OK) {
-    printf("[Failed to set security state %"PRIu32"]\r\n", app_security_state);
+    printfBoth("[Failed to set security state %"PRIu32"]\r\n", app_security_state);
     ret = __LINE__; goto cleanup;
   }
-#endif
+#endif /* SLI_WISUN_DISABLE_SECURITY */
 /*
   // As per RFC3748, "The Identity Response field MUST NOT be null terminated"
   ret = sl_wisun_set_eap_identity(strlen(this_network.eap_identity),
                                   (const uint8_t *)this_network.eap_identity);
   if (ret != SL_STATUS_OK) {
-    printf("[Failed to set EAP identity]\r\n");
+    printfBoth("[Failed to set EAP identity]\r\n");
     ret = __LINE__; goto cleanup;
   }
 */
-  printfBothTime("Network[%d]: \"%s\": %s]\r\n",
+  printfBothTime("Joining Network[%d]: \"%s\": %s]\r\n",
         app_parameters.network_index,
         this_network.network_name,
         app_wisun_phy_to_str(&(network[app_parameters.network_index].phy)));
@@ -876,7 +945,7 @@ uint8_t app_join_network(uint8_t network_index) {
     if (ret == SL_STATUS_FAIL) {
         sl_wisun_get_join_state(&join_state);
         if (join_state == SL_WISUN_JOIN_STATE_DISCONNECTED) {
-            printfBothTime("Network[%d]: Incorrect PHY selection: Will never connect on %s\n",
+            printfBoth("Network[%d]: Incorrect PHY selection: Will never connect on %s\n",
                 app_parameters.network_index,
                 app_wisun_phy_to_str(&(network[app_parameters.network_index].phy)));
         }
@@ -913,7 +982,7 @@ uint8_t app_join_network(uint8_t network_index) {
                               phy_mode_id_p,
                               app_settings_wisun.rx_mdr_capable);
     if (ret != SL_STATUS_OK) {
-      printfBothTime("[Failed: unable to set RX PhyModeId list in POM-IE for Mode Switch: %lu]\r\n", ret);
+      printfBoth("[Failed: unable to set RX PhyModeId list in POM-IE for Mode Switch: %lu]\r\n", ret);
       ret = __LINE__; goto cleanup;
     }
   }
@@ -938,67 +1007,64 @@ cleanup:
 
   if (ret != SL_STATUS_OK) {
       if (ret != SL_STATUS_FAIL) {
-          printfBothTime("app_join_network(%d) failed around line %ld\n", app_parameters.network_index, ret);
+          printfBoth("app_join_network(%d) failed around line %ld\n", app_parameters.network_index, ret);
       } else {
-          printfBothTime("sl_wisun_join() failed: the most probable cause is an unknown PHY. Check you Radio configuration\n");
+          printfBoth("sl_wisun_join() failed: the most probable cause is an unknown PHY. Check you Radio configuration\n");
       }
   }
 
   return ret;
 }
 
-/* App task function*/
+/* App task function */
 void app_task(void *args)
 {
   (void) args;
-  uint16_t join_res = 0;
-  uint64_t now = 0;
-  uint64_t connection_timestamp;
-  uint64_t connected_delay_sec;
-  bool print_keep_alive = true;
+  uint32_t osdelay_msec;
+
 #ifdef    SL_CATALOG_SIMPLE_BUTTON_PRESENT
   uint8_t startup_option = 0;
 #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
+
 #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-  uint8_t change_leds;
-  uint8_t previous_change_leds = 5;
+  previous_change_leds = 5;
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
-  bool with_time, to_console, to_rtt, to_udp, to_coap;
+
 #ifdef    SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT
   BootloaderStorageInformation_t storage_info;
 #endif  /* SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT */
 
-/* Init app timestamp, timestamp uses in printf */
-app_timestamp_init();
+#ifdef    APP_TIMESTAMP_H
+  app_timestamp_init();
+#endif /* APP_TIMESTAMP_H */
 
-#ifdef   SL_CATALOG_POWER_MANAGER_PRESENT
+#ifdef    SL_CATALOG_POWER_MANAGER_PRESENT
+  printfBoth("With     Power Manager (for low power)\n");
   init_power_manager_stats();
 #endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
 
-init_app_parameters();
+#ifdef    APP_PARAMETERS_H
+  init_app_parameters();
+#endif /* APP_PARAMETERS_H */
 
-with_time = to_console = to_rtt = true;
-  to_udp = to_coap = false;
-
-#ifdef    APP_CHECK_PREVIOUS_CRASH
+#ifdef    SL_WISUN_CRASH_HANDLER_H
   sl_wisun_check_previous_crash();
   if (strlen(crash_info_string)) {
       app_parameters.nb_crashes++;
       save_app_parameters();
       printfBoth("Info on previous crash: %s\n", crash_info_string);
   }
-#endif /* APP_CHECK_PREVIOUS_CRASH */
+#endif /* SL_WISUN_CRASH_HANDLER_H */
 
-  osDelay(1000);
   printf("\n");
   snprintf(chip, 8, "%s", CHIP);
 
-  #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
   snprintf(application, 100, "%s %s %s %s %d.%d", chip, SL_BOARD_NAME, "Wi-SUN Node Monitoring", APP_VERSION_STRING, START_FLASHES_A, START_FLASHES_B);
 #else  /* SL_CATALOG_SIMPLE_LED_PRESENT */
   snprintf(application, 100, "%s %s %s %s", chip, SL_BOARD_NAME, "Wi-SUN Node Monitoring", APP_VERSION_STRING);
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
-  snprintf(version, 80, "Compiled on %s at %s", __DATE__, __TIME__);
+
 
 #ifdef    SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT
   bootloader_getStorageInfo(&storage_info);
@@ -1016,6 +1082,7 @@ with_time = to_console = to_rtt = true;
 
   printfBoth("%s\n", application);
   printfBoth("%s\n", version);
+  printfBoth("Wi-SUN Stack V%d.%d.%d\n", SL_WISUN_VERSION_MAJOR, SL_WISUN_VERSION_MINOR, SL_WISUN_VERSION_PATCH);
 
   printfBoth("Network[%d] %s\n",
     app_parameters.network_index,
@@ -1023,16 +1090,18 @@ with_time = to_console = to_rtt = true;
 
 
 #ifdef    SL_CATALOG_APP_OS_STAT_PRESENT
-#ifdef APP_OS_STAT_UPDATE_PERIOD_TIME_MS
-printfBoth("with app_os_stat every %d ms\n", APP_OS_STAT_UPDATE_PERIOD_TIME_MS);
-#endif /* APP_OS_STAT_UPDATE_PERIOD_TIME_MS */
+  #ifdef APP_OS_STAT_UPDATE_PERIOD_TIME_MS
+  printfBoth("with app_os_stat every %d ms\n", APP_OS_STAT_UPDATE_PERIOD_TIME_MS);
+  #endif /* APP_OS_STAT_UPDATE_PERIOD_TIME_MS */
 #endif /* SL_CATALOG_APP_OS_STAT_PRESENT */
-printfBoth("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
+  printfBoth("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
     network[app_parameters.network_index].network_size));
+
 #ifdef    WISUN_CONFIG_BROADCAST_RETRIES
   printfBoth("Broadcast Retries %d\n", WISUN_CONFIG_BROADCAST_RETRIES);
 #endif /* WISUN_CONFIG_BROADCAST_RETRIES */
   TRACES_WHILE_CONNECTING;
+
 
 #ifdef    HISTORY
   snprintf(history_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE, "%s", "");
@@ -1046,13 +1115,13 @@ printfBoth("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
     printfBoth("With     OTA DFU Support\n");
   #endif /* SL_CATALOG_WISUN_OTA_DFU_PRESENT */
 
-  #ifdef WITH_TCP_SERVER
+  #ifdef    APP_TCP_SERVER_H
     printfBoth("With     TCP Server %s\n", DEFINE_string(WITH_TCP_SERVER));
-  #endif /* WITH_TCP_SERVER */
+  #endif /* APP_TCP_SERVER_H */
 
-  #ifdef WITH_UDP_SERVER
+  #ifdef    APP_UDP_SERVER_H
     printfBoth("With     UDP Server %s\n", DEFINE_string(WITH_UDP_SERVER));
-  #endif /* WITH_UDP_SERVER */
+  #endif /* APP_UDP_SERVER_H */
 
   #ifdef WITH_DIRECT_CONNECT
     printfBoth("With     Direct Connect\n");
@@ -1064,6 +1133,7 @@ printfBoth("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
   sprintf(device_tag, "%02x%02x", device_mac.address[6], device_mac.address[7]);
   printfBoth("device MAC %s\n", device_mac_string);
   printfBoth("device_tag %s\n", device_tag);
+
 
 #ifdef    SL_CATALOG_SIMPLE_BUTTON_PRESENT
   B0 = ( sl_button_get_state(&sl_button_btn0) == SL_SIMPLE_BUTTON_PRESSED );
@@ -1080,29 +1150,20 @@ printfBoth("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
   }
 #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
 
-  printfBoth("device_type %s\n", device_type);
-
-#ifdef    WITH_DIRECT_CONNECT
-  if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
-    // Register our Direct Connect custom callback function with the event manager (aka 'em')
-    app_wisun_em_custom_callback_register(SL_WISUN_MSG_DIRECT_CONNECT_LINK_AVAILABLE_IND_ID, app_direct_connect_custom_callback);
-    app_wisun_em_custom_callback_register(SL_WISUN_MSG_DIRECT_CONNECT_LINK_STATUS_IND_ID   , app_direct_connect_custom_callback);
-    app_direct_connect(true);
-  }
-#endif /* WITH_DIRECT_CONNECT */
+  // Use flags to select trace destinations
+  // Traces can only be sent over UDP or CoAP once connected, so
+  //  to_udp and to_coap are false by default.
+  with_time = to_console = to_rtt = true;
+  to_udp = to_coap = false;
 
   // Register our join state custom callback function with the event manager (aka 'em')
-  app_wisun_em_custom_callback_register(SL_WISUN_MSG_JOIN_STATE_IND_ID, _join_state_custom_callback);
+  app_wisun_em_custom_callback_register(SL_WISUN_MSG_JOIN_STATE_IND_ID , _join_state_custom_callback);
 
-#ifdef    AUTO_CLEAR_CREDENTIAL_CACHE
-  sl_wisun_clear_credential_cache();
-  printfBoth("Cleared credential cache\n");
-#endif /* AUTO_CLEAR_CREDENTIAL_CACHE */
 
-#ifdef    LIST_RF_CONFIGS
+#ifdef    APP_LIST_CONFIGS_H
   printf("RAIL PHYs (as in config/rail/radio_settings.radioconf, from Wi-SUN Radio Configurator)\n");
   list_rf_configs();
-#endif /* LIST_RF_CONFIGS */
+#endif /* APP_LIST_CONFIGS_H */
 
 #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
   // LEDs indicate the 'version' in 2 steps
@@ -1120,80 +1181,114 @@ printfBoth("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
   set_leds(0, 0);
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
-  /* Reset app_timestamp after application init (LED & button useless time)  */
-  app_timestamp = 0;
-
-#ifdef WITH_TCP_SERVER
+#ifdef    APP_TCP_SERVER_H
   init_tcp_server();
-#endif /* WITH_TCP_SERVER */
+#endif /* APP_TCP_SERVER_H */
 
-#ifdef WITH_UDP_SERVER
+#ifdef    APP_UDP_SERVER_H
   init_udp_server();
-#endif /* WITH_UDP_SERVER */
+#endif /* APP_UDP_SERVER_H */
 
-  // Store the time where we call app_join_network()
-  connect_time_sec = now_sec();
+  printf("\n%s Compiled on %s at %s\n", __FILE__, __DATE__, __TIME__);
+
+#ifdef    WITH_DIRECT_CONNECT
+  if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
+    // Register our Direct Connect custom callback function with the event manager (aka 'em')
+    app_wisun_em_custom_callback_register(SL_WISUN_MSG_DIRECT_CONNECT_LINK_AVAILABLE_IND_ID, app_direct_connect_custom_callback);
+    app_wisun_em_custom_callback_register(SL_WISUN_MSG_DIRECT_CONNECT_LINK_STATUS_IND_ID   , app_direct_connect_custom_callback);
+    app_direct_connect(true);
+  }
+#endif /* WITH_DIRECT_CONNECT */
+
+  // Reset the time to when we call app_join_network()
+  join_call_time_sec = app_timestamp_reset();
   // connect to the wisun network
   join_res = app_join_network(app_parameters.network_index);
 
-  while (1) { // To allow a Direct Connect connection, regularly check UDP messages
+#ifdef TRACK_HEAP_PER_THREAD
+  sl_memory_manager_print_per_thread_alloc_free(0x00);
+#endif /* TRACK_HEAP_PER_THREAD */
+
+  while (1) {
       #ifdef    WITH_DIRECT_CONNECT
-        #ifdef    WITH_UDP_SERVER
+      if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
+       // To allow a Direct Connect connection, regularly check UDP messages
+        #ifdef    APP_UDP_SERVER_H
+        #if (WITH_UDP_SERVER == SO_NONBLOCK)
         check_udp_server_messages();
-        #endif /* WITH_UDP_SERVER */
+        #endif /* (WITH_UDP_SERVER == SO_NONBLOCK) */
+        #endif /* APP_UDP_SERVER_H */
+      }
       #endif /* WITH_DIRECT_CONNECT */
-      now = now_sec();
-      sl_wisun_get_join_state(&join_state);
       if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) break;
+      now = now_sec();
       if (join_res == SL_STATUS_OK) {
-        if (now % 60 == 0) {
-            printfBothTime("Waiting for %s connection to network[%d]: \"%s\": %s. join_state %d\n",
-                      device_type,
-                      app_parameters.network_index,
-                      network[app_parameters.network_index].network_name,
-                      app_wisun_phy_to_str(&network[app_parameters.network_index].phy),
-                      join_state);
+          printfBothTime("Waiting for %s connection to network[%d]: \"%s\": %s. join_state %d\n",
+                    device_type_string,
+                    app_parameters.network_index,
+                    network[app_parameters.network_index].network_name,
+                    app_wisun_phy_to_str(&network[app_parameters.network_index].phy),
+                    join_state);
+
 #ifdef   SL_CATALOG_POWER_MANAGER_PRESENT
-            print_power_manager_pm_transitions();
-            print_power_manager_delays();
+          print_power_manager_delays();
 #endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
-        }
+
       } else {
         if (join_res != SL_STATUS_OK) {
             if (join_res == SL_STATUS_FAIL) {
-                printfBothTime("Invalid PHY\n");
-                printfBothTime("Check that this PHY is listed as a RAIL PHY (see above)\n");
+                printfBoth("Invalid PHY\n");
+                printfBoth("Check that this PHY is listed as a RAIL PHY (see above)\n");
             } else {
-                printfBothTime("Check the traces and the app_join_network() code around line %d\n", join_res);
+                printfBoth("Check the traces and the app_join_network() code around line %d\n", join_res);
             }
-            printfBothTime("Will not connect to \"%s\": %s. join_res %d\n",
-                       network[app_parameters.network_index].network_name,
-                       app_wisun_phy_to_str(&network[app_parameters.network_index].phy),
-                       join_res);
+            printfBoth("Will not connect to \"%s\": %s. join_res %d\n",
+                      network[app_parameters.network_index].network_name,
+                      app_wisun_phy_to_str(&network[app_parameters.network_index].phy),
+                      join_res);
             app_parameters.network_index = (app_parameters.network_index + 1) % MAX_NETWORK_CONFIGS;
-            printfBothTime("Attempting to connect to network[%d]: \"%s\": %s\n",
-                       app_parameters.network_index,
-                       network[app_parameters.network_index].network_name,
-                       app_wisun_phy_to_str(&network[app_parameters.network_index].phy));
-            connect_time_sec = now_sec();
+            printfBoth("Attempting to connect to network[%d]: \"%s\": %s\n",
+                      app_parameters.network_index,
+                      network[app_parameters.network_index].network_name,
+                      app_wisun_phy_to_str(&network[app_parameters.network_index].phy));
+            join_call_time_sec = app_timestamp_reset();
             join_res = app_join_network(app_parameters.network_index);
         }
       }
-      osDelay(1000);
+
+    if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
+      // If using Direct connect, the wait time must be lower than the direct connect timeout (check udp server)
+      (void) sl_wisun_app_core_wait_state((1 << SL_WISUN_APP_CORE_STATE_NETWORK_CONNECTED),
+                                      20*1000);
+    }
+    else
+    {
+      // In case of LFN wait for connected state and wake-up every 60 sec
+      (void) sl_wisun_app_core_wait_state((1 << SL_WISUN_APP_CORE_STATE_NETWORK_CONNECTED),
+                                      60*1000);
+    }
+
+    #ifdef TRACK_HEAP_PER_THREAD
+      sl_memory_manager_print_per_thread_alloc_free(0x01);
+    #endif /* TRACK_HEAP_PER_THREAD */
+
   }
+
 
   /*******************************************
   /  We only reach this part once connected  /
   *******************************************/
   connection_timestamp = now_sec();
-  // Once connected for the first time, reduce RTT traces to the minimum
-  TRACES_WHEN_CONNECTED;
 
   // Get ready to listen to and send notifications to the Border Router
   //  also get ready for CoAP communication
   _open_udp_sockets();
 
-#ifdef    SL_CATALOG_WISUN_OTA_DFU_PRESENT
+  // Once connected for the first time, reduce RTT traces to the minimum
+  TRACES_WHEN_CONNECTED;
+
+
+  #ifdef    SL_CATALOG_WISUN_OTA_DFU_PRESENT
   in6_addr_t global_ipv6;
 
   printf("OTA DFU will download chunks of '<TFTP_DIRECTORY>/%s' from %s/%d\n",
@@ -1205,38 +1300,40 @@ printfBoth("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
   sl_wisun_get_ip_address(SL_WISUN_IP_ADDRESS_TYPE_GLOBAL, &global_ipv6);
   printf("OTA DFU 'start' command:\n");
   sprintf(device_global_ipv6_string, app_wisun_trace_util_get_ip_str(&global_ipv6));
-  printf(" coap-client -m post -N -B 10 -t text coap://[%s]:%d%s -e \"start\"\n",
+  printf(" coap-client -m post -N -B 10 -t text/plain coap://[%s]:%d%s -e \"start\"\n",
         device_global_ipv6_string,
         5683,
         SL_WISUN_OTA_DFU_URI_PATH
       );
   printf("Follow OTA DFU progress (from node, intrusive) using:\n");
-  printf(" coap-client -m get -N -B 10 -t text coap://[%s]:%d%s\n",
+  printf(" coap-client -m get -N -B 10 -t text/plain coap://[%s]:%d%s\n",
       device_global_ipv6_string,
       SL_WISUN_COAP_RESOURCE_HND_SERVICE_PORT,
       SL_WISUN_OTA_DFU_URI_PATH
   );
 
-  if (SL_WISUN_OTA_DFU_HOST_NOTIFY_ENABLED) {
-      printf("OTA DFU notifications enabled (every %d chunks)\n",
-        SL_WISUN_OTA_DFU_NOTIFY_DOWNLOAD_CHUNK_CNT
-      );
-      printf("OTA DFU notifications will be POSTed to notification server coap://[%s]:%d%s\n",
-        SL_WISUN_OTA_DFU_NOTIFY_HOST_ADDR,
-        SL_WISUN_OTA_DFU_NOTIFY_PORT,
-        SL_WISUN_OTA_DFU_NOTIFY_URI_PATH
-      );
-    printf("Follow OTA DFU progress (from notification server) using:\n");
-    printf(" coap-client -m get -N -B 1 -t text coap://[%s]:%d%s\n",
+  #if SL_WISUN_OTA_DFU_HOST_NOTIFY_ENABLED
+    printf("OTA DFU notifications enabled (every %d chunks)\n",
+      SL_WISUN_OTA_DFU_NOTIFY_DOWNLOAD_CHUNK_CNT
+    );
+    printf("OTA DFU notifications will be POSTed to notification server coap://[%s]:%d%s\n",
       SL_WISUN_OTA_DFU_NOTIFY_HOST_ADDR,
       SL_WISUN_OTA_DFU_NOTIFY_PORT,
       SL_WISUN_OTA_DFU_NOTIFY_URI_PATH
     );
-  }
+    printf("Follow OTA DFU progress (from notification server) using:\n");
+    printf(" coap-client -m get -N -B 1 -t text/plain coap://[%s]:%d%s\n",
+      SL_WISUN_OTA_DFU_NOTIFY_HOST_ADDR,
+      SL_WISUN_OTA_DFU_NOTIFY_PORT,
+      SL_WISUN_OTA_DFU_NOTIFY_URI_PATH
+    );
+  #endif /* SL_WISUN_OTA_DFU_HOST_NOTIFY_ENABLED */
 #endif /* SL_CATALOG_WISUN_OTA_DFU_PRESENT */
 
+#ifdef    SL_CATALOG_WISUN_COAP_PRESENT
   // Print info on possible CoAP commands, now that CoAP communication is set
   print_coap_help(device_global_ipv6_string, border_router_ipv6_string);
+#endif /* SL_CATALOG_WISUN_COAP_PRESENT */
 
   // Print and send initial connection message
   to_udp  = true;
@@ -1244,13 +1341,15 @@ printfBoth("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
   print_and_send_messages (_connection_json_string(""),
               with_time, to_console, to_rtt, to_udp, to_coap);
 
-#ifdef    APP_CHECK_PREVIOUS_CRASH
+
+
+#ifdef    SL_WISUN_CRASH_HANDLER_H
   if (strlen(crash_info_string)) {
       osDelay(2UL);
       print_and_send_messages (crash_info_string,
                   with_time, to_console, to_rtt, to_udp, to_coap);
   }
-#endif /* APP_CHECK_PREVIOUS_CRASH */
+#endif /* SL_WISUN_CRASH_HANDLER_H */
 
 #ifdef    APP_TRACK_HEAP
   sl_memory_get_heap_info(&app_heap_info);
@@ -1262,175 +1361,204 @@ printfBoth("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
 
   printfBothTime("network[%d].auto_send_sec %d\n", app_parameters.network_index, network[app_parameters.network_index].auto_send_sec);
 
-  osDelay(2UL);
-
   if (network[app_parameters.network_index].device_type == SL_WISUN_LFN) {
   #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
     set_leds(0, 0);
   #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+
   }
-#ifdef   SL_CATALOG_POWER_MANAGER_PRESENT
+
+  #ifdef   SL_CATALOG_POWER_MANAGER_PRESENT
   print_power_manager_pm_transitions();
   print_power_manager_delays();
-#endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
-  while (1) {
+  #endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
+
+  previous_join_state = join_state;
+
     ///////////////////////////////////////////////////////////////////////////
     // Put your application code here!                                       //
     ///////////////////////////////////////////////////////////////////////////
-
-      now = now_sec();
-      // Use the connection time as reference, in order to spread messages in time
-      // when several devices are powered on at the same time
-      connected_delay_sec = now - connection_timestamp;
-
-    // We can only send messages outside if connected
-    if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
-      to_udp  = true;
-      to_coap = false;
-
-      #ifdef    WITH_TCP_SERVER
-        check_tcp_server_messages();
-      #endif /* WITH_TCP_SERVER */
-
-      #ifdef    WITH_UDP_SERVER
-        check_udp_server_messages();
-      #endif /* WITH_UDP_SERVER */
-
-#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-      if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
-        // 1 Sec join state 5 indicator
-        change_leds = connected_delay_sec % 4;
-        if (change_leds != previous_change_leds) {
-            if (change_leds == 0) set_leds(0, 1);
-            if (change_leds == 1) set_leds(1, 1);
-            if (change_leds == 2) set_leds(1, 0);
-            if (change_leds == 3) set_leds(0, 0);
-            previous_change_leds = change_leds;
-        }
-      }
-#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+  loop = 1;
+  next_status_sec = now_sec() - connection_timestamp;
+  while (1) {
+    app_do_your_things();
+    // Wait auto_send_sec
+    if (network[app_parameters.network_index].auto_send_sec == 0) {
+      osdelay_msec = 60*1000;
     } else {
-
-#ifdef    WITH_DIRECT_CONNECT
-  #ifdef    WITH_UDP_SERVER
-  // Direct Connect connection is possible even when not connected to the Wi-SUN network
-  check_udp_server_messages();
-  #endif /* WITH_UDP_SERVER */
-#endif /* WITH_DIRECT_CONNECT */
-
-#ifdef    AUTO_CLEAR_CREDENTIAL_CACHE
-      if (just_disconnected) {
-          just_disconnected = false;
-          sl_wisun_disconnect();
-          sl_wisun_clear_credential_cache();
-          app_wisun_network_connect();
-      }
-#endif /* AUTO_CLEAR_CREDENTIAL_CACHE */
-      to_udp = to_coap = false;
-#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-      if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
-        // 1 Sec non join state 5 indicator
-        change_leds = connected_delay_sec % 4;
-        if (change_leds != previous_change_leds) {
-            if (change_leds == 0         ) leds_f_join_state(join_state);
-            if (change_leds == join_state) set_leds(0, 0);
-            previous_change_leds = change_leds;
-        }
-      }
-#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+      osdelay_msec = network[app_parameters.network_index].auto_send_sec*1000;
     }
 
-    // Print status message once then disable status
-    if ((connected_delay_sec % network[app_parameters.network_index].auto_send_sec == 0) || (send_asap)) {
-        if ((print_keep_alive == true) || (send_asap)) {
-#ifdef   SL_CATALOG_POWER_MANAGER_PRESENT
-          print_power_manager_pm_transitions();
-          print_power_manager_delays();
-#endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
-          print_and_send_messages (_status_json_string(""),
-                    with_time, to_console, to_rtt, to_udp, to_coap);
-          print_keep_alive = false;
-          send_asap = false;
-          #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-          if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
-            sl_led_toggle(&sl_led_led0);
-            sl_led_toggle(&sl_led_led1);
-          }
-          #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
-        }
+    //Router Device never sleep decrease polling time for best performances
+    if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
+      osdelay_msec = 1;
     }
-    // Enable status for next time
-    if (connected_delay_sec % network[app_parameters.network_index].auto_send_sec == 1) {
-        if (print_keep_alive == false) {
-            print_keep_alive = true;
-        }
-    }
-
-#ifdef    APP_TRACK_HEAP
-    // Refresh heap info once then disable the refresh
-    if (connected_delay_sec % 5 == 0) {
-        if (refresh_heap) {
-          sl_memory_get_heap_info(&app_heap_info);
-#ifdef    APP_TRACK_HEAP_DIFF
-          if (app_previous_heap_free == 0) { app_previous_heap_free = app_heap_info.free_size; }
-          if (app_previous_heap_free != app_heap_info.free_size) {
-            printfBothTime("heap free %8d used %8d %6.2f%% (diff %5d)\n",
-                        app_heap_info.free_size,
-                         app_heap_info.used_size,
-                        1.0*app_heap_info.used_size / (app_heap_info.total_size / 100),
-                        app_heap_info.free_size - app_previous_heap_free
-            );
-          }
-          app_previous_heap_free = app_heap_info.free_size;
-#endif /* APP_TRACK_HEAP_DIFF */
-          refresh_heap = false;
-        }
-    }
-    // Enable heap info refresh for next time
-    if (connected_delay_sec % 5 == 1) { refresh_heap = true; }
-#endif /* APP_TRACK_HEAP */
-
-#ifdef    SL_CATALOG_SIMPLE_BUTTON_PRESENT
-    if (connected_delay_sec % BUTTON_CHECK_DELAY == 0) {
-      if (check_buttons == true) {
-        check_buttons = false;
-        B0 = ( sl_button_get_state(&sl_button_btn0) == SL_SIMPLE_BUTTON_PRESSED );
-        B1 = ( sl_button_get_state(&sl_button_btn1) == SL_SIMPLE_BUTTON_PRESSED );
-        #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-          if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
-            if (B0) sl_led_turn_on(&sl_led_led0);
-            if (B1) sl_led_turn_on(&sl_led_led1);
-          }
-        #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
-        if (B0 + B1) {
-          print_and_send_messages (_button_json_string(""),
-                    with_time, to_console, to_rtt, to_udp, to_coap);
-        #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-          if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
-            sl_led_turn_off(&sl_led_led0);
-            sl_led_turn_off(&sl_led_led1);
-          }
-        #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
-        }
-      }
-    }
-    if (connected_delay_sec % BUTTON_CHECK_DELAY == 1) {
-      check_buttons = true;
-    }
-#endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
 
     if (network[app_parameters.network_index].device_type == SL_WISUN_LFN) {
-      #define SLEEP_DELAY_MS 1000UL
-      osDelay(SLEEP_DELAY_MS);
-    } else {
-      osDelay(1UL);
+
+      #ifdef SL_CATALOG_POWER_MANAGER_DEEPSLEEP_PRESENT
+      if ((to_console) && (loop > 3) && 0) {
+        printf("\nDisabling console printf to preserve power after %d loops...\n\n", loop);
+        fflush(stdout);
+        to_console = false;
+
+        #ifdef    SL_BOARD_CONTROL_H
+        osDelay(1000);
+        (void)sl_board_disable_vcom();
+      #endif /* SL_BOARD_CONTROL_H */
+
     }
+    #endif /* SL_CATALOG_POWER_MANAGER_DEEPSLEEP_PRESENT */
+    }
+
+    osDelay(osdelay_msec);
   }
 }
 
 // -----------------------------------------------------------------------------
 //                          Static Function Definitions
 // -----------------------------------------------------------------------------
+
+void app_do_your_things() {
+  loop++;
+  now = now_sec();
+  // Use the connection time as reference, in order to spread messages in time
+  // when several devices are powered on at the same time
+  connected_delay_sec = now - connection_timestamp;
+
+  // We can only send messages outside if connected
+  if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
+    to_udp  = true;
+    to_coap = false;
+
+    #ifdef    APP_TCP_SERVER_H
+      check_tcp_server_messages();
+    #endif /* APP_TCP_SERVER_H */
+
+    #ifdef    APP_UDP_SERVER_H
+    #if (WITH_UDP_SERVER == SO_NONBLOCK)
+    check_udp_server_messages();
+    #endif /* (WITH_UDP_SERVER == SO_NONBLOCK) */
+    #endif /* APP_UDP_SERVER_H */
+
+  #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+    if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
+      // 1 Sec join state 5 indicator
+      change_leds = connected_delay_sec % 4;
+      if (change_leds != previous_change_leds) {
+          if (change_leds == 0) set_leds(0, 1);
+          if (change_leds == 1) set_leds(1, 1);
+          if (change_leds == 2) set_leds(1, 0);
+          if (change_leds == 3) set_leds(0, 0);
+          previous_change_leds = change_leds;
+      }
+    }
+  #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+
+  } else {
+
+#ifdef    WITH_DIRECT_CONNECT
+  // Direct Connect connection is possible even when not connected to the Wi-SUN network
+  #ifdef    APP_UDP_SERVER_H
+  #if (WITH_UDP_SERVER == SO_NONBLOCK)
+  check_udp_server_messages();
+  #endif /* (WITH_UDP_SERVER == SO_NONBLOCK) */
+  #endif /* APP_UDP_SERVER_H */
+#endif /* WITH_DIRECT_CONNECT */
+
+    to_udp = to_coap = false;
+  #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+    if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
+      // 1 Sec non join state 5 indicator
+      change_leds = connected_delay_sec % 4;
+      if (change_leds != previous_change_leds) {
+          if (change_leds == 0         ) leds_f_join_state(join_state);
+          if (change_leds == join_state) set_leds(0, 0);
+          previous_change_leds = change_leds;
+      }
+    }
+  #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+
+  }
+
+  if (connected_delay_sec >= next_status_sec || send_asap) {
+    time_to_send_status = true;
+    next_status_sec = connected_delay_sec + network[app_parameters.network_index].auto_send_sec;
+  } else {
+    time_to_send_status = false;
+  }
+  send_asap = false;
+
+  // Print status message once then disable status
+  if (time_to_send_status == true) {
+#ifdef   SL_CATALOG_POWER_MANAGER_PRESENT
+    if (to_console) {
+      print_power_manager_delays();
+    }
+#endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
+
+    print_and_send_messages (_status_json_string(""), with_time, to_console, to_rtt, to_udp, to_coap);
+    #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+    if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
+      sl_led_toggle(&sl_led_led0);
+      sl_led_toggle(&sl_led_led1);
+    }
+    #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+  }
+
+#ifdef    APP_TRACK_HEAP
+  // Refresh heap info once then disable the refresh
+  if (refresh_heap) {
+    sl_memory_get_heap_info(&app_heap_info);
+  #ifdef    APP_TRACK_HEAP_DIFF
+    if (app_previous_heap_free == 0) { app_previous_heap_free = app_heap_info.free_size; }
+    if (app_previous_heap_free != app_heap_info.free_size) {
+      printfBothTime("heap free %8d used %8d %6.2f%% (free diff %5d)\n",
+                  app_heap_info.free_size,
+                  app_heap_info.used_size,
+                  1.0*app_heap_info.used_size / (app_heap_info.total_size / 100),
+                  app_heap_info.free_size - app_previous_heap_free
+      );
+      refresh_heap = false;
+    }
+    app_previous_heap_free = app_heap_info.free_size;
+  #endif /* APP_TRACK_HEAP_DIFF */
+    refresh_heap = false;
+  }
+  // Enable heap info refresh for next time
+  if (connected_delay_sec % 5 == 1) { refresh_heap = true; }
+#endif /* APP_TRACK_HEAP */
+
+#ifdef    SL_CATALOG_SIMPLE_BUTTON_PRESENT
+  if (connected_delay_sec % BUTTON_CHECK_DELAY == 0) {
+    if (check_buttons == true) {
+      check_buttons = false;
+      B0 = ( sl_button_get_state(&sl_button_btn0) == SL_SIMPLE_BUTTON_PRESSED );
+      B1 = ( sl_button_get_state(&sl_button_btn1) == SL_SIMPLE_BUTTON_PRESSED );
+      #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+        if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
+          if (B0) sl_led_turn_on(&sl_led_led0);
+          if (B1) sl_led_turn_on(&sl_led_led1);
+        }
+      #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
+      if (B0 + B1) {
+        print_and_send_messages (_button_json_string(""),
+                  with_time, to_console, to_rtt, to_udp, to_coap);
+      #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+        if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
+          sl_led_turn_off(&sl_led_led0);
+          sl_led_turn_off(&sl_led_led1);
+        }
+      #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
+      }
+    }
+  }
+  if (connected_delay_sec % BUTTON_CHECK_DELAY == 1) {
+    check_buttons = true;
+  }
+#endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
+
+}
 
 void app_reset_statistics(void) {
   connection_time_sec = now_sec();
@@ -1440,58 +1568,69 @@ void app_reset_statistics(void) {
   disconnected_total_sec = 0;
 }
 
-// -----------------------------------------------------------------------------
-//                          Static Function Definitions
-// -----------------------------------------------------------------------------
 sl_wisun_mac_address_t _get_parent_mac_address_and_update_parent_info(void) {
   sl_status_t ret;
   uint8_t neighbor_count;
   uint8_t i;
   sl_wisun_neighbor_info_t neighbor_info;
+
+  // fill with zeros
   for ( i = 0 ; i<  SL_WISUN_MAC_ADDRESS_SIZE ; i++) {
       parent_mac.address[i] = 0;
       secondary_mac.address[i] = 0;
   }
 
   ret = sl_wisun_get_neighbor_count(&neighbor_count);
-  if (ret) {printfBothTime("[Failed: sl_wisun_get_neighbor_count() returned 0x%04x]\n", (uint16_t)ret);}
-  sl_wisun_mac_address_t neighbor_mac_addresses[neighbor_count];
-  ret = sl_wisun_get_neighbors(&neighbor_count, neighbor_mac_addresses);
-  if (ret) {printfBothTime("[Failed: sl_wisun_get_neighbors() returned 0x%04x]\n", (uint16_t)ret);}
-  for (i = 0 ; i < neighbor_count; i++) {
-      sl_wisun_get_neighbor_info(&neighbor_mac_addresses[i], &neighbor_info);
-      if (neighbor_info.type == SL_WISUN_NEIGHBOR_TYPE_PRIMARY_PARENT) {
-        sl_wisun_get_neighbor_info(&neighbor_mac_addresses[i], &parent_info);
-        parent_mac = neighbor_mac_addresses[i];
-      }
-      if (neighbor_info.type == SL_WISUN_NEIGHBOR_TYPE_SECONDARY_PARENT) {
-        sl_wisun_get_neighbor_info(&neighbor_mac_addresses[i], &secondary_info);
-        secondary_mac = neighbor_mac_addresses[i];
-      }
+  if (ret) {
+    printfBothTime("[Failed: sl_wisun_get_neighbor_count() returned 0x%04x]\n", (uint16_t)ret);
+    neighbor_count = 0;
   }
+
+  if (neighbor_count) {
+    sl_wisun_mac_address_t *neighbor_mac_addresses = NULL;
+    neighbor_mac_addresses = sl_malloc(sizeof(sl_wisun_mac_address_t) * neighbor_count);
+    if (neighbor_mac_addresses == NULL) {
+      printfBothTime("[Failed: memory allocation for %d sl_wisun_mac_address_t in neighbor_mac_addresses returned NULL]\n", (uint16_t)neighbor_count);
+    } else {
+      ret = sl_wisun_get_neighbors(&neighbor_count, neighbor_mac_addresses);
+      if (ret) {printfBothTime("[Failed: sl_wisun_get_neighbors() returned 0x%04x]\n", (uint16_t)ret);}
+      for (i = 0 ; i < neighbor_count; i++) {
+          sl_wisun_get_neighbor_info(&neighbor_mac_addresses[i], &neighbor_info);
+          if (neighbor_info.type == SL_WISUN_NEIGHBOR_TYPE_PRIMARY_PARENT  ) {
+            sl_wisun_get_neighbor_info(&neighbor_mac_addresses[i], &parent_info);
+            parent_mac = neighbor_mac_addresses[i];
+          }
+          if (neighbor_info.type == SL_WISUN_NEIGHBOR_TYPE_SECONDARY_PARENT) {
+            sl_wisun_get_neighbor_info(&neighbor_mac_addresses[i], &secondary_info);
+            secondary_mac = neighbor_mac_addresses[i];
+          }
+      }
+      sl_free(neighbor_mac_addresses);
+    }
+  }
+
   return parent_mac;
 }
 
 void refresh_parent_tag(void) {
   _get_parent_mac_address_and_update_parent_info();
-  sprintf(parent_tag, "%02x%02x", parent_mac.address[6], parent_mac.address[7]);
+  sprintf(parent_tag   , "%02x%02x", parent_mac.address[6]   , parent_mac.address[7]   );
   sprintf(secondary_tag, "%02x%02x", secondary_mac.address[6], secondary_mac.address[7]);
 };
 
 void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
   int i;
   uint64_t delay;
-  // Use flags to select trace destinations
-  // Traces can only be sent over UDP or CoAP once connected, so
-  //  to_udp and to_coap are false by default.
-  bool with_time, to_console, to_rtt, to_udp, to_coap;
-  with_time = to_console = to_rtt = true;
-  to_udp = to_coap = false;
 
   join_state = (sl_wisun_join_state_t)evt->evt.join_state.join_state;
   if (join_state >  SL_WISUN_JOIN_STATE_OPERATIONAL) {
-      // Do not process intermediate join states, whose values are > 5
-      return;
+    if (join_state >  SL_WISUN_JOIN_STATE_OPERATIONAL) {
+      printfBothTime("[Join state %d.%d]\n", join_state/10, join_state%10);
+    } else {
+      printfBothTime("[Join state %d]\n", join_state);
+    }
+    // Do not process intermediate join states, whose values are > 5
+    return;
   }
   if (join_state != previous_join_state) {
     // join_state changed...
@@ -1500,6 +1639,13 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
     if (join_state < min_join_state) { min_join_state = join_state; }
     if ((join_state > SL_WISUN_JOIN_STATE_DISCONNECTED) && (join_state <= SL_WISUN_JOIN_STATE_OPERATIONAL)) {
       app_join_state_sec[join_state] = now_sec();
+    #ifdef SL_CATALOG_POWER_MANAGER_DEEPSLEEP_PRESENT
+      #ifdef    SL_BOARD_CONTROL_H
+      sl_board_enable_vcom();
+      loop = 1;
+      printf("\nEnabling console printf because of disconnected state\n\n");
+      #endif /* SL_BOARD_CONTROL_H */
+    #endif /* SL_CATALOG_POWER_MANAGER_DEEPSLEEP_PRESENT */
       // Store transition delay
       delay = app_join_state_delay_sec[join_state] = app_join_state_sec[join_state] - app_join_state_sec[join_state-1];
       printfBothTime("app_join_state_delay_sec[%d] = %llu sec\n", join_state, delay);
@@ -1524,15 +1670,17 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
         disconnected_total_sec += connection_time_sec - disconnection_time_sec;
       }
 
-#ifdef    HISTORY
+    #ifdef    HISTORY
       APPEND_TO_HISTORY(" (%d) %s |", join_state , now_str());
-#endif /* HISTORY */
+    #endif /* HISTORY */
+
       parent_mac = _get_parent_mac_address_and_update_parent_info();
       sprintf(parent_tag, "%02x%02x", parent_mac.address[6], parent_mac.address[7]);
       // if sockets are opened, print and send connection message
       // This will occur in case of a reconnection
       if (udp_notification_socket_id) {
-        to_udp = to_coap = true;
+        to_udp = true;
+        to_coap = false;
         print_and_send_messages (_connection_json_string(""),
             with_time, to_console, to_rtt, to_udp, to_coap);
       }
@@ -1550,19 +1698,23 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
       disconnection_time_sec = app_join_state_sec[join_state];
       printfBothTime("Disconnected after %llu sec\n", disconnection_time_sec - connection_time_sec);
       connected_total_sec += disconnection_time_sec - connection_time_sec;
-#ifdef    HISTORY
+    #ifdef    HISTORY
       APPEND_TO_HISTORY(" (%d) %s /", join_state , now_str());
-#endif /* HISTORY */
+    #endif /* HISTORY */
+
       just_disconnected = true;
       TRACES_WHILE_CONNECTING;
     }
     previous_join_state = join_state;
-#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+    #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
     leds_f_join_state(join_state);
-#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+    #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+
   }
 }
 
+
+#ifdef    APP_CHECK_NEIGHBORS_H
 void  _check_neighbors(void) {
   sl_status_t ret;
   uint8_t neighbor_count;
@@ -1579,6 +1731,7 @@ void  _check_neighbors(void) {
     }
   }
 }
+#endif /* APP_CHECK_NEIGHBORS_H */
 
 char* _connection_json_string () {
   #define CONNECTION_JSON_FORMAT_STR                    \
@@ -1595,9 +1748,11 @@ char* _connection_json_string () {
     END_JSON
 
   char sec_string[20];
+  uint64_t connection_sec;
 
   sl_wisun_get_network_info(&network_info);
-  sprintf(sec_string, "%s", now_str());
+  connection_sec = now_sec();
+  sprintf(sec_string, "%s", dhms(connection_sec));
   refresh_parent_tag();
   msg_count++;
 
@@ -1660,20 +1815,17 @@ char* _status_json_string (char * start_text) {
   sl_wisun_statistics_t         mac_statistics;
   sl_wisun_statistics_t         phy_statistics;
 
+  uint64_t status_sec;
   uint64_t current_state_sec;
 
-  sprintf(running_sec_string, "%s", now_str());
-  refresh_parent_tag();
   // Make sure of the join state
   sl_wisun_get_join_state(&join_state);
-  sl_wisun_get_network_info(&network_info);
-  sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_NETWORK, &network_statistics);
-  sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_MAC    , &mac_statistics);
-  sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_PHY    , &phy_statistics);
   msg_count++;
 
+  status_sec = now;
+
   if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
-    current_state_sec = now_sec() - connection_time_sec;
+    current_state_sec = status_sec - connection_time_sec;
     sprintf(connected_string,       "%s", dhms(current_state_sec));
     sprintf(disconnected_string,    "no");
     sprintf(connected_sec_string,   "%s", dhms(connected_total_sec + current_state_sec));
@@ -1684,7 +1836,7 @@ char* _status_json_string (char * start_text) {
         availability = 100.0;
     }
   } else {
-    current_state_sec = now_sec() - disconnection_time_sec;
+    current_state_sec = status_sec - disconnection_time_sec;
     sprintf(connected_string, " no (join_state %d)", join_state);
     sprintf(disconnected_string,    "%s", dhms(current_state_sec));
     sprintf(connected_sec_string,   "%s", dhms(connected_total_sec));
@@ -1695,6 +1847,16 @@ char* _status_json_string (char * start_text) {
         availability = 100.0;
     }
   }
+  // Refresh network info
+  sl_wisun_get_network_info(&network_info);
+  // Refresh statistics used in status
+  sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_NETWORK, &network_statistics);
+  sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_MAC    , &mac_statistics);
+  sl_wisun_get_statistics (SL_WISUN_STATISTICS_TYPE_PHY    , &phy_statistics);
+
+  refresh_parent_tag();
+
+  sprintf(running_sec_string, "%s", dhms(status_sec));
 
   snprintf(json_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE,
     CONNECTED_JSON_FORMAT_STR,
@@ -1765,26 +1927,18 @@ sl_status_t _open_udp_sockets(void){
   IF_ERROR_RETURN(ret, "[Failed: unable to open the UDP notification socket]\n");
 
   udp_notification_sockaddr_in6.sin6_family = AF_INET6;
-#if (SL_WISUN_VERSION_MAJOR >= 2)
-       // API_2.+
   udp_notification_sockaddr_in6.sin6_port = htons(UDP_NOTIFICATION_PORT);
-#else  /* API_2.+ */
-  udp_notification_sockaddr_in6.sin6_port = UDP_NOTIFICATION_PORT;
-#endif /* API_2.+ */
 
+#ifdef    SL_CATALOG_WISUN_COAP_PRESENT
   // (UDP) CoAP Notifications (autonomously sent by the device)
-  ret = coap_notification_socket_id = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+  coap_notification_socket_id = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
   ret =(coap_notification_socket_id == SOCKET_INVALID_ID) ? 1 : 0;
   NO_ERROR(ret, "Opened    the COAP notification socket (id %d)\n", (int)coap_notification_socket_id);
   IF_ERROR_RETURN(ret, "[Failed: unable to open the COAP notification socket]\n");
 
   coap_notification_sockaddr_in6.sin6_family = AF_INET6;
-#if (SL_WISUN_VERSION_MAJOR >= 2)
-       // API_2.+
   coap_notification_sockaddr_in6.sin6_port = htons(COAP_NOTIFICATION_PORT);
-#else  /* API_2.+ */
-  coap_notification_sockaddr_in6.sin6_port = COAP_NOTIFICATION_PORT;
-#endif /* API_2.+ */
+
   coap_notify_ch.sockid = coap_notification_socket_id;
   coap_notify_ch.addr = coap_notification_sockaddr_in6;
 
@@ -1795,17 +1949,19 @@ sl_status_t _open_udp_sockets(void){
   coap_notify_ch.pkt.content_format = COAP_CT_JSON;
   coap_notify_ch.pkt.uri_path_ptr = (uint8_t *)SL_WISUN_STATUS_CONNECTION_URI_PATH;
   coap_notify_ch.pkt.uri_path_len = sl_strnlen(
-      (char *) SL_WISUN_STATUS_CONNECTION_URI_PATH,
-               SL_WISUN_STATUS_JSON_STR_MAX_LEN);
+       (char *) SL_WISUN_STATUS_CONNECTION_URI_PATH,
+                SL_WISUN_STATUS_JSON_STR_MAX_LEN);
 
   coap_notify_ch.pkt.token_ptr = NULL;
   coap_notify_ch.pkt.token_len = 0U;
   coap_notify_ch.pkt.options_list_ptr = NULL;
+#endif /* SL_CATALOG_WISUN_COAP_PRESENT */
 
   return SL_STATUS_OK;
 
 };
 
+#ifdef    SL_WISUN_COAP_H
 sl_status_t _coap_notify(char* json_string)
 {
   sl_status_t ret = SL_STATUS_OK;
@@ -1834,38 +1990,47 @@ sl_status_t _coap_notify(char* json_string)
                   0,
                   (const struct sockaddr *) &coap_notification_sockaddr_in6,
                   sizeof(sockaddr_in6_t)) == -1) {
-          printfBothTime("_coap_notify() error on line %d: sendto(%ld)\n", __LINE__, coap_notify_ch.sockid);
+          printfBothTime("_coap_notify() error on line %d\n", __LINE__);
           ret = SL_STATUS_TRANSMIT;
       }
   }
   sl_free(buff);
   return ret;
 }
+#endif /* SL_WISUN_COAP_H */
 
-uint8_t print_and_send_messages (char *in_msg, bool with_time,
-                            bool to_console, bool to_rtt, bool to_udp, bool to_coap) {
+uint8_t print_and_send_messages (char *in_msg, bool _with_time,
+                            bool _to_console, bool _to_rtt, bool _to_udp, bool _to_coap) {
+#ifdef    SL_WISUN_COAP_H
   sl_status_t ret = SL_STATUS_OK;
+  uint16_t coap_msg_len;
+#else
+  to_coap = false;
+#endif /* SL_WISUN_COAP_H */
   uint8_t messages_processed = 0;
   uint16_t udp_msg_len;
-  uint16_t coap_msg_len;
 
-  if (to_console == true) { // Print to console
-      if (with_time == true) {
-        printfTime(in_msg);
+  if (_to_console == true) { // Print to console
+      if (_with_time == true) {
+        printfTime("%s", in_msg);
       } else {
-        printf(in_msg);
+        printf("%s", in_msg);
       }
     messages_processed++;
   }
-  if (to_rtt == true) {     // Print to RTT traces
-      if (with_time == true) {
-        printfTimeRTT(in_msg);
+#ifdef    SEGGER_RTT_printf
+  if (_to_rtt == true) {     // Print to RTT traces
+      if (_with_time == true) {
+        printfTimeRTT("%s", in_msg);
       } else {
-        printfRTT(in_msg);
+        printfRTT("%s", in_msg);
       }
     messages_processed++;
   }
-  if (to_udp == true) {     // Send to UDP port
+#else /* SEGGER_RTT_printf */
+  (void) _to_rtt;
+#endif /* SEGGER_RTT_printf */
+  if (_to_udp == true) {     // Send to UDP port
     udp_msg_len  = snprintf(udp_msg,  1024, "%s", in_msg);
     if (sendto(udp_notification_socket_id,
                 (uint8_t *)udp_msg,
@@ -1873,13 +2038,14 @@ uint8_t print_and_send_messages (char *in_msg, bool with_time,
                 0L,
                 (const struct sockaddr *) &udp_notification_sockaddr_in6,
                 sizeof(sockaddr_in6_t)) == -1) {
-      printfBothTime("\n[Failed (line %d): unable to send to the UDP notification socket (%d %s/%d)] udp_msg_len %d\n", __LINE__,
+      printfBothTime("\n[Failed (%s line %d): unable to send to the UDP notification socket (%d %s/%d)] udp_msg_len %d\n", __FILE__, __LINE__,
               (int)udp_notification_socket_id, udp_notification_ipv6_string , UDP_NOTIFICATION_PORT, udp_msg_len);
     } else {
       messages_processed++;
     }
   }
-  if (to_coap == true) {    // Send to CoAP notification port
+#ifdef    SL_WISUN_COAP_H
+  if (_to_coap == true) {    // Send to CoAP notification port
     coap_msg_len = snprintf(coap_msg, 1024, "%s", in_msg);
     if (coap_msg_len > SL_WISUN_STATUS_JSON_STR_MAX_LEN) {
         printfBothTime("\n[Failed (line %d): CoAP message len %d is higher than MAX %d]. Message not sent because it would overflow\n", __LINE__,
@@ -1891,6 +2057,7 @@ uint8_t print_and_send_messages (char *in_msg, bool with_time,
       if (ret == SL_STATUS_OK) messages_processed++;
     }
   }
+#endif /* SL_WISUN_COAP_H */
 
   return messages_processed;
 }

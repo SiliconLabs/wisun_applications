@@ -45,17 +45,59 @@ extern "C" {
 // -----------------------------------------------------------------------------
 //                                   Includes
 // -----------------------------------------------------------------------------
-#include "cmsis_os2.h"
+#include <string.h>
+
 #include "sl_component_catalog.h"
 
-#include "app_timestamp.h"
-#include "app_rtt_traces.h"
-
-#if __has_include("ltn_config.h")
-#include "ltn_config.h"
-#  pragma message("Using settings from ltn_config.h (Silabs internal)")
+#if __has_include("app_timestamp.h")
+  #include "app_timestamp.h"
 #endif
 
+#if __has_include("app_parameters.h")
+  #include "app_parameters.h"
+#endif
+
+#if __has_include("app_rtt_traces.h")
+  #include "app_rtt_traces.h"
+#endif
+
+#if __has_include("app_check_neighbors.h")
+  #include "app_check_neighbors.h"
+#endif
+
+#ifdef   SL_CATALOG_WISUN_COAP_PRESENT
+  // app_coap.c/h can only be used if the WI-SUN CoAP Component is present
+  #if __has_include("app_coap.h")
+    #include "app_coap.h"
+  #endif
+#endif /* SL_CATALOG_WISUN_COAP_PRESENT */
+
+#if __has_include("ltn_config.h")
+  #include "ltn_config.h"
+#endif
+
+#if __has_include("app_reporter.h")
+  #include "app_reporter.h"
+#endif
+
+#ifdef   SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+  #ifdef    SL_CATALOG_WISUN_FFN_DEVICE_SUPPORT_PRESENT
+    #if __has_include("app_direct_connect.h")
+      #include "app_direct_connect.h"
+    #endif
+  #else  /* SL_CATALOG_WISUN_FFN_DEVICE_SUPPORT_PRESENT */
+    // LFN-only: no direct connect support
+  #endif /* SL_CATALOG_WISUN_FFN_DEVICE_SUPPORT_PRESENT */
+#else  /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
+  #if __has_include("app_direct_connect.h")
+    #include "app_direct_connect.h"
+  #endif
+#endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
+
+#ifndef printfBothTime
+    #define printfTime     printf
+    #define printfBothTime printf
+#endif /*printfBothTime*/
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
@@ -69,22 +111,16 @@ extern "C" {
 #define DEFINE_string(s)   #s
 
 #define HISTORY
-//#define LIST_RF_CONFIGS
 
 // UDP and TCP server need to be set to either SO_NONBLOCK or SO_EVENT_MODE, if defined
 // Comment the lines if the corresponding server is not required
-#define WITH_UDP_SERVER    SO_NONBLOCK
+// NB: Do NOT use SO_NONBLOCK for low-Power use, as it keeps the server loop active!
+#define WITH_UDP_SERVER    SO_EVENT_MODE
 #define WITH_TCP_SERVER    SO_EVENT_MODE
 
-#define WITH_REPORTER
-#ifdef    WITH_REPORTER
-  #include "app_reporter.h"
-#endif /* WITH_REPORTER */
-
-#define WITH_DIRECT_CONNECT
-#ifdef    WITH_DIRECT_CONNECT
-  #include "app_direct_connect.h"
-#endif /* WITH_DIRECT_CONNECT */
+#ifndef   SL_CATALOG_WISUN_COAP_PRESENT
+#define   SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE 1024
+#endif /* SL_CATALOG_WISUN_COAP_PRESENT */
 
 // -----------------------------------------------------------------------------
 //                                Global Variables
@@ -105,6 +141,7 @@ extern bool send_asap;
 
 uint8_t app_join_network(uint8_t network_index);
 void app_task(void *args);
+void app_do_your_things();
 void app_reset_statistics(void);
 void refresh_parent_tag(void);
 

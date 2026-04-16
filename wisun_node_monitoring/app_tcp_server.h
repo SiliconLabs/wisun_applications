@@ -33,6 +33,8 @@
 * This code will not be maintained.
 *
 ******************************************************************************/
+#ifndef   APP_TCP_SERVER_H
+#define   APP_TCP_SERVER_H
 // -----------------------------------------------------------------------------
 //                                   Includes
 // -----------------------------------------------------------------------------
@@ -52,3 +54,5 @@ void init_tcp_server(void);
 void check_tcp_server_messages(void);
 
 #endif /* WITH_TCP_SERVER */
+
+#endif /* APP_TCP_SERVER_H */

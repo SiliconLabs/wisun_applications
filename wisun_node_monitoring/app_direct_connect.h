@@ -36,7 +36,7 @@
 #ifndef APP_DIRECT_CONNECT_H
 #define APP_DIRECT_CONNECT_H
 
-#include "string.h"
+#include <string.h>
 
 #include "sl_wisun_types.h"
 #include "sl_wisun_events.h"

@@ -58,7 +58,8 @@ char *timestamped_msg;
 //                                Static Variables
 // -----------------------------------------------------------------------------
 char time_str[TIME_STRING_LEN];
-sl_sleeptimer_timer_handle_t app_timer;
+static uint64_t app_start_tick;
+static uint32_t app_tick_frequency_hz;
 
 // Application timestamp mutex
 static osMutexId_t _app_timestamp_mutex = NULL;
@@ -76,50 +77,56 @@ static const osMutexAttr_t _app_timestamp_mutex_attr = {
 /* Mutex acquire */
 __STATIC_INLINE void _app_timestamp_mutex_acquire(void)
 {
-  assert(osMutexAcquire(_app_timestamp_mutex, osWaitForever) == osOK);
+  if (_app_timestamp_mutex != NULL) {
+    assert(osMutexAcquire(_app_timestamp_mutex, osWaitForever) == osOK);
+  }
 }
 
 /* Mutex release */
 __STATIC_INLINE void _app_timestamp_mutex_release(void)
 {
-  assert(osMutexRelease(_app_timestamp_mutex) == osOK);
-}
-
-void app_timer_callback(sl_sleeptimer_timer_handle_t *handle, void *data) {
-  (void)handle;
-  (void)data;
-  app_timestamp++;
+  if (_app_timestamp_mutex != NULL) {
+    assert(osMutexRelease(_app_timestamp_mutex) == osOK);
+  }
 }
 
 // -----------------------------------------------------------------------------
 //                          Public Function Definitions
 // -----------------------------------------------------------------------------
+uint64_t app_timestamp_reset(void) {
+  _app_timestamp_mutex_acquire();
+  app_start_tick = sl_sleeptimer_get_tick_count64();
+  app_timestamp = 0;
+  _app_timestamp_mutex_release();
+  return now_sec();
+}
+
 sl_status_t app_timestamp_init(void) {
   sl_status_t status;
-  uint32_t app_timer_timeout;
 
   // init mutex
   _app_timestamp_mutex = osMutexNew(&_app_timestamp_mutex_attr);
   assert(_app_timestamp_mutex != NULL);
   timestamped_msg = timestamped_msg_buffer;
 
-  app_timestamp =  0;
-
-  status = sl_sleeptimer_init();
-  if (status != SL_STATUS_OK) {
+  app_tick_frequency_hz = sl_sleeptimer_get_timer_frequency();
+  if (app_tick_frequency_hz == 0U) {
+    status = sl_sleeptimer_init();
+    if ((status != SL_STATUS_OK) && (status != SL_STATUS_ALREADY_INITIALIZED)) {
       printf("Error initializing sleeptimer. Status %lu\n", status);
       return status;
+    }
+    app_tick_frequency_hz = sl_sleeptimer_get_timer_frequency();
+    if (app_tick_frequency_hz == 0U) {
+      printf("Error reading sleeptimer frequency.\n");
+      return SL_STATUS_INVALID_STATE;
+    }
   }
-  app_timer_timeout = (uint32_t)1.0*sl_sleeptimer_get_timer_frequency();
-  status = sl_sleeptimer_start_periodic_timer(&app_timer,
-                                              app_timer_timeout,
-                                              app_timer_callback,
-                                              NULL, 0, 0);
-  if (status != SL_STATUS_OK) {
-      printf("Error starting periodic timer 'app_timer'. Status %lu\n", status);
-      return status;
-  }
-  return status;
+
+  app_start_tick = sl_sleeptimer_get_tick_count64();
+  app_timestamp = 0;
+
+  return SL_STATUS_OK;
 }
 
 sl_status_t  d_h_m_s_total(sl_sleeptimer_timestamp_64_t timestamp_secs,
@@ -166,10 +173,22 @@ char*        dhms         (sl_sleeptimer_timestamp_64_t timestamp_secs) {
 }
 
 uint64_t     now_sec      (void) {
+  uint64_t current_tick;
   sl_sleeptimer_timestamp_64_t current_sec;
+
   _app_timestamp_mutex_acquire();
-  current_sec = app_timestamp;
+  if (app_tick_frequency_hz == 0U) {
+    app_tick_frequency_hz = sl_sleeptimer_get_timer_frequency();
+  }
+  if (app_tick_frequency_hz == 0U) {
+    _app_timestamp_mutex_release();
+    return (uint64_t)app_timestamp;
+  }
+  current_tick = sl_sleeptimer_get_tick_count64();
+  current_sec = (current_tick - app_start_tick) / app_tick_frequency_hz;
+  app_timestamp = current_sec;
   _app_timestamp_mutex_release();
+
   return (uint64_t)current_sec;
 }
 

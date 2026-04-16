@@ -51,14 +51,19 @@
 
 #include "app_timestamp.h"
 #include "app_rtt_traces.h"
-#include "app_reporter.h"
+
 #include "app_direct_connect.h"
 
+#if __has_include("app_reporter.h")
+  #include "app_reporter.h"
+#endif
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
-uint32_t direct_connect_reporter_period_ms = 100;
+#ifdef    __APP_REPORTER_H__
+  uint32_t direct_connect_reporter_period_ms = 100;
+#endif /* __APP_REPORTER_H__ */
 // -----------------------------------------------------------------------------
 //                                Global Variables
 // -----------------------------------------------------------------------------
@@ -93,7 +98,7 @@ sl_status_t app_direct_connect(bool is_enabled)
     #endif /* SEMAILBOX_PRESENT */
 
     psa_set_key_lifetime(&pmk_key_attributes,
-                         PSA_KEY_LIFETIME_FROM_PERSISTENCE_AND_LOCATION(PSA_KEY_LIFETIME_VOLATILE, pmk_location));
+                        PSA_KEY_LIFETIME_FROM_PERSISTENCE_AND_LOCATION(PSA_KEY_LIFETIME_VOLATILE, pmk_location));
 
     if (app_direct_connect_pmk_key_id != MBEDTLS_SVC_KEY_ID_INIT) {
       psa_destroy_key(app_direct_connect_pmk_key_id);
@@ -150,17 +155,21 @@ void app_direct_connect_custom_callback(sl_wisun_evt_t *evt) {
       ip6tos(&evt->evt.direct_connect_link_status.link_local_ipv6, ipv6_string);
       switch (evt->evt.direct_connect_link_status.link_status) {
         case SL_WISUN_DIRECT_CONNECT_LINK_STATUS_CONNECTED:
+#ifdef   __APP_REPORTER_H__
           app_start_reporter(ipv6_string, direct_connect_reporter_period_ms, (char *)"*");
-          printfBothTime("Direct Connect Link Connected with %s\r\n", ipv6_string);
           printfBothTime("Sending RTT traces every %ld ms to %s\r\n", direct_connect_reporter_period_ms, ipv6_string);
+#endif /* __APP_REPORTER_H__ */
+          printfBothTime("Direct Connect Link Connected with %s\r\n", ipv6_string);
           break;
         case SL_WISUN_DIRECT_CONNECT_LINK_STATUS_ERROR:
           printfBothTime("Direct Connect Link %s: error\r\n", ipv6_string);
           break;
         case SL_WISUN_DIRECT_CONNECT_LINK_STATUS_DISCONNECTED:
-          app_stop_reporter();
           printfBothTime("Direct Connect Link %s: disconnected\r\n", ipv6_string);
+#ifdef   __APP_REPORTER_H__
+          app_stop_reporter();
           printfBothTime("Stopped reporting RTT traces\r\n");
+#endif /* __APP_REPORTER_H__ */
           break;
         default:
           break;

@@ -39,14 +39,37 @@
 #include <stdio.h>
 #include <assert.h>
 
+#include "sl_hal_sysrtc.h"
 #include "sl_main_init.h"
 #include "cmsis_os2.h"
 #include "sl_cmsis_os2_common.h"
 
-#include "sl_wisun_crash_handler.h"
-#include "app_coap.h"
 #include "app.h"
-#include "app_action_scheduler.h"
+#include "sl_component_catalog.h"
+
+#ifdef    SL_CATALOG_WISUN_COAP_PRESENT
+  #include "app_coap.h"
+#endif
+
+#if __has_include("sl_wisun_crash_handler.h")
+  #include "sl_wisun_crash_handler.h"
+#endif
+
+#if __has_include("app_action_scheduler.h")
+    #include "app_action_scheduler.h"
+#endif
+
+#if __has_include("app_coap.h")
+  #include "app_coap.h"
+#endif
+
+#if __has_include("sl_mx25_flash_shutdown.h")
+  #include "sl_mx25_flash_shutdown.h"
+#endif
+
+#if __has_include("btl_interface.h")
+  #include "btl_interface.h"
+#endif
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -70,13 +93,54 @@
 // -----------------------------------------------------------------------------
 void app_init(void)
 {
-  printf("========================================================\n");
+  int i;
 
+  // print an easily visible banner to detect reboots
+  const char* banner = "============ app_init() ============";
+  printf("\n\n");
+  for (i=5;i>0;i--)  { printf("%s\n", banner+i); }
+  for (i=0;i<=5;i++) { printf("%s\n", banner+i); }
+  printf("\n\n");
+
+  sl_hal_sysrtc_config_t sysrtc_config = SYSRTC_CONFIG_DEFAULT;
+  uint32_t status;
+
+#ifdef BTL_INTERFACE_H
+  //bootloader_deinit();
+#endif /* BTL_INTERFACE_H */
+
+#ifdef    SL_MX25_FLASH_SHUTDOWN_H
+  //sl_mx25_flash_shutdown(); // Needs refining to allow bootloader_getStorageInfo(), etc. in OTA code
+#endif /* SL_MX25_FLASH_SHUTDOWN_H */
+
+  status = sl_hal_sysrtc_get_status();
+  if (!(status & SYSRTC_STATUS_RUNNING)) {
+    /**
+     * SYSRTC is needed for RAIL timer synchronization. If it's not started
+     * by sleep timer, it must be started manually. Peripheral bus clock is
+     * enabled by device init/clock manager.
+     */
+    sl_hal_sysrtc_init(&sysrtc_config);
+    sl_hal_sysrtc_enable();
+  }
+
+#ifdef    SL_WISUN_CRASH_HANDLER_H
   sl_wisun_crash_handler_init();
+#endif /* SL_WISUN_CRASH_HANDLER_H */
 
-  app_coap_resources_init();
+#ifdef    SL_CATALOG_WISUN_COAP_PRESENT
+  #ifdef APP_COAP_H
+    #if SL_WISUN_COAP_RESOURCE_HND_MAX_RESOURCES < 20
+      #pragma message("SL_WISUN_COAP_RESOURCE_HND_MAX_RESOURCES needs to be increased to avoid an assert during app_coap_resources_init(); Count the number of calls to sl_wisun_coap_rhnd_resource_add)( in app_coap.c to get an idea of the required value)")
+    #endif
+    app_coap_resources_init();
+  #endif /* APP_COAP_H */
+#endif /* SL_CATALOG_WISUN_COAP_PRESENT */
 
+#ifdef    APP_ACTION_SCHEDULER_H
   app_scheduler_action_init();
+#endif /* APP_ACTION_SCHEDULER_H */
+
   /* Creating App main thread */
   const osThreadAttr_t app_task_attr = {
     .name        = "app_task",
@@ -88,13 +152,19 @@ void app_init(void)
     .priority    = osPriorityNormal,
     .tz_module   = 0
   };
-  printf("%s/%s starting app_task              : APP_STACK_SIZE_BYTES %4ld\n",
+
+  printf("%s/%s starting '%s' thread with stack_size of %4ld words\n",
         __FILE__, __FUNCTION__,
-        APP_STACK_SIZE_BYTES);
+        app_task_attr.name,
+        app_task_attr.stack_size);
+
   osThreadId_t app_thr_id = osThreadNew(app_task,
                                         NULL,
                                         &app_task_attr);
   assert(app_thr_id != NULL);
+
+  printf("'%s' thread started\n",
+        app_task_attr.name);
 }
 
 // -----------------------------------------------------------------------------

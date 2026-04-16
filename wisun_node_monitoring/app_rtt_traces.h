@@ -53,9 +53,13 @@ Usage: Setting all traces groups to the same trace level
     app_set_all_traces(SL_WISUN_TRACE_LEVEL_WARN, true);
     app_set_trace(SL_WISUN_TRACE_GROUP_SOCK, SL_WISUN_TRACE_LEVEL_DEBUG, true);
 */
+#ifndef   APP_RTT_TRACES_H
+#define   APP_RTT_TRACES_H
 
 #include <stdio.h>
 #include "sl_wisun_trace_api.h"
 
 sl_status_t app_set_all_traces(uint8_t trace_level, bool verbose);
 sl_status_t app_set_trace     (uint8_t group_id, uint8_t trace_level, bool verbose);
+
+#endif /* APP_RTT_TRACES_H */

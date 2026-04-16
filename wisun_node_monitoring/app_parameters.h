@@ -44,6 +44,7 @@
 #include <stdlib.h>
 
 #include "nvm3_default.h"
+#include "sl_wisun_types.h"
 #include "sl_wisun_connection_params_api.h"
 
 // -----------------------------------------------------------------------------
@@ -73,7 +74,7 @@
   /* For example: adding a new parameter or changing the order of parameters in app_settings_wisun_t or app_wisun_parameters_t. */
   /* After updating the application with a new NVM3_APP_PARAMS_VERSION,                                                         */
   /*    the parameters will be reset to the new default values (when the code detects a change in NVM3_APP_PARAMS_VERSION)      */
-  #define NVM3_APP_PARAMS_VERSION   10010
+  #define NVM3_APP_PARAMS_VERSION   10011
 #endif /* NVM3_APP_PARAMS_VERSION */
 
 #ifndef   MAX_NETWORK_CONFIGS
@@ -312,9 +313,13 @@ static const sl_wisun_connection_params_t sl_wisun_params_profile_special = {
 
 #define APP_UTIL_PRINTABLE_DATA_MAX_LENGTH 64
 
-
-
-
+typedef struct {
+  uint8_t min_be;
+  uint8_t max_be;
+  uint16_t backoff_period_us;
+  uint8_t max_cca_retries;
+  uint8_t max_frame_retries;
+} app_settings_mac_t;
 
 // app_settings_wisun_t structure similar to Wi-SUN SoC CLI (only FAN1.1 support)
 typedef struct {
@@ -326,6 +331,7 @@ typedef struct {
   uint8_t network_size;
   int16_t tx_power_ddbm;
   int16_t auto_send_sec;
+  uint16_t rx_fifo_size;
   uint8_t uc_dwell_interval_ms;
 //  uint16_t number_of_channels;
 //  uint32_t ch0_frequency;
@@ -368,6 +374,7 @@ typedef struct {
   uint16_t lowpan_mtu;
   uint16_t ipv6_mru;
   uint8_t  max_edfe_fragment_count;
+  app_settings_mac_t mac;
   char udp_notification_dest[IPV6_STR_LEN];
   char coap_notification_dest[IPV6_STR_LEN];
 //  uint16_t socket_rx_buffer_size;
@@ -391,9 +398,9 @@ typedef struct {
   uint16_t auto_send_sec;        // Notification period in seconds
   uint8_t  network_count;        // Number of network settings
   uint8_t  network_index;        // Selector for network settings
-  uint16_t newtork_struct_size;   // Store sizeof(app_wisun_network_settings_t)
+  uint16_t network_struct_size;   // Store sizeof(app_wisun_network_settings_t)
                                  // Read at boot, set all parameters to defaults if
-                                 //   sizeof(app_wisun_network_settings_t) != newtork_struct_size
+                                 //   sizeof(app_wisun_network_settings_t) != network_struct_size
                                  //    This is to avoid missmatching after application update
 } app_wisun_parameters_t;
 

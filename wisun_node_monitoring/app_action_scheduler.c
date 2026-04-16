@@ -46,8 +46,15 @@
 #include "sl_wisun_api.h"
 #include "sl_wisun_app_core.h"
 #include "app_parameters.h"
-#include "app_wisun_multicast_ota.h"
-#include "btl_interface.h"
+
+#if __has_include("app_wisun_multicast_ota.h")
+  #include "app_wisun_multicast_ota.h"
+#endif
+
+#if __has_include("btl_interface.h")
+  #include "btl_interface.h"
+#endif
+
 #include "nvm3.h"
 #include "nvm3_default.h"
 #include "em_core.h"
@@ -167,7 +174,7 @@ static void app_scheduler_action_execute(void)
     sl_wisun_clear_credential_cache();
     sl_wisun_app_core_util_connect_and_wait();
     break;
-
+#ifdef    BTL_INTERFACE_H
   case APP_SCHEDULER_OTA_REBOOT_INSTALL:
     printf("scheduler: OTA rebootAndInstall clear_nvm=%u\n", local.clear_nvm_mode);
     // optional NVM cleanup, same logic as in original rebootAndInstall()
@@ -179,6 +186,7 @@ static void app_scheduler_action_execute(void)
     printf("scheduler: bootloader_rebootAndInstall()\n");
     bootloader_rebootAndInstall();
     break;
+#endif /* BTL_INTERFACE_H */
 
   default:
     break;
@@ -239,7 +247,7 @@ bool app_scheduler_action_get_remaining(uint32_t *remaining_ms,
   }
 
   uint64_t now = now_ms();
-  uint64_t rem = (g_scheduler.deadline_ms > now)
+  uint64_t rem =   (g_scheduler.deadline_ms > now)
                  ? (g_scheduler.deadline_ms - now)
                  : 0U;
 

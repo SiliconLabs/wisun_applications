@@ -1,5 +1,14 @@
+#if __has_include("sl_wisun_ota_dfu.h")
+  #include "sl_wisun_ota_dfu.h"
+  #include "app_wisun_multicast_ota.h"
+#else
+  #pragma message ("app_wisun_multicast_ota can only work if sl_wisun_ota_dfu is present")
+#endif
+
+#ifdef    APP_WISUN_MULTICAST_OTA_H
+
 #include "cmsis_os2.h"
-#include "app_wisun_multicast_ota.h"
+#include "app.h"
 
 uint32_t udp_index;
 uint32_t udp_previous_index;
@@ -7,15 +16,17 @@ uint32_t udp_lost_count;
 uint32_t udp_received_count;
 
 #include "sl_memory_manager.h"
-#include "sl_wisun_ota_dfu.h"
+
+
 #include "btl_interface.h"
 #include "printf.h"
+
 #include "app_parameters.h"
 #include "app_action_scheduler.h"
 
 extern char device_tag[];
 //extern sl_wisun_ota_dfu_settings_t _settings;
-extern const char * udp_ip_str;
+
 /// Resent packet count
 uint32_t _resent_count;
 /// Received packet count
@@ -134,9 +145,9 @@ void clear_ota_data() {
   _resent_count = 0;
   _received_count = 0;
   _downl_bytes = 0;
-
+#if       SL_WISUN_OTA_DFU_HOST_NOTIFY_ENABLED
   sl_wisun_ota_dfu_set_notify_download_chunk(_downl_bytes);
-
+#endif /* SL_WISUN_OTA_DFU_HOST_NOTIFY_ENABLED */
   slot0_start_address = 0x12345678;
 
   udp_rx_total_count = 0;
@@ -272,7 +283,7 @@ uint32_t list_missed() {
 
 bool verify_image_in_flash() {
   int32_t count = 0;
-  int32_t ret_val;
+  int32_t ret_val = BOOTLOADER_OK;
   bool continue_verification = true;
   while (continue_verification) {
     count++;
@@ -417,8 +428,7 @@ uint8_t rebootAndInstall(uint32_t time_reboot_sec, uint8_t clear_nvm)
   return ret;
 }
 
-
-int multicast_rx(char* udp_buff, uint32_t received_bytes) {
+int multicast_rx(char* udp_buff, uint32_t received_bytes, const char* udp_ip_str) {
   int received = 0;
   int res;
 #if MULTICAST_OTA_STORE_IN_FLASH == 1
@@ -436,6 +446,10 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
   info_byte[1] = 0x31;
   info_byte[2] = 0x32;
   info_byte[3] = 0x33;
+
+  if (udp_ip_str == NULL) {
+    udp_ip_str = "unknown";
+  }
 
   sprintf(expected_tag, SL_BOARD_NAME);
   // NB:  slot0_start_address is set to 0x12345678 in clear_ota_data()
@@ -528,7 +542,9 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
                 received = chunk_size;
                 _received_count++;
                 _downl_bytes += chunk_size;
+  #if       SL_WISUN_OTA_DFU_HOST_NOTIFY_ENABLED
                 sl_wisun_ota_dfu_set_notify_download_chunk(_downl_bytes);
+  #endif /* SL_WISUN_OTA_DFU_HOST_NOTIFY_ENABLED */
 #else
                 printf("[%s] UDP Rx %4ld from %s (%4ld bytes): ERROR MULTICAST_OTA_STORE_IN_FLASH Disabled for chunk[%4ld] | %02x %02x ---(%4ld bytes)--- %02x %02x | [%6ld:%6ld]/[%08lx:%08lx]\n",
                                 device_tag,
@@ -616,3 +632,5 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes) {
   }
   return received;
 }
+
+#endif /* APP_WISUN_MULTICAST_OTA_H */

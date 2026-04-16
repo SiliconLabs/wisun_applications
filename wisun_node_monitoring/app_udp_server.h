@@ -33,6 +33,8 @@
 * This code will not be maintained.
 *
 ******************************************************************************/
+#ifndef   APP_UDP_SERVER_H
+#define   APP_UDP_SERVER_H
 // -----------------------------------------------------------------------------
 //                                   Includes
 // -----------------------------------------------------------------------------
@@ -52,3 +54,4 @@ void check_udp_server_messages(void);
 
 #endif /* WITH_UDP_SERVER */
 
+#endif /* APP_UDP_SERVER_H */

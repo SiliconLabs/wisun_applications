@@ -101,17 +101,17 @@ void init_tcp_server(void) {
   #if       (WITH_TCP_SERVER == SO_EVENT_MODE)
     // Open TCP server socket in blocking (event) mode
     socket_type = SOCK_STREAM;
-    printfBothTime("tcp_server in blocking/Event mode\n");
+    printfBoth("tcp_server in blocking/Event mode\n");
   #endif /* (WITH_TCP_SERVER == SO_EVENT_MODE) */
 
   #if       (WITH_TCP_SERVER == SO_NONBLOCK)
     // Open TCP server socket in non-blocking (polling) mode
     socket_type = SOCK_STREAM|SOCK_NONBLOCK;
-    printfBothTime("tcp_server in non-blocking/Polling mode\n");
+    printfBoth("tcp_server in non-blocking/Polling mode\n");
   #endif /* (WITH_TCP_SERVER == SO_NONBLOCK) */
 
   tcp_server_sockid = socket(AF_INET6, socket_type, IPPROTO_TCP);
-  printfBothTime("tcp_server_sockid %ld\n", tcp_server_sockid);
+  printfBoth("tcp_server_sockid %ld\n", tcp_server_sockid);
   assert_res(tcp_server_sockid, "TCP server socket()");
 
   // Fill the TCP server address structure
@@ -136,7 +136,7 @@ void init_tcp_server(void) {
   tcp_r = listen(tcp_server_sockid, 0);
   assert_res(tcp_r, "TCP server listen()");
   tcp_ip_str = app_wisun_trace_util_get_ip_str((void *) &tcp_server_addr.sin6_addr);
-  printfBothTime("Waiting for TCP connection requests on %s port %d\n", tcp_ip_str, tcp_server_port);
+  printfBoth("Waiting for TCP connection requests on %s port %d\n", tcp_ip_str, tcp_server_port);
   sl_free((void*)tcp_ip_str);
 }
 
@@ -150,7 +150,7 @@ void check_tcp_server_messages(void) {
       tcp_ip_str = app_wisun_trace_util_get_ip_str((void *) &tcp_client_addr.sin6_addr);
       // Print the received message
       printfBothTime("TCP Rx %2ld from %s (%d bytes): %s\n",
-                     count_tcp_rx, tcp_ip_str, tcp_data_length, tcp_buff);
+                    count_tcp_rx, tcp_ip_str, tcp_data_length, tcp_buff);
       sl_free((void*)tcp_ip_str);
       tcp_socket_data_received = false;
     }

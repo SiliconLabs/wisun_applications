@@ -69,9 +69,12 @@
 * This code will not be maintained.
 *
 ******************************************************************************/
+#include "sl_component_catalog.h"
+#ifdef    SL_CATALOG_WISUN_COAP_PRESENT
 // -----------------------------------------------------------------------------
 //                                   Includes
 // -----------------------------------------------------------------------------
+#include <string.h>
 #include "sl_string.h"
 #include "sl_memory_manager.h"
 
@@ -87,8 +90,17 @@
 #include "app_parameters.h"
 #include "app_coap.h"
 #include "app_check_neighbors.h"
-#include "app_rtt_traces.h"
-#include "app_wisun_multicast_ota.h"
+
+#if __has_include("app_rtt_traces.h")
+  // app_rtt_traces/c/.h can be added/removed from the project
+  #include "app_rtt_traces.h"
+#endif
+
+#if __has_include("app_wisun_multicast_ota.h")
+  // app_wisun_multicast_ota/c/.h can be added/removed from the project
+  #include "app_wisun_multicast_ota.h"
+#endif
+
 #include "app_action_scheduler.h"
 
 // -----------------------------------------------------------------------------
@@ -116,9 +128,9 @@ void  print_coap_help (char* device_global_ipv6_string, char* border_router_ipv6
   printf("To start a CoAP server on the linux Border Router:\n");
   printf("  coap-server -A %s -p %d -d 10\n", border_router_ipv6_string, 5685);
   printf("CoAP discovery:\n");
-  printf("  coap-client -m get -N -B 3 coap://[%s]:5683/.well-known/core\n", device_global_ipv6_string);
+  printf("  coap-client -m get -N -B 3 -t text/plain coap://[%s]:5683/.well-known/core\n", device_global_ipv6_string);
   printf("CoAP GET requests:\n");
-  printf("  coap-client -m get -N -B 3 coap://[%s]:5683/<resource>, for the following resources:\n", device_global_ipv6_string);
+  printf("  coap-client -m get -N -B 3 -t text/plain coap://[%s]:5683/<resource>, for the following resources:\n", device_global_ipv6_string);
   sl_wisun_coap_rhnd_print_resources();
   printf("  '/settings/auto_send'         returns the current notification duration in seconds\n");
   printf("  '/settings/auto_send' -e <d>' changes the notification duration to d seconds\n");
@@ -176,7 +188,7 @@ sl_wisun_coap_packet_t * coap_callback_all_infos (
             device_tag,
             chip,
             SL_BOARD_NAME,
-            device_type,
+            device_type_string,
             application,
             version,
             major, minor, patch, build,
@@ -246,7 +258,7 @@ sl_wisun_coap_packet_t * coap_callback_board (
 
 sl_wisun_coap_packet_t * coap_callback_device_type (
     const  sl_wisun_coap_packet_t *const req_packet)  {
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", device_type);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", device_type_string);
   return app_coap_reply(coap_response, req_packet); }
 
 sl_wisun_coap_packet_t * coap_callback_application (
@@ -315,12 +327,17 @@ return app_coap_reply(coap_response, req_packet); }
 
 sl_wisun_coap_packet_t * coap_callback_neighbor (
       const  sl_wisun_coap_packet_t *const req_packet)  {
+  char* payload_str = NULL;
   int index = 0;
-  int res;
+  int res = 0;
   uint8_t neighbor_count;
   if (req_packet->payload_len) {
-    res = sscanf((char *)req_packet->payload_ptr, "%d", &index);
-    if (res) {
+    payload_str = sl_wisun_coap_get_payload_str(req_packet);
+    if (payload_str != NULL ){
+      res = sscanf((char *)payload_str, "%d", &index);
+      sl_free(payload_str);
+    }
+    if (res ==1) {
       snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", app_neighbor_info_str(index));
       return app_coap_reply(coap_response, req_packet);
     }
@@ -705,13 +722,17 @@ sl_wisun_coap_packet_t * coap_callback_auto_send (
         res = sscanf((char *)payload_str, "%d", &sec);
         sl_free(payload_str);
     }
-    if (res) {
+    if (res == 1) {
         network[app_parameters.network_index].auto_send_sec = (uint16_t)sec;
+    } else {
+        snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "invalid payload");
+        return app_coap_reply(coap_response, req_packet);
     }
   }
   snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", network[app_parameters.network_index].auto_send_sec);
 return app_coap_reply(coap_response, req_packet); }
 
+#ifdef    APP_RTT_TRACES_H
 sl_wisun_coap_packet_t * coap_callback_trace_level (
       const  sl_wisun_coap_packet_t *const req_packet)  {
   char* payload_str = NULL;
@@ -750,7 +771,9 @@ sl_wisun_coap_packet_t * coap_callback_trace_level (
       snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Error app_set_all_traces 0x%lx", ret);
   }
 return app_coap_reply(coap_response, req_packet); }
+#endif /* APP_RTT_TRACES_H */
 
+#ifdef    APP_PARAMETERS_H
 sl_wisun_coap_packet_t * coap_callback_application_parameter (
       const  sl_wisun_coap_packet_t *const req_packet)  {
   #define MAX_PARAMETER_NAME 40
@@ -780,6 +803,9 @@ sl_wisun_coap_packet_t * coap_callback_application_parameter (
           }
           if (done == 0) { // PUT <parameter> <int>
             if  (2 == sscanf((char *)payload_str, "%s %ld", parameter_name, &value)) { done++; }
+          }
+          if (done == 0) { // PUT <parameter>
+            if  (1 == sscanf((char *)payload_str, "%s", parameter_name)) { done++; }
           }
           if (done) {
             set_app_parameter(parameter_name, index, value, value_str);
@@ -814,6 +840,7 @@ sl_wisun_coap_packet_t * coap_callback_application_parameter (
   }
 
 return app_coap_reply(coap_response, req_packet); }
+#endif /* APP_PARAMETERS_H */
 
 #ifdef    __APP_REPORTER_H__
 sl_wisun_coap_packet_t * coap_callback_reporter_start (
@@ -841,6 +868,7 @@ sl_wisun_coap_packet_t * coap_callback_reporter_stop (
   #endif /* __APP_REPORTER_H__ */
 
 #ifdef    APP_WISUN_MULTICAST_OTA_H
+#ifdef    SL_CATALOG_WISUN_OTA_DFU_PRESENT
 sl_wisun_coap_packet_t * coap_callback_multicast_ota (
     const  sl_wisun_coap_packet_t *const req_packet)  {
     snprintf(coap_response, COAP_MAX_RESPONSE_LEN, missed_chunks());
@@ -856,6 +884,7 @@ sl_wisun_coap_packet_t * coap_callback_multicast_ota_info (
     snprintf(coap_response, COAP_MAX_RESPONSE_LEN, ota_multicast_info());
   return app_coap_reply(coap_response, req_packet); }
 
+#endif /* SL_CATALOG_WISUN_OTA_DFU_PRESENT */
 #endif /* APP_WISUN_MULTICAST_OTA_H */
 
 sl_wisun_coap_packet_t * coap_callback_realloc (
@@ -1165,6 +1194,7 @@ uint8_t app_coap_resources_init() {
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
+  #ifdef    APP_RTT_TRACES_H
   coap_resource.data.uri_path = "/settings/trace_level";
   coap_resource.data.resource_type = "level";
   coap_resource.data.interface = "settings";
@@ -1172,7 +1202,9 @@ uint8_t app_coap_resources_init() {
   coap_resource.discoverable = true;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
+#endif /* APP_RTT_TRACES_H */
 
+#ifdef    APP_PARAMETERS_H
   coap_resource.data.uri_path = "/settings/parameter";
   coap_resource.data.resource_type = "int";
   coap_resource.data.interface = "settings";
@@ -1180,6 +1212,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.discoverable = true;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
+#endif /* APP_PARAMETERS_H */
 
 #ifdef    __APP_REPORTER_H__
   coap_resource.data.uri_path = "/reporter/crash";
@@ -1209,6 +1242,7 @@ uint8_t app_coap_resources_init() {
 
 
 #ifdef    APP_WISUN_MULTICAST_OTA_H
+#ifdef    SL_CATALOG_WISUN_OTA_DFU_PRESENT
   coap_resource.data.uri_path = "/multicast_ota/missed";
   coap_resource.data.resource_type = "text";
   coap_resource.data.interface = "multicast_ota";
@@ -1232,6 +1266,7 @@ uint8_t app_coap_resources_init() {
   coap_resource.discoverable = true;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
+#endif /* SL_CATALOG_WISUN_OTA_DFU_PRESENT */
 #endif /* APP_WISUN_MULTICAST_OTA_H */
 
   coap_resource.data.uri_path = "/realloc";
@@ -1243,5 +1278,9 @@ uint8_t app_coap_resources_init() {
   count++;
 
   printf("  %d/%d CoAP resources added to CoAP Resource handler\n", count, SL_WISUN_COAP_RESOURCE_HND_MAX_RESOURCES);
+  #if SL_WISUN_COAP_RESOURCE_HND_MAX_RESOURCES < 20
+    #pragma message("Increase SL_WISUN_COAP_RESOURCE_HND_MAX_RESOURCES to avoid an assert")
+  #endif
   return count;
 }
+#endif /* SL_CATALOG_WISUN_COAP_PRESENT */

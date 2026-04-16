@@ -34,6 +34,12 @@
 * This code will not be maintained.
 *
 ******************************************************************************/
+#include "sl_component_catalog.h"
+#ifdef    SL_CATALOG_WISUN_COAP_PRESENT
+
+#ifndef APP_COAP_H
+#define APP_COAP_H
+
 // -----------------------------------------------------------------------------
 //                                   Includes
 // -----------------------------------------------------------------------------
@@ -58,7 +64,7 @@ extern char version[];
 extern char device_tag[];
 extern char parent_tag[];
 extern char history_string[];
-extern char device_type[];
+extern char device_type_string[];
 extern sl_wisun_mac_address_t parent_mac;
 
 // -----------------------------------------------------------------------------
@@ -68,3 +74,9 @@ extern sl_wisun_mac_address_t parent_mac;
 
 uint8_t app_coap_resources_init();
 void  print_coap_help (char* device_global_ipv6_string, char* border_router_ipv6_string);
+
+#endif /* APP_COAP_H */
+
+#else /* SL_CATALOG_WISUN_COAP_PRESENT */
+    #pragma message("app_coap.c/h can only be used if the WI-SUN CoAP Component is present")
+#endif /* SL_CATALOG_WISUN_COAP_PRESENT */

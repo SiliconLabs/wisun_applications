@@ -1,9 +1,9 @@
 project_name: wisun_node_monitoring
 label: wisun_node_monitoring
 
-description: The Wi-SUN Node Monitoring sample application is a non-CLI application, as most field applications.
-  It uses UART only to print messages, with no input capability. It adds OTA DFU & CoAP support to monitor the device connection status.
-  It can be easily expanded to monitor sensors and control actuators. Various statistics can be made available via CoAP, depending on defined values.
+description: The Wi-SUN Node Monitoring LFN sample application is a non-CLI application, as most field applications, tailored for low-power.
+  It works in EM2 most of the time.
+  It's similar to the Wi-SUN Node Monitoring sample application, and support similar features without button or led support.
 
 category: Wi-SUN Examples
 package: wisun
@@ -29,12 +29,6 @@ source:
 - {path: app_crash_handler.c}
 
 include:
-- path: config
-  file_list:
-  - {path: ltn_config.h}
-- path: config/wisun
-  file_list:
-  - {path: ltn_wisun_settings.wisunconf}
 - path: .
   file_list:
   - {path: app_check_neighbors.h}
@@ -51,6 +45,7 @@ include:
   - {path: app_wisun_multicast_ota.h}
   - {path: app_action_scheduler.h}
   - {path: app_crash_handler.h}
+  - {path: lfn_checks.h}
 
 toolchain_settings:
 - value: -Wl,--wrap=__stack_chk_fail,--wrap=__assert_func
@@ -59,7 +54,7 @@ toolchain_settings:
 component:
   - id: "wisun_stack_debug"
   - id: "wisun_stack_lfn"
-  - id: "wisun_stack_ffn"
+  - id: "power_manager"
   - id: "wisun_keychain"
   - id: "wisun_silabs_certificates"
   - id: "radio_config_brd_wisun_singlephy"
@@ -84,17 +79,15 @@ component:
   - id: "sl_wisun_coap"
   - id: "sl_wisun_ota_dfu"
   - id: segger_rtt_printf
-  - {id: simple_led,    condition: [brd2705a], instance: [led0, led1]}
-  - {id: simple_button, condition: [brd2705a], instance: [btn0, btn1]}
-  - {id: simple_led,    condition: [brd4270b, hardware_board_mainboard], instance: [led0, led1]}
-  - {id: simple_button, condition: [brd4270b, hardware_board_mainboard], instance: [btn0, btn1]}
-  - {id: simple_led,    condition: [brd4401c, hardware_board_mainboard], instance: [led0, led1]}
-  - {id: simple_button, condition: [brd4401c, hardware_board_mainboard], instance: [btn0, btn1]}
 
 define:
   - name: DEBUG_EFM_USER
 
 configuration:
+  - name: "SL_DEVICE_TYPE"
+    value: "SL_WISUN_LFN"
+  - name: "SL_DEVICE_PROFILE"
+    value: "SL_WISUN_LFN_PROFILE_TEST"
   - name: "SL_BOARD_ENABLE_VCOM"
     value: "1"
   - name: SL_IOSTREAM_EUSART_VCOM_CONVERT_BY_DEFAULT_LF_TO_CRLF
@@ -143,9 +136,28 @@ configuration:
     value: 0U
   - name: SL_WISUN_OTA_DFU_HOST_NOTIFY_ENABLED
     value: 0U
+  - name: SL_WISUN_OTA_DFU_TFTP_TIMEOUT_SEC
+    value: 150U
   - name: SL_WISUN_OTA_DFU_AUTO_INSTALL_ENABLED
     value: 0U
-# MicriumOS Normal Power mode (FFN)
+# LFN low power settings, if power_manager_deepsleep (default with power_manager)
+#  EUSART Low Power
+  - name: SL_CLOCK_MANAGER_EUSART0CLK_SOURCE
+    value: CMU_EUSART0CLKCTRL_CLKSEL_LFXO
+    condition: [power_manager_deepsleep]
+  - name: SL_IOSTREAM_EUSART_VCOM_RESTRICT_ENERGY_MODE_TO_ALLOW_RECEPTION
+    value: 0
+    condition: [iostream_eusart, power_manager_deepsleep]
+  - name: SL_IOSTREAM_EUSART_INSTANCE_RESTRICT_ENERGY_MODE_TO_ALLOW_RECEPTION
+    value: 0
+    condition: [iostream_eusart, power_manager_deepsleep]
+  - name: SL_IOSTREAM_EUSART_VCOM_BAUDRATE
+    value: 9600
+    condition: [iostream_eusart, power_manager_deepsleep]
+  - name: SL_IOSTREAM_EUSART_VCOM_ENABLE_HIGH_FREQUENCY
+    value: 0
+    condition: [iostream_eusart, power_manager_deepsleep]
+#  MicriumOS low Power
   - name: OS_CFG_SCHED_ROUND_ROBIN_EN
     value: "1"
     condition: [power_manager_deepsleep, micriumos_kernel]
@@ -155,13 +167,35 @@ configuration:
   - name: OS_CFG_TASK_PROFILE_EN
     value: "1"
     condition: [power_manager_deepsleep, micriumos_kernel]
+#  Misc Low Power
+  - name: SL_SLEEPTIMER_PERIPHERAL
+    value: SL_SLEEPTIMER_PERIPHERAL_SYSRTC
+    condition: [power_manager_deepsleep]
+  - name: SL_POWER_MANAGER_INIT_EMU_EM2_DEBUG_ENABLE
+    value: 0
+    condition: [power_manager_deepsleep]
+  - name: SL_CLOCK_MANAGER_LFXO_EN
+    value: 0
+    condition: [clock_power_manager, power_manager_deepsleep]
+# Should not be used if UDP and TCP server modes are SO_EVENT, as recommended for low power!
+  - name: SL_WISUN_APP_CORE_THREAD_LP_DISPATCH_MS
+    value: 5000U
+# Code profiling in Energy Profiler
+  - name: SL_DEBUG_SWO_SAMPLE_IRQ
+    value: 0
+    condition: [debug_swo]
+  - name: SL_DEBUG_SWO_SAMPLE_PC
+    value: 0
+    condition: [debug_swo]
+
 readme:
 - path: README.md
+- path: README_LFN.md
 - path: app_parameters.md
 
 ui_hints:
   highlight:
-  - path: README.md
+  - path: README_LFN.md
     focus: true
   - path: config/wisun/wisun_settings.wisunconf
 

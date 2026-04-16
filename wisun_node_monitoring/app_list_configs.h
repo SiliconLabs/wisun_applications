@@ -44,7 +44,11 @@
 RF configs:
 phy[0]:  'NA-32-5 (FAN1.1)'
 phy[1]:  'BZ-32-5 (FAN1.1)'
-
 */
 
+#ifndef   APP_LIST_CONFIGS_H
+#define   APP_LIST_CONFIGS_H
+
 void list_rf_configs (void);
+
+#endif /* APP_LIST_CONFIGS_H */

@@ -1,3 +1,6 @@
+#ifndef   APP_WISUN_MULTICAST_OTA_H
+#define   APP_WISUN_MULTICAST_OTA_H
+
 #include <stdio.h>
 #include <string.h>
 
@@ -9,9 +12,6 @@
 #if __has_include("ltn_config.h")
 #include "ltn_config.h"
 #endif
-
-#ifndef APP_WISUN_MULTICAST_OTA_H
-#define APP_WISUN_MULTICAST_OTA_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,10 +50,11 @@ char* ota_multicast_info();
 
 char* now_timestamp();
 
-int multicast_rx(char* udp_buff, uint32_t received_bytes);
+int multicast_rx(char* udp_buff, uint32_t received_bytes, const char* udp_ip_str);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // APP_WISUN_MULTICAST_OTA_H
+#endif /* APP_MULTICAST_OTA_H */
+

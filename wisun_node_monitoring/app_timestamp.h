@@ -8,14 +8,14 @@
 * once:
 * sl_status_t status;
 * status = app_timestamp_init();
-* the 'app_timestamp' variable is the number of seconds since
-*  app_timestamp_init(). It can be used to compute durations in seconds
-*  and retrieved using 'now_ms()'
+* the 'app_timestamp' variable is the number of seconds elapsed since
+* app_timestamp_init() was called. It can be used to compute durations in
+* seconds and retrieved using 'now_sec()'
 * example:
-* printTime("Current app_timestamp = %6lu\n", now_ms());
+* printTime("Current app_timestamp = %6lu\n", now_sec());
 * results in:
 * [  0-00:10:32] Current app_timestamp =   632
-* (where the application time stamp is visible in ddd-hh:mm:ss (0:00:10:32) and in seconds (632)
+* (where the application time stamp is visible in ddd-hh:mm:ss (0-00:10:32) and in seconds (632)
 * Several options for printing are available (via macros):
 *  print a message in the console:
 *  printf("a message\n");
@@ -62,10 +62,15 @@
 * This code will not be maintained.
 *
 ******************************************************************************/
+#ifndef APP_TIMESTAMP_H
+#define APP_TIMESTAMP_H
 
 #include <stdio.h>
 #include "sl_sleeptimer.h"
-#include "SEGGER_RTT.h"
+
+#ifdef SL_CATALOG_SEGGER_RTT_PRESENT
+    #include "SEGGER_RTT.h"
+#endif /* SL_CATALOG_SEGGER_RTT_PRESENT */
 
 #define TIMESTAMP_MSG_LEN 1400
 extern char timestamped_msg_buffer[TIMESTAMP_MSG_LEN];
@@ -75,33 +80,17 @@ extern char *timestamped_msg;
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
 #define printfTime(...)     printf("[%s] ", now_str()); printf(__VA_ARGS__)
-#ifdef    SEGGER_RTT_H
+#ifdef    SL_CATALOG_SEGGER_RTT_PRESENT
  #define printfRTT(...)      snprintf(timestamped_msg, TIMESTAMP_MSG_LEN, __VA_ARGS__); SEGGER_RTT_printf(0, timestamped_msg)
  #define printfTimeRTT(...)  snprintf(timestamped_msg, TIMESTAMP_MSG_LEN, __VA_ARGS__); SEGGER_RTT_printf(0, "[%s] %s", now_str(), timestamped_msg)
  #define printfBoth(...)     snprintf(timestamped_msg, TIMESTAMP_MSG_LEN, __VA_ARGS__); SEGGER_RTT_printf(0, timestamped_msg); printf(timestamped_msg)
  #define printfBothTime(...) snprintf(timestamped_msg, TIMESTAMP_MSG_LEN, __VA_ARGS__); SEGGER_RTT_printf(0, "[%s] %s", now_str(), timestamped_msg); printf("[%s] %s", now_str(), timestamped_msg)
-#else  /* SEGGER_RTT_H */
- #define printfRTT(...)      printf(__VA_ARGS__)
- #define printfTimeRTT(...)  printf(__VA_ARGS__)
+#else  /* SL_CATALOG_SEGGER_RTT_PRESENT */
+ #define printfRTT(...)      /* */
+ #define printfTimeRTT(...)  /* */
  #define printfBoth(...)     printf(__VA_ARGS__)
  #define printfBothTime(...) printf("[%s] ", now_str()); printf(__VA_ARGS__)
-#endif /* SEGGER_RTT_H */
-// -----------------------------------------------------------------------------
-//                          Static Function Declarations
-// -----------------------------------------------------------------------------
-/**************************************************************************//**
- * Callback handler to increment the application timestamp
- *
- * @param handle The timer handle.
- *
- * @param data An extra parameter for the user application.
- *
- * @return SL_STATUS_OK if successful, an error code otherwise
- *
- * This function increases by 1 the app_timstamp public variable
- *****************************************************************************/
-void app_timer_callback(sl_sleeptimer_timer_handle_t *handle, void *data);
-
+#endif /* SL_CATALOG_SEGGER_RTT_PRESENT */
 // -----------------------------------------------------------------------------
 //                                Global Variables
 // -----------------------------------------------------------------------------
@@ -117,11 +106,20 @@ extern sl_sleeptimer_timestamp_64_t app_timestamp;
  *
  * @return SL_STATUS_OK if successful, an error code otherwise
  *
- * This function initializes the sleep timer then starts a 1 second
- * periodic timer.
+ * This function captures a reference sleeptimer tick at startup. The
+ * timestamp is then calculated on-demand using the SDK sleeptimer tick count.
  *****************************************************************************/
 sl_status_t app_timestamp_init(void);
 
+/**************************************************************************//**
+ * reset the timestamp timer
+ *
+ * @return the current timestamp (0)
+ *
+ * This function resets the reference sleeptimer tick to the current time. Its used to 
+ * avoid counting 'explanatory' time before calling join for the first time.
+ *****************************************************************************/
+uint64_t app_timestamp_reset(void);
 /**************************************************************************//**
  * Sleep Timer seconds timestamp expansion to total days/hours/mins/secs, not
  *  using modulo to limit hours to 24, mins to 60, secs to 60.
@@ -185,3 +183,5 @@ char*        now_str     (void);
  * Used to store the application time stamp
  *****************************************************************************/
 uint64_t     now_sec      (void);
+
+#endif /* APP_TIMESTAMP_H */

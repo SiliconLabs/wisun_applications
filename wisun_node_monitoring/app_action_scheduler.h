@@ -33,6 +33,10 @@
 * This code will not be maintained.
 *
 ******************************************************************************/
+
+#ifndef APP_ACTION_SCHEDULER_H
+#define APP_ACTION_SCHEDULER_H
+
 // -----------------------------------------------------------------------------
 //                                   Includes
 // -----------------------------------------------------------------------------
@@ -90,3 +94,4 @@ bool app_scheduler_action_get_remaining(uint32_t *remaining_ms,
                                        app_scheduler_action_type_t *action);
 
 
+#endif /* APP_ACTION_SCHEDULER_H */
