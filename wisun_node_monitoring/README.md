@@ -30,7 +30,7 @@ The block diagram of this application is shown in the image below:
 
 ## Simplicity SDK Version ##
 
-SiSDK v2025.06.2
+SiSDK v2025.12.0 or earlier.
 
 ## Hardware Required ##
 
