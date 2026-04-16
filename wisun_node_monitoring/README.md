@@ -329,6 +329,12 @@ This box selects the value set for `WISUN_CONFIG_DEVICE_TYPE` in `autogen\sl_wis
 
 ![WISUN_CONFIG_DEVICE_TYPE](image/config_device_type.png)
 
+For best low power consumption performances, please select preconfigured "Wi-SUN Node Monitoring Application LFN" project and refer to [README_LFN.md](README_LFN.md).
+
+## OTA Multicast ##
+
+Node Monitoring demonstrates firmware updates over OTA multicast. Follow the [OTA Multicast README](app_wisun_multicast_ota.md) for more information.
+
 ## Access to RTT traces ##
 
 The project being based on Wi-SUN SoC Empty, which doesn't include the **wisun_stack_debug** component, this component is added to the `.slcp` file. This can be uninstalled for release versions of the application.
