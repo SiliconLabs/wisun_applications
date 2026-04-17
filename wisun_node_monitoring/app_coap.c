@@ -120,7 +120,34 @@ sl_wisun_statistics_t statistics;
 // -----------------------------------------------------------------------------
 //                          Static Function Declarations
 // -----------------------------------------------------------------------------
+static uint32_t app_scheduler_reconnect_cb(void *context);
+static uint32_t app_scheduler_clear_and_reconnect_cb(void *context);
 
+static uint32_t app_scheduler_reconnect_cb(void *context)
+{
+  (void)context;
+  printfBothTime("scheduler: disconnect + reconnect\n");
+  sl_wisun_disconnect();
+  sl_wisun_app_core_wait_state(SL_WISUN_MSG_DISCONNECTED_IND_ID, 5000);
+  sl_wisun_app_core_util_connect_and_wait();
+  return 0U;
+}
+
+static uint32_t app_scheduler_clear_and_reconnect_cb(void *context)
+{
+  sl_status_t status;
+
+  (void)context;
+  printfBothTime("scheduler: clear credential cache + reconnect\n");
+  sl_wisun_disconnect();
+  sl_wisun_app_core_wait_state(SL_WISUN_MSG_DISCONNECTED_IND_ID, 5000);
+  status = sl_wisun_clear_credential_cache();
+  if (status != SL_STATUS_OK) {
+    return (uint32_t)status;
+  }
+  sl_wisun_app_core_util_connect_and_wait();
+  return 0U;
+}
 
 
 void  print_coap_help (char* device_global_ipv6_string, char* border_router_ipv6_string) {
@@ -279,7 +306,10 @@ sl_wisun_coap_packet_t * coap_callback_application (
 
     if (res) {
       if (strcmp(cmd, "clear_and_reconnect") == 0) {
-        if (app_scheduler_action_schedule(APP_SCHEDULER_CLEAR_AND_RECONNECT, 0U, CLEAR_NVM_NO)) {
+        if (app_scheduler_action_schedule(app_scheduler_clear_and_reconnect_cb,
+                                          0U,
+                                          0U,
+                                          NULL)) {
           snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
                   "clear_and_reconnect scheduled");
         } else {
@@ -290,7 +320,10 @@ sl_wisun_coap_packet_t * coap_callback_application (
       }
 
       if (strcmp(cmd, "reconnect") == 0) {
-        if (app_scheduler_action_schedule(APP_SCHEDULER_RECONNECT, 0U, CLEAR_NVM_NO)) {
+        if (app_scheduler_action_schedule(app_scheduler_reconnect_cb,
+                                          0U,
+                                          0U,
+                                          NULL)) {
           snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
                   "reconnect scheduled");
         } else {

@@ -46,27 +46,20 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define CLEAR_NVM_NO   0
-#define CLEAR_NVM_APP  1
-#define CLEAR_NVM_FULL 2
+#define APP_SCHEDULER_MAX_SLOTS 8U
 
-typedef enum {
-  APP_SCHEDULER_NONE = 0,
-  APP_SCHEDULER_REBOOT,
-  APP_SCHEDULER_CLEAR_CRED_AND_REBOOT,
-  APP_SCHEDULER_RECONNECT,
-  APP_SCHEDULER_CLEAR_AND_RECONNECT,
-  APP_SCHEDULER_OTA_REBOOT_INSTALL,
-} app_scheduler_action_type_t;
+typedef uint32_t (*app_scheduler_action_fn_t)(void *context);
 
 // Small state struct, if you ever want to expose more info.
 typedef struct {
-  bool                       active;
-  app_scheduler_action_type_t action;
-  uint32_t                   delay_ms;
-  uint64_t                   start_ms;
-  uint64_t                   deadline_ms;
-  uint8_t                    clear_nvm_mode;   // reuse CLEAR_NVM_* from multicast OTA
+  bool                      active;
+  bool                      periodic;
+  app_scheduler_action_fn_t action_fn;
+  uint32_t                  delay_ms;
+  uint32_t                  period_ms;
+  uint64_t                  start_ms;
+  uint64_t                  deadline_ms;
+  void                      *context;
 } app_scheduler_action_state_t;
 
 void app_scheduler_action_init(void);
@@ -74,24 +67,34 @@ void app_scheduler_action_init(void);
 /**
  * Schedule a scheduler action.
  *
- * @param action       What to do when the delay expires.
+ * @param action_fn    Callback to execute when the delay expires.
  * @param delay_ms     Delay in milliseconds.
- * @param clear_nvm    CLEAR_NVM_NO / APP / FULL when relevant, 0 otherwise.
+ * @param period_ms    Period for repeated execution, 0 for one-shot scheduling.
+ * @param context      Optional user context passed to the action callback.
  * @return true on success (timer started), false on error.
  */
-bool app_scheduler_action_schedule(app_scheduler_action_type_t action,
-                                  uint32_t delay_ms,
-                                  uint8_t clear_nvm);
+bool app_scheduler_action_schedule(app_scheduler_action_fn_t action_fn,
+                                   uint32_t delay_ms,
+                                   uint32_t period_ms,
+                                   void *context);
 
 /**
- * Get remaining time before the scheduled action.
+ * Stop all scheduled instances of the given callback.
  *
- * @param remaining_ms [out] remaining time, 0 if already due.
- * @param action       [out] current action type.
- * @return true if an action is scheduled, false otherwise.
+ * @param action_fn Callback to stop.
+ * @return true if at least one instance was stopped.
  */
-bool app_scheduler_action_get_remaining(uint32_t *remaining_ms,
-                                       app_scheduler_action_type_t *action);
+bool app_scheduler_action_stop(app_scheduler_action_fn_t action_fn);
+
+/**
+ * Get remaining time for the earliest scheduled instance of a callback.
+ *
+ * @param action_fn    Callback to query.
+ * @param remaining_ms [out] remaining time, 0 if already due.
+ * @return true if at least one matching callback is scheduled.
+ */
+bool app_scheduler_action_get_remaining(app_scheduler_action_fn_t action_fn, 
+                                        uint32_t *remaining_ms);
 
 
 #endif /* APP_ACTION_SCHEDULER_H */

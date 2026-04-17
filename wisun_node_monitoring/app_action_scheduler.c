@@ -40,23 +40,10 @@
 
 #include "app_action_scheduler.h"
 
-#include "sl_wisun_app_core_util.h"
+#include <string.h>
+
 #include "sl_sleeptimer.h"
 #include "cmsis_os2.h"
-#include "sl_wisun_api.h"
-#include "sl_wisun_app_core.h"
-#include "app_parameters.h"
-
-#if __has_include("app_wisun_multicast_ota.h")
-  #include "app_wisun_multicast_ota.h"
-#endif
-
-#if __has_include("btl_interface.h")
-  #include "btl_interface.h"
-#endif
-
-#include "nvm3.h"
-#include "nvm3_default.h"
 #include "em_core.h"
 #include "printf.h"
 
@@ -64,44 +51,177 @@
 // Local state
 // -----------------------------------------------------------------------------
 
-static app_scheduler_action_state_t g_scheduler;
-
+static app_scheduler_action_state_t g_scheduler_queue[APP_SCHEDULER_MAX_SLOTS];
+static uint8_t g_scheduler_count;
 static sl_sleeptimer_timer_handle_t g_scheduler_timer;
 
-static osThreadId_t      g_scheduler_task_id;
-static osEventFlagsId_t  g_scheduler_flags;
+static osThreadId_t g_scheduler_task_id;
+static osEventFlagsId_t g_scheduler_flags;
 
-#define APP_SCHEDULER_FLAG_EXECUTE   (1U << 0)
-
-#define APP_SCHEDULER_TASK_SIZE_BYTES   (1*2048UL)
+#define APP_SCHEDULER_FLAG_EXECUTE         (1U << 0)
+#define APP_SCHEDULER_TASK_SIZE_BYTES      (1 * 2048UL)
 
 static const osThreadAttr_t g_scheduler_task_attr = {
-  .name       = "scheduler_action",
-  .attr_bits   = osThreadDetached,
-  .cb_mem      = NULL,
-  .cb_size     = 0,
-  .stack_mem  = NULL,
-  .stack_size = APP_SCHEDULER_TASK_SIZE_BYTES, // Optional: tune stack size as needed.
-  .priority   = osPriorityAboveNormal, // Optional: tune stack prio as needed.
-  .tz_module   = 0
+  .name = "scheduler_action",
+  .attr_bits = osThreadDetached,
+  .cb_mem = NULL,
+  .cb_size = 0,
+  .stack_mem = NULL,
+  .stack_size = APP_SCHEDULER_TASK_SIZE_BYTES,
+  .priority = osPriorityAboveNormal,
+  .tz_module = 0
 };
+
+static void scheduler_timer_cb(sl_sleeptimer_timer_handle_t *handle, void *data);
 
 // -----------------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------------
 
+// Convert the shared sleeptimer tick source to milliseconds for queue deadlines.
 static uint64_t now_ms(void)
 {
   uint64_t ticks = sl_sleeptimer_get_tick_count64();
-  uint32_t freq  = sl_sleeptimer_get_timer_frequency();
+  uint32_t freq = sl_sleeptimer_get_timer_frequency();
+
   if (freq == 0U) {
     return 0U;
   }
+
   return (ticks * 1000ULL) / (uint64_t)freq;
 }
 
-// Forward declaration
-static void app_scheduler_action_execute(void);
+// Remove one entry and keep the queue densely packed and deadline ordered (index 0 = next deadline)
+static void queue_remove(uint8_t idx)
+{
+  uint8_t i;
+
+  if (idx >= g_scheduler_count) {
+    return;
+  }
+
+  for (i = idx; (i + 1U) < g_scheduler_count; ++i) {
+    g_scheduler_queue[i] = g_scheduler_queue[i + 1U];
+  }
+
+  if (g_scheduler_count > 0U) {
+    g_scheduler_count--;
+    memset(&g_scheduler_queue[g_scheduler_count], 0, sizeof(g_scheduler_queue[0]));
+  }
+}
+
+// Insert while preserving deadline order so queue[0] is always the next due item.
+static void queue_insert(const app_scheduler_action_state_t *state)
+{
+  uint8_t i = g_scheduler_count;
+
+  while ((i > 0U) && (g_scheduler_queue[i - 1U].deadline_ms > state->deadline_ms)) {
+    g_scheduler_queue[i] = g_scheduler_queue[i - 1U];
+    i--;
+  }
+
+  g_scheduler_queue[i] = *state;
+  g_scheduler_count++;
+}
+
+// Must be called with the scheduler lock held. It always arms only the earliest deadline.
+static void rearm_timer_locked(void)
+{
+  uint32_t delay_ms;
+  uint64_t current_ms;
+  sl_status_t status;
+
+  (void)sl_sleeptimer_stop_timer(&g_scheduler_timer);
+
+  if (g_scheduler_count == 0U) {
+    return;
+  }
+
+  current_ms = now_ms();
+  delay_ms = (g_scheduler_queue[0].deadline_ms > current_ms)
+             ? (uint32_t)(g_scheduler_queue[0].deadline_ms - current_ms)
+             : 0U;
+
+  // If the deadline is already due, wake the worker task directly instead of
+  // starting a 0 ms timer from inside the critical section.
+  if (delay_ms == 0U) {
+    (void)osEventFlagsSet(g_scheduler_flags, APP_SCHEDULER_FLAG_EXECUTE);
+  } else {
+    status = sl_sleeptimer_start_timer_ms(&g_scheduler_timer,
+                                       delay_ms,
+                                       scheduler_timer_cb,
+                                       NULL,
+                                       0,
+                                       0);
+    assert(status == SL_STATUS_OK);
+  }
+}
+
+// Thin wrapper around the user callback so NULL handling stays in one place.
+static uint32_t execute_action(const app_scheduler_action_state_t *local)
+{
+  if (local->action_fn == NULL) {
+    return 1U;
+  }
+
+  return local->action_fn(local->context);
+}
+
+// Execute every action that is already due. The queue entry is removed before
+// the callback runs so stop/query APIs only operate on still-pending instances.
+static void process_due_actions(void)
+{
+  for (;;) {
+    app_scheduler_action_state_t local;
+    bool have_due = false;
+    bool requeue = false;
+    uint64_t current_ms;
+
+    CORE_DECLARE_IRQ_STATE;
+    CORE_ENTER_CRITICAL();
+
+    if (g_scheduler_count > 0U) {
+      current_ms = now_ms();
+      if (g_scheduler_queue[0].deadline_ms <= current_ms) {
+        local = g_scheduler_queue[0];
+        queue_remove(0U);
+        have_due = true;
+      }
+    }
+
+    if (!have_due) {
+      rearm_timer_locked();
+      CORE_EXIT_CRITICAL();
+      break;
+    }
+
+    // User code runs outside the critical section to avoid blocking scheduling.
+    CORE_EXIT_CRITICAL();
+
+    uint32_t result = execute_action(&local);
+    if (result != 0U) {
+      printf("scheduler: action callback failed with code %lu\n",
+                     (unsigned long)result);
+    }
+
+    // Periodic actions use fixed-delay scheduling: the next period starts after
+    // the current callback finishes.
+    if (local.periodic) {
+      local.start_ms = now_ms();
+      local.deadline_ms = local.start_ms + (uint64_t)local.period_ms;
+      requeue = true;
+    }
+
+    if (requeue) {
+      CORE_ENTER_CRITICAL();
+      if (g_scheduler_count < APP_SCHEDULER_MAX_SLOTS) {
+        queue_insert(&local);
+      }
+      rearm_timer_locked();
+      CORE_EXIT_CRITICAL();
+    }
+  }
+}
 
 // Timer callback: runs in ISR context, only signals the task.
 static void scheduler_timer_cb(sl_sleeptimer_timer_handle_t *handle, void *data)
@@ -125,71 +245,8 @@ static void scheduler_task(void *argument)
                                       osFlagsWaitAny,
                                       osWaitForever);
     if ((flags & APP_SCHEDULER_FLAG_EXECUTE) != 0U) {
-      app_scheduler_action_execute();
+      process_due_actions();
     }
-  }
-}
-
-// Do the actual action (called from task context).
-static void app_scheduler_action_execute(void)
-{
-  app_scheduler_action_state_t local;
-
-  CORE_DECLARE_IRQ_STATE;
-  CORE_ENTER_CRITICAL();
-  local = g_scheduler;      // copy under lock
-  g_scheduler.active = false;
-  CORE_EXIT_CRITICAL();
-
-  if (!local.active) {
-    return;
-  }
-
-  switch (local.action) {
-  case APP_SCHEDULER_REBOOT:
-    // simple reset
-    printf("scheduler: NVIC_SystemReset()\n");
-    NVIC_SystemReset();
-    break;
-
-  case APP_SCHEDULER_CLEAR_CRED_AND_REBOOT:
-    printf("scheduler: clear credential cache + reset\n");
-    sl_wisun_clear_credential_cache();
-    NVIC_SystemReset();
-    break;
-
-  case APP_SCHEDULER_RECONNECT:
-    printf("scheduler: disconnect + reconnect\n");
-    sl_wisun_disconnect();
-    //wait for disconnection complete
-    sl_wisun_app_core_wait_state(SL_WISUN_MSG_DISCONNECTED_IND_ID,5000);
-    sl_wisun_app_core_util_connect_and_wait();
-    break;
-
-  case APP_SCHEDULER_CLEAR_AND_RECONNECT:
-    printf("scheduler: clear credential cache + reconnect\n");
-    sl_wisun_disconnect();
-    //wait for disconnection complete
-    sl_wisun_app_core_wait_state(SL_WISUN_MSG_DISCONNECTED_IND_ID,5000);
-    sl_wisun_clear_credential_cache();
-    sl_wisun_app_core_util_connect_and_wait();
-    break;
-#ifdef    BTL_INTERFACE_H
-  case APP_SCHEDULER_OTA_REBOOT_INSTALL:
-    printf("scheduler: OTA rebootAndInstall clear_nvm=%u\n", local.clear_nvm_mode);
-    // optional NVM cleanup, same logic as in original rebootAndInstall()
-    if (local.clear_nvm_mode == CLEAR_NVM_APP) {
-      (void)delete_app_parameters();
-    } else if (local.clear_nvm_mode == CLEAR_NVM_FULL) {
-      (void)nvm3_eraseAll(nvm3_defaultHandle);
-    }
-    printf("scheduler: bootloader_rebootAndInstall()\n");
-    bootloader_rebootAndInstall();
-    break;
-#endif /* BTL_INTERFACE_H */
-
-  default:
-    break;
   }
 }
 
@@ -199,64 +256,97 @@ static void app_scheduler_action_execute(void)
 
 void app_scheduler_action_init(void)
 {
-  memset(&g_scheduler, 0, sizeof(g_scheduler));
+  memset(g_scheduler_queue, 0, sizeof(g_scheduler_queue));
+  g_scheduler_count = 0U;
+  memset(&g_scheduler_timer, 0, sizeof(g_scheduler_timer));
 
   g_scheduler_flags = osEventFlagsNew(NULL);
   g_scheduler_task_id = osThreadNew(scheduler_task, NULL, &g_scheduler_task_attr);
+  (void)g_scheduler_task_id;
 }
 
-bool app_scheduler_action_schedule(app_scheduler_action_type_t action,
-                                  uint32_t delay_ms,
-                                  uint8_t clear_nvm_mode)
+bool app_scheduler_action_schedule(app_scheduler_action_fn_t action_fn,
+                                   uint32_t delay_ms,
+                                   uint32_t period_ms,
+                                   void *context)
 {
-  sl_status_t status;
+  app_scheduler_action_state_t state;
 
-  // Stop any currently running timer
-  (void)sl_sleeptimer_stop_timer(&g_scheduler_timer);
-
-  CORE_DECLARE_IRQ_STATE;
-  CORE_ENTER_CRITICAL();
-  g_scheduler.action        = action;
-  g_scheduler.clear_nvm_mode= clear_nvm_mode;
-  g_scheduler.delay_ms      = delay_ms;
-  g_scheduler.start_ms      = now_ms();
-  g_scheduler.deadline_ms   = g_scheduler.start_ms + (uint64_t)delay_ms;
-  g_scheduler.active        = true;
-  CORE_EXIT_CRITICAL();
-
-  if (delay_ms == 0U) {
-    // immediate: skip sleeptimer, just wake the task
-    (void)osEventFlagsSet(g_scheduler_flags, APP_SCHEDULER_FLAG_EXECUTE);
-    return true;
-  }
-
-  status = sl_sleeptimer_start_timer_ms(&g_scheduler_timer,
-                                        delay_ms,
-                                        scheduler_timer_cb,
-                                        NULL,
-                                        0,
-                                        0);
-  return (status == SL_STATUS_OK);
-}
-
-bool app_scheduler_action_get_remaining(uint32_t *remaining_ms,
-                                       app_scheduler_action_type_t *action)
-{
-  if (!g_scheduler.active) {
+  if (action_fn == NULL) {
     return false;
   }
 
-  uint64_t now = now_ms();
-  uint64_t rem =   (g_scheduler.deadline_ms > now)
-                 ? (g_scheduler.deadline_ms - now)
-                 : 0U;
+  memset(&state, 0, sizeof(state));
+  state.active = true;
+  state.periodic = (period_ms != 0U);
+  state.action_fn = action_fn;
+  state.delay_ms = delay_ms;
+  state.period_ms = period_ms;
+  state.start_ms = now_ms();
+  state.deadline_ms = state.start_ms + (uint64_t)delay_ms;
+  state.context = context;
 
-  if (remaining_ms != NULL) {
-    *remaining_ms = (rem > 0xFFFFFFFFULL) ? 0xFFFFFFFFUL : (uint32_t)rem;
+  CORE_DECLARE_IRQ_STATE;
+  CORE_ENTER_CRITICAL();
+  if (g_scheduler_count >= APP_SCHEDULER_MAX_SLOTS) {
+    CORE_EXIT_CRITICAL();
+    return false;
   }
-  if (action != NULL) {
-    *action = g_scheduler.action;
-  }
+  queue_insert(&state);
+  rearm_timer_locked();
+  CORE_EXIT_CRITICAL();
+
   return true;
 }
 
+bool app_scheduler_action_stop(app_scheduler_action_fn_t action_fn)
+{
+  bool stopped = false;
+  uint8_t i;
+
+  CORE_DECLARE_IRQ_STATE;
+  CORE_ENTER_CRITICAL();
+
+  for (i = 0U; i < g_scheduler_count;) {
+    if (g_scheduler_queue[i].action_fn == action_fn) {
+      queue_remove(i);
+      stopped = true;
+    } else {
+      i++;
+    }
+  }
+
+  if (stopped) {
+    rearm_timer_locked();
+  }
+
+  CORE_EXIT_CRITICAL();
+  return stopped;
+}
+
+bool app_scheduler_action_get_remaining(app_scheduler_action_fn_t action_fn,
+                                        uint32_t *remaining_ms)
+{
+  uint8_t i;
+  uint64_t current_ms;
+  bool found = false;
+
+  CORE_DECLARE_IRQ_STATE;
+  CORE_ENTER_CRITICAL();
+  current_ms = now_ms();
+  for (i = 0U; i < g_scheduler_count; ++i) {
+    if (g_scheduler_queue[i].action_fn == action_fn) {
+      uint64_t remaining = (g_scheduler_queue[i].deadline_ms > current_ms)
+                           ? (g_scheduler_queue[i].deadline_ms - current_ms)
+                           : 0U;
+      if (remaining_ms != NULL) {
+        *remaining_ms = (remaining > 0xFFFFFFFFULL) ? 0xFFFFFFFFUL : (uint32_t)remaining;
+      }
+      found = true;
+      break;
+    }
+  }
+  CORE_EXIT_CRITICAL();
+
+  return found;
+}

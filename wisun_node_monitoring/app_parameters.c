@@ -75,6 +75,8 @@
 // -----------------------------------------------------------------------------
 //                          Static Function Declarations
 // -----------------------------------------------------------------------------
+static uint32_t app_scheduler_reboot_cb(void *context);
+static uint32_t app_scheduler_clear_credential_cache_and_reboot_cb(void *context);
 
 // -----------------------------------------------------------------------------
 //                                Global Variables
@@ -100,6 +102,28 @@ static const osMutexAttr_t _app_parameters_mutex_attr = {
   .cb_mem    = NULL,
   .cb_size   = 0U
 };
+
+static uint32_t app_scheduler_reboot_cb(void *context)
+{
+  (void)context;
+  printfBothTime("scheduler: NVIC_SystemReset()\n");
+  NVIC_SystemReset();
+  return 0U;
+}
+
+static uint32_t app_scheduler_clear_credential_cache_and_reboot_cb(void *context)
+{
+  sl_status_t status;
+
+  (void)context;
+  printfBothTime("scheduler: clear credential cache + reset\n");
+  status = sl_wisun_clear_credential_cache();
+  if (status != SL_STATUS_OK) {
+    return (uint32_t)status;
+  }
+  NVIC_SystemReset();
+  return 0U;
+}
 
 /* Copies token into out, removing ONE surrounding quote pair if present.
  * Accepts:
@@ -439,9 +463,12 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
   // reboot options
   if  (!match) { match = (sl_strcasecmp(parameter_name, "reboot") == 0);
     if (match) {
-      if (app_scheduler_action_schedule(APP_SCHEDULER_REBOOT, value, CLEAR_NVM_NO)) {
+      if (app_scheduler_action_schedule(app_scheduler_reboot_cb,
+                                        value,
+                                        0U,
+                                        NULL)) {
         uint32_t remaining;
-        app_scheduler_action_get_remaining(&remaining, NULL);
+        app_scheduler_action_get_remaining(app_scheduler_reboot_cb, &remaining);
         sprintf(value_str,
                 "reboot scheduled in %lu ms (remaining=%lu ms)",
                 (unsigned long)value,
@@ -455,11 +482,13 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
   #ifdef    APP_ACTION_SCHEDULER_H
   if  (!match) { match = (sl_strcasecmp(parameter_name, "clear_credential_cache_and_reboot") == 0);
     if (match) { // This is useful to test a full network restart, with credentials cleared on both ends
-      if (app_scheduler_action_schedule(APP_SCHEDULER_CLEAR_CRED_AND_REBOOT,
-                                      value,
-                                      CLEAR_NVM_NO)) {
+      if (app_scheduler_action_schedule(app_scheduler_clear_credential_cache_and_reboot_cb,
+                                        value,
+                                        0U,
+                                        NULL)) {
         uint32_t remaining;
-        app_scheduler_action_get_remaining(&remaining, NULL);
+        app_scheduler_action_get_remaining(app_scheduler_clear_credential_cache_and_reboot_cb,
+                                           &remaining);
         sprintf(value_str,
                 "clear_credential_cache_and_reboot scheduled in %lu ms (remaining=%lu ms)",
                 (unsigned long)value,
@@ -708,12 +737,21 @@ sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, 
   }
   #ifdef    APP_ACTION_SCHEDULER_H
   if  (!match) { match = (sl_strcasecmp(parameter_name, "reboot") == 0);
-    if (match) {app_scheduler_action_get_remaining(value, NULL); }
+    if (match) {
+      if (!app_scheduler_action_get_remaining(app_scheduler_reboot_cb, value)) {
+        *value = 0U;
+      }
+    }
   }
   #endif /* APP_ACTION_SCHEDULER_H */
   #ifdef    APP_ACTION_SCHEDULER_H
   if  (!match) { match = (sl_strcasecmp(parameter_name, "clear_credential_cache_and_reboot") == 0);
-    if (match) {app_scheduler_action_get_remaining(value, NULL); }
+    if (match) {
+      if (!app_scheduler_action_get_remaining(app_scheduler_clear_credential_cache_and_reboot_cb,
+                                              value)) {
+        *value = 0U;
+      }
+    }
   }
   #endif /* APP_ACTION_SCHEDULER_H */
   if  (!match) {

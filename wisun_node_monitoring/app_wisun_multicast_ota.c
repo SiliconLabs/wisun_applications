@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 #if __has_include("sl_wisun_ota_dfu.h")
   #include "sl_wisun_ota_dfu.h"
   #include "app_wisun_multicast_ota.h"
@@ -19,13 +21,26 @@ uint32_t udp_received_count;
 
 
 #include "btl_interface.h"
+#include "nvm3.h"
+#include "nvm3_default.h"
 #include "printf.h"
 
-#include "app_parameters.h"
-#include "app_action_scheduler.h"
+#if __has_include("app_parameters.h")
+  #include "app_parameters.h"
+#endif
+
+#if __has_include("app_action_scheduler.h")
+  #include "app_action_scheduler.h"
+#endif
 
 extern char device_tag[];
 //extern sl_wisun_ota_dfu_settings_t _settings;
+
+typedef enum {
+  APP_OTA_CLEAR_NVM_NO = 0,
+  APP_OTA_CLEAR_NVM_APP = 1,
+  APP_OTA_CLEAR_NVM_FULL = 2,
+} app_ota_clear_nvm_t;
 
 /// Resent packet count
 uint32_t _resent_count;
@@ -60,6 +75,33 @@ uint32_t  missed_rx_index[MAX_CHUNKS];
 char    information_string[INFO_STRING_LENGTH];
 BootloaderStorageInformation_t storage_info;
 BootloaderStorageSlot_t slot0;
+
+static uint32_t app_scheduler_ota_reboot_install_cb(void *context)
+{
+  app_ota_clear_nvm_t clear_nvm = (app_ota_clear_nvm_t)(uintptr_t)context;
+  sl_status_t status;
+
+  printfBothTime("scheduler: OTA rebootAndInstall context=%lu\n",
+                 (unsigned long)clear_nvm);
+
+  if (clear_nvm == APP_OTA_CLEAR_NVM_APP) {
+    #ifdef APP_PARAMETERS_H
+    status = delete_app_parameters();
+    if (status != SL_STATUS_OK) {
+      return (uint32_t)status;
+    }
+    #endif /* APP_PARAMETERS_H */
+  } else if (clear_nvm == APP_OTA_CLEAR_NVM_FULL) {
+    status = nvm3_eraseAll(nvm3_defaultHandle);
+    if (status != SL_STATUS_OK) {
+      return (uint32_t)status;
+    }
+  }
+
+  printfBothTime("scheduler: bootloader_rebootAndInstall()\n");
+  bootloader_rebootAndInstall();
+  return 0U;
+}
 
 // safe append helper
 #define APPEND(fmt, ...) do {                                            \
@@ -383,7 +425,7 @@ void setImageToBootload(int slot) {
   printf("[%s] bootloader_setImageToBootload(%d) %ld 0x%04lx\n", device_tag, slot, ret_val, ret_val);
 }
 
-uint8_t rebootAndInstall(uint32_t time_reboot_sec, uint8_t clear_nvm)
+uint8_t rebootAndInstall(uint32_t time_reboot_sec, app_ota_clear_nvm_t clear_nvm)
 {
   uint8_t ret = 0xFF;
 
@@ -411,19 +453,28 @@ uint8_t rebootAndInstall(uint32_t time_reboot_sec, uint8_t clear_nvm)
   uint32_t delay_ms = time_reboot_sec * 1000U;
   printf("[%s] Scheduling reboot and install in %lu ms\n",
          device_tag, (unsigned long)delay_ms);
-
-  if (!app_scheduler_action_schedule(APP_SCHEDULER_OTA_REBOOT_INSTALL,
-                                    delay_ms,
-                                    clear_nvm)) {
+ #ifdef    APP_ACTION_SCHEDULER_H
+  if (!app_scheduler_action_schedule(app_scheduler_ota_reboot_install_cb,
+                                     delay_ms,
+                                     0U,
+                                     (void *)(uintptr_t)clear_nvm)) {
     printf("[%s] Failed to schedule rebootAndInstall\n", device_tag);
     ret = 5;
   } else {
     uint32_t remaining;
-    app_scheduler_action_get_remaining(&remaining, NULL);
+    app_scheduler_action_get_remaining(app_scheduler_ota_reboot_install_cb,
+                                       &remaining);
     printf("[%s] rebootAndInstall scheduled, remaining=%lu ms\n",
            device_tag, (unsigned long)remaining);
     ret = 0;
   }
+#else /* ! APP_ACTION_SCHEDULER_H */
+  osDelay(delay_ms);
+  if (app_scheduler_ota_reboot_install_cb((void *)(uintptr_t)clear_nvm) != 0) {
+    printf("[%s] Failed to rebootAndInstall\n", device_tag);
+    ret = 5;
+  }
+#endif /* APP_ACTION_SCHEDULER_H */
 
   return ret;
 }
@@ -592,7 +643,7 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes, const char* udp_ip_str
 #if MULTICAST_OTA_STORE_IN_FLASH == 1
       if (strcmp(gbl_filename, "rebootAndInstall()"     ) == 0) {
           time_reboot_sec = chunk_index;
-          if (rebootAndInstall(time_reboot_sec, CLEAR_NVM_NO) == 0){
+          if (rebootAndInstall(time_reboot_sec, APP_OTA_CLEAR_NVM_NO) == 0){
               received = 8;
           }
           else{
@@ -602,7 +653,7 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes, const char* udp_ip_str
       }
       else if (strcmp(gbl_filename, "rebootAndInstallClearNVMApp()"     ) == 0) {
           time_reboot_sec = chunk_index;
-          if (rebootAndInstall(time_reboot_sec, CLEAR_NVM_APP) == 0){
+          if (rebootAndInstall(time_reboot_sec, APP_OTA_CLEAR_NVM_APP) == 0){
               received = 9;
           }
           else{
@@ -612,7 +663,7 @@ int multicast_rx(char* udp_buff, uint32_t received_bytes, const char* udp_ip_str
       }
       else if (strcmp(gbl_filename, "rebootAndInstallClearNVMFull()"     ) == 0) {
           time_reboot_sec = chunk_index;
-          if (rebootAndInstall(time_reboot_sec, CLEAR_NVM_FULL) == 0){
+          if (rebootAndInstall(time_reboot_sec, APP_OTA_CLEAR_NVM_FULL) == 0){
               received = 10;
           }
           else{
