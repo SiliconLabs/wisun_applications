@@ -60,9 +60,7 @@
 // -----------------------------------------------------------------------------
 #define APP_REPORTER_TASK_STACK_SIZE 2500 // in units of CPU_INT32U
 #define REPORTER_PORT                        3770
-uint32_t reporter_period_ms;
 uint32_t reporter_started = 0;
-uint32_t reporter_active  = 0;
 
 #define REPORT_PERIOD_S                      10
 #define RTT_REPORT_TASK_FLAG_NONE            (0)
@@ -332,7 +330,7 @@ static void check_and_send_reporter_logs(char *log_buffer)
     if (socket_retval == SOCKET_RETVAL_ERROR) {
       printf("Could not send log\n");
     } else {
-      printf("%s\n", lines_to_send );
+      // printf("%s\n", lines_to_send );
     }
   }
   _app_reporter_mutex_release();
@@ -341,7 +339,6 @@ static void check_and_send_reporter_logs(char *log_buffer)
 void app_reporter_task(void *args)
 {
   (void)args;
-  sl_status_t ret;
   int32_t socket_retval = SOCKET_RETVAL_ERROR;
   char *log_buffer = NULL;
 
@@ -388,28 +385,17 @@ void app_reporter_task(void *args)
 
   rtt_report_task_flag_group = osEventFlagsNew(&rtt_report_task_flags_attr);
   assert(rtt_report_task_flag_group != NULL);
-  ret = sl_sleeptimer_start_periodic_timer_ms(&app_reporter_timer,
-                                        reporter_period_ms,
-                                        reporter_timer_cb,
-                                        NULL,
-                                        0,
-                                        0);
-  if(ret != SL_STATUS_OK) {
-    goto cleanup;
-  }
 
   while (1) {
-    if (reporter_active == 1) {
-      rtt_report_task_flags = osEventFlagsWait(rtt_report_task_flag_group,
-                                               RTT_REPORT_TASK_FLAG_ALL,
-                                               osFlagsWaitAny,
-                                               osWaitForever);
-      assert((rtt_report_task_flags & CMSIS_RTOS_ERROR_MASK) == 0);
-      if (rtt_report_task_flags & RTT_REPORT_TASK_FLAG_SEND) {
-        check_and_send_reporter_logs(log_buffer);
-      } else if (rtt_report_task_flags & RTT_REPORT_TASK_FLAG_STOP) {
-        goto cleanup;
-      }
+    rtt_report_task_flags = osEventFlagsWait(rtt_report_task_flag_group,
+                                              RTT_REPORT_TASK_FLAG_ALL,
+                                              osFlagsWaitAny,
+                                              osWaitForever);
+    assert((rtt_report_task_flags & CMSIS_RTOS_ERROR_MASK) == 0);
+    if (rtt_report_task_flags & RTT_REPORT_TASK_FLAG_SEND) {
+      check_and_send_reporter_logs(log_buffer);
+    } else if (rtt_report_task_flags & RTT_REPORT_TASK_FLAG_STOP) {
+      goto cleanup;
     }
   }
 
@@ -491,11 +477,16 @@ void app_start_reporter(char *report__dest_ipv6_str,
       printf("reporter_matches.match[%d] %s\n", i, reporter_matches.match[i]);
   }
 
-  reporter_period_ms = report_period_ms;
-  reporter_active  = 1;
+  sl_sleeptimer_start_periodic_timer_ms(&app_reporter_timer,
+                                        report_period_ms,
+                                        reporter_timer_cb,
+                                        NULL,
+                                        0,
+                                        0);
+
 }
 
 void app_stop_reporter(void)
 {
-  reporter_active  = 0;
+  sl_sleeptimer_stop_timer(&app_reporter_timer);
 }
