@@ -323,6 +323,7 @@ uint16_t loop;
 
 #ifdef    APP_TRACK_HEAP
 sl_memory_heap_info_t app_heap_info;
+#define APP_TRACK_HEAP_PERIOD_S  5 //second
  #ifdef    APP_TRACK_HEAP_DIFF
 size_t app_previous_heap_free;
  #endif /* APP_TRACK_HEAP_DIFF */
@@ -1191,6 +1192,11 @@ void app_task(void *args)
 
   printf("\n%s Compiled on %s at %s\n", __FILE__, __DATE__, __TIME__);
 
+  // Reset the time to when we call app_join_network()
+  join_call_time_sec = app_timestamp_reset();
+  // connect to the wisun network
+  join_res = app_join_network(app_parameters.network_index);
+
 #ifdef    WITH_DIRECT_CONNECT
   if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
     // Register our Direct Connect custom callback function with the event manager (aka 'em')
@@ -1200,10 +1206,6 @@ void app_task(void *args)
   }
 #endif /* WITH_DIRECT_CONNECT */
 
-  // Reset the time to when we call app_join_network()
-  join_call_time_sec = app_timestamp_reset();
-  // connect to the wisun network
-  join_res = app_join_network(app_parameters.network_index);
 
 #ifdef TRACK_HEAP_PER_THREAD
   sl_memory_manager_print_per_thread_alloc_free(0x00);
@@ -1508,7 +1510,7 @@ void app_do_your_things() {
 
 #ifdef    APP_TRACK_HEAP
   // Refresh heap info once then disable the refresh
-  if (refresh_heap) {
+  if ((refresh_heap) && (connected_delay_sec % APP_TRACK_HEAP_PERIOD_S != 1)) {
     sl_memory_get_heap_info(&app_heap_info);
   #ifdef    APP_TRACK_HEAP_DIFF
     if (app_previous_heap_free == 0) { app_previous_heap_free = app_heap_info.free_size; }
@@ -1526,7 +1528,7 @@ void app_do_your_things() {
     refresh_heap = false;
   }
   // Enable heap info refresh for next time
-  if (connected_delay_sec % 5 == 1) { refresh_heap = true; }
+  if (connected_delay_sec % APP_TRACK_HEAP_PERIOD_S == 1) { refresh_heap = true; }
 #endif /* APP_TRACK_HEAP */
 
 #ifdef    SL_CATALOG_SIMPLE_BUTTON_PRESENT
