@@ -10,7 +10,7 @@ This paragraph describes required steps to enable low_power EM2, given that some
 
 Use the Wi-SUN Configurator to set the device type to 'LFN' and set the 'Device Profile'
 
-![Device_Type_LFN](image\lfn_configuration__device_type__LFN__lfn_profile.png)
+![Device_Type_LFN](image/lfn_configuration__device_type__LFN__lfn_profile.png)
 
 ### Guarding against incorrect low-power settings
 
