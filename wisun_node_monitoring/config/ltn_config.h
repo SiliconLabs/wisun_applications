@@ -58,7 +58,7 @@
 #endif /* APP_VERSION_STRING */
 
 #ifndef   NVM3_APP_PARAMS_VERSION
-  #define NVM3_APP_PARAMS_VERSION   10011
+  #define NVM3_APP_PARAMS_VERSION   10013
 #endif /* NVM3_APP_PARAMS_VERSION */
 
 #ifndef   MAX_NETWORK_CONFIGS
@@ -98,6 +98,10 @@
 #ifndef   SPECIAL_CONNECT_PARAMs
   #define SPECIAL_CONNECT_PARAMs          {                            0,                                 0,                                     0,                                       0 }
 #endif /* SPECIAL_CONNECT_PARAMs */
+
+#ifndef   FIRST_BREATHs
+  #define FIRST_BREATHs                   {                            0,                                 0,                                      0,                                       0 }
+#endif /* FIRST_BREATHs */
 
 #ifndef   NETWORK_SIZEs
   #define NETWORK_SIZEs                   {   SL_WISUN_NETWORK_SIZE_LARGE,      SL_WISUN_NETWORK_SIZE_MEDIUM,           SL_WISUN_NETWORK_SIZE_SMALL ,           SL_WISUN_NETWORK_SIZE_SMALL }
@@ -163,58 +167,41 @@
   #define COAP_NOTIFICATION_DESTINATIONs  {           "fd00:6172:6d00::2",               "fd00:6172:6d00::2",     "2001:db8:0:2:d47:e4c8:60ad:b4ab" ,                    "fd00:6172:6d00::2"}
 #endif /* COAP_NOTIFICATION_DESTINATIONs */
 
+#ifndef  JOIN_NODE_COUNTs
+  #define JOIN_NODE_COUNTs                {                             0,                                 0,                                      0}
+#endif  /* JOIN_NODE_COUNTs */
+
 #ifndef SL_WISUN_PARAMS_PROFILE_SPECIAL
 /// Special Profile for network
-static const sl_wisun_connection_params_t sl_wisun_params_profile_special = {
-  .version = SL_WISUN_PARAMS_API_VERSION,
-  .discovery = {
-    .trickle_pa = {
-      .imin_s = 15,
-      .imax_s = 60,
-      .k = 1
-    },
-    .trickle_pas = {
-      .imin_s = 15,
-      .imax_s = 60,
-      .k = 1
-    },
-    .eapol_target_min_sens = DBM_TO_RSL_RANGE(-60),
-    .allow_skip = true
+static const sl_wisun_ffn_advanced_parameters_t sl_wisun_params_profile_special = {
+  .version = SL_WISUN_FFN_ADVANCED_PARAMS_API_VERSION,
+  .trickle_pa = {
+    .imin_s = 10,
+    .imax_s = 60,
+    .k = 1
   },
-  .configuration = {
-    .trickle_pc = {
-      .imin_s = 15,
-      .imax_s = 60,
-      .k = 1
-    },
-    .trickle_pcs = {
-      .imin_s = 15,
-      .imax_s = 60,
-      .k = 1
-    }
+  .trickle_pas = {
+    .imin_s = 10,
+    .imax_s = 60,
+    .k = 1
   },
-  .eapol = {
-    .sec_prot_trickle = {
-      .imin_s = 0,
-      .imax_s = 0,
-      .k = 0,
-    },
-    .pmk_lifetime_m = 0,
-    .ptk_lifetime_m = 0,
-    .sec_prot_retry_timeout_s = 0,
-    .initial_key_min_s = 0,
-    .initial_key_max_s = 60,
-    .initial_key_retry_min_s = 60,
-    .initial_key_retry_max_s = 0,
-    .initial_key_retry_max_limit_s = 180,
-    .temp_min_timeout_s = 0,
-    .gtk_request_imin_m = 0,
-    .gtk_request_imax_m = 0,
-    .gtk_max_mismatch_m = 64,
-    .lgtk_max_mismatch_m = 60,
-    .sec_prot_trickle_expirations = 0,
-    .initial_key_retry_limit = 3,
-    .allow_skip = true
+  .trickle_pc = {
+    .imin_s = 10,
+    .imax_s = 60,
+    .k = 1
+  },
+  .trickle_pcs = {
+    .imin_s = 10,
+    .imax_s = 60,
+    .k = 1
+  },
+  .key_request_txalg = {
+    .rand = 0.1,
+    .max_delay_s = 60,
+    .irt_s = 60,
+    .mrt_s = 180,
+    .mrd_s = 0,
+    .mrc = 3
   },
   .rpl = {
     .dao_txalg = {
@@ -225,71 +212,16 @@ static const sl_wisun_connection_params_t sl_wisun_params_profile_special = {
       .mrd_s = 0,
       .mrc = 3,
     },
-    .dis_max_delay_first_s = 2,
-    .dis_max_delay_s = 300,
-    .init_parent_selection_s = 10,
-    .etx_probe_period_max_s = 30,
-    .address_registration_lifetime_s = 2220,
-    .etx_samples_init = 1,
-    .etx_samples_refresh = 4,
-    .candidate_parents_max = 5,
-    .parents_max = 2,
+    .first_dis_max_delay_s = 2,
+    .etx_probe_max_delay_s = 15
   },
-  .mpl = {
-    .trickle = {
-      .imin_s = 1,
-      .imax_s = 10,
-      .k = 8,
-    },
-    .seed_set_entry_lifetime_s = 180,
-    .trickle_expirations = 2,
-    .seed_id_type = 0,
-  },
-  .dhcp = {
-    .sol_txalg = {
-      .rand = 0.1f,
-      .max_delay_s = 10,
-      .irt_s = 10,
-      .mrt_s = HOUR_TO_SEC(1),
-      .mrd_s = 0,
-      .mrc = 3,
-    },
-  },
-  .lfn_parent = {
-    .lfn_pan_timeout_m = 0,
-    .lfn_lpc_retry_count = 5,
-    .lfn_na_wait_duration_m = 0,
-  },
-  .misc = {
-    .temp_link_min_timeout_s = 260,
-    .pan_timeout_m = 30,
-  },
-  .direct_connect_eapol = {
-    .pmk_lifetime_m = 0,
-    .ptk_lifetime_m = 0,
-    .sec_prot_retry_timeout_s = 0,
-    .initial_key_min_s = 0,
-    .initial_key_max_s = 3,
-    .initial_key_retry_min_s = 10,
-    .initial_key_retry_max_s = 0,
-    .initial_key_retry_max_limit_s = 30,
-    .gtk_request_imin_m = 0,
-    .gtk_request_imax_m = 0,
-    .gtk_max_mismatch_m = 64,
-    .initial_key_retry_limit = 3,
-    .allow_skip = false
-  },
-  .traffic = {
-    .lowpan_mtu = 1576,
-    .ipv6_mru = 1504,
-    .max_edfe_fragment_count = 5,
-  },
-  .mac = {
-    .backoff_period_us = 0, // calculate from PHY by default
-    .min_be = 3,
-    .max_be = 5,
-    .max_cca_retries = 8,
-    .max_frame_retries = 7,
+  .dhcp_solicit_txalg = {
+    .rand = 0.1f,
+    .max_delay_s = 10,
+    .irt_s = 10,
+    .mrt_s = HOUR_TO_SEC(1),
+    .mrd_s = 0,
+    .mrc = 3,
   }
 };
 #define SL_WISUN_PARAMS_PROFILE_SPECIAL sl_wisun_params_profile_special

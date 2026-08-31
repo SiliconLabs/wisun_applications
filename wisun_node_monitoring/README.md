@@ -30,7 +30,7 @@ The block diagram of this application is shown in the image below:
 
 ## Simplicity SDK Version ##
 
-SiSDK v2025.12.0 or earlier.
+SiSDK v2026.6.0 or earlier.
 
 ## Hardware Required ##
 
@@ -67,7 +67,7 @@ A single example application is required in order to use this demonstration: **W
 
 To test this application, you can
 
-- [Add the 'Wi-SUN Applications' Repository to Simplicity Studio 5](../README.md#add-the-wi-sun-applications-repository-to-simplicity-studio-5)
+- [Add the 'Wi-SUN Applications' Repository to Simplicity Studio 6](../README.md#add-the-wi-sun-applications-repository-to-simplicity-studio-6)
 - Create the Wi-SUN Applications 'Wi-SUN Node Monitoring' Project as described [here](../README.md#create-the-wi-sun-applications-example-projects)
 
 ## Communication methods ##
@@ -239,7 +239,8 @@ The URIs are
 |status/connected                 | time since last connection                  | 'ddd-hh:mm:ss' ||
 |status/all                       | all of the 'status' group above             | json           ||
 |status/send                      | Trigger an immediate Tx of status_json_string() | json           | Same message as sent to UDP server|
-|statistic/app/join_states_sec    | array of seconds spent to reach each join state (1 to 5) | 'ddd-hh:mm:ss' ||
+|statistic/app/join_states_sec    | array of cumulative seconds spent in each join state (1 to 5) across all visits | array of `%llu` ||
+|statistic/app/join_states_4x_sec | array of cumulative seconds spent in each join state 4 sub-state (4.1 = parent select, 4.2 = DHCP, 4.3 = address registration, 4.4 = DAO) | array of `%llu` ||
 |statistic/app/disconnected_total |  | 'ddd-hh:mm:ss' ||
 |statistic/app/connections        |  | '%d'           ||
 |statistic/app/connected_total    |  | 'ddd-hh:mm:ss' ||
@@ -257,6 +258,9 @@ The URIs are
 |reporter/crash                   | Info on any previous crash, using `sl_wisun_crash_handler.c/.h` | '%s' | text info on crash (from `sl_wisun_crash_handler.h/sl_wisun_crash_type`) |
 |reporter/start                   | Start RTT trace filtering on \<str\> and report on `REPORTER_PORT`, using `app_reporter.c/.h`  | '%s'| '-e \<string_1\|string_2\|...\|string_n\>' sets the list of strings to look for in RTT traces. |
 |reporter/stop                    | Stop RTT trace reporting |||
+|test/reconnect                   | Disconnect after `x` ms, wait `y` ms, then rejoin through `app_join_network()` | text | `-e "x y"` in ms; empty payload uses `0 0` |
+|test/clear_and_reconnect         | Disconnect after `x` ms, clear credential cache, wait `y` ms, then rejoin through `app_join_network()` | text | `-e "x y"` in ms; empty payload uses `0 0` |
+|test/reboot                      | Start after `x` ms, block normal app activity for `y` ms, then reboot | text | `-e "x y"` in ms; does not disconnect before the blackout |
 
 ### CoAP request examples ###
 

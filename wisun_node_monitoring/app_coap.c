@@ -13,12 +13,17 @@
 * "/info/application"                   Application 'info'
 * "/info/all"                           All 'info'
 * "/status/running"                     How much time the application has been running
+* "/time/run_time"                      How much time the application has been running
+* "/time/saved_time"                    Running time saved when EMERGENCY propagation callback was triggered
 * "/status/parent"                      Tag made of last 2 bytes of parent's MAC address
 * "/status/neighbor"                    Neighbor info (per index required by '-e <payload>')
 * "/status/connected"                   How much time the device has been connected for the current connection
 * "/status/all"                         All 'status'
 * "/status/send"                        Trigger a Tx of _status_json_string (ASAP)
-* "/statistics/app/join_state_secs"     How much seconds to jump to each join state
+* "/statistics/app/join_states_sec"      Cumulative seconds spent in each join state (1 to 5)
+* "/statistics/app/join_states_4x_sec"   Cumulative seconds spent in each join state 4 sub-state (4.1 to 4.4)
+* "/statistics/app/join_states_count"    Number of times each join state (1 to 5) was entered
+* "/statistics/app/join_states_4x_count" Number of times each join state 4 sub-state (4.1 to 4.4) was entered
 * "/statistics/app/disconnected_total"  How much time the device has been disconnected since the first connection
 * "/statistics/app/connections"         How many times the device connected
 * "/statistics/app/connected_total"     How much time the device has been connected since the first connection
@@ -36,6 +41,9 @@
 * "/reporter/crash"                     Report info on previous crash (if any)
 * "/reporter/start"                     Start filtering RTT traces for selected strings and reporting then to REPORTER_PORT
 * "/reporter/stop"                      Stop filtering RTT traces
+* "/test/reconnect"                     Disconnect after x ms, wait y ms, then rejoin
+* "/test/clear_and_reconnect"           Clear credential cache and reconnect with x/y timing
+* "/test/reboot"                        After x ms, block application activity for y ms, then reboot
 *
 *******************************************************************************
 * # License
@@ -74,17 +82,17 @@
 // -----------------------------------------------------------------------------
 //                                   Includes
 // -----------------------------------------------------------------------------
+#include <stdint.h>
 #include <string.h>
+#include "cmsis_nvic_virtual.h"
 #include "sl_string.h"
 #include "sl_memory_manager.h"
+#include "sl_sleeptimer.h"
 
 #include "sl_wisun_api.h"
 #include "sl_wisun_types.h"
-#include "sl_wisun_config.h"
 #include "sl_wisun_trace_util.h"
 #include "sl_wisun_app_core.h"
-#include "sl_wisun_version.h"
-#include "sl_wisun_app_core_util.h"
 
 #include "app.h"
 #include "app_parameters.h"
@@ -106,6 +114,7 @@
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
+#define COAP_TEST_DISCONNECT_WAIT_MS         5000U
 
 // -----------------------------------------------------------------------------
 //                          Variables
@@ -120,33 +129,140 @@ sl_wisun_statistics_t statistics;
 // -----------------------------------------------------------------------------
 //                          Static Function Declarations
 // -----------------------------------------------------------------------------
+static bool coap_parse_two_uint32_args(const sl_wisun_coap_packet_t *const req_packet,
+                                       uint32_t *first_ms,
+                                       uint32_t *second_ms);
+static void coap_disconnect_and_wait(void);
+static uint32_t app_scheduler_join_cb(void *context);
 static uint32_t app_scheduler_reconnect_cb(void *context);
 static uint32_t app_scheduler_clear_and_reconnect_cb(void *context);
+static uint32_t app_scheduler_reboot_cb(void *context);
+
+static bool coap_parse_two_uint32_args(const sl_wisun_coap_packet_t *const req_packet,
+                                       uint32_t *first_ms,
+                                       uint32_t *second_ms)
+{
+  char *payload_str = NULL;
+  unsigned long first;
+  unsigned long second;
+  char extra;
+  int res;
+
+  if ((first_ms == NULL) || (second_ms == NULL)) {
+    return false;
+  }
+
+  *first_ms = 0U;
+  *second_ms = 0U;
+
+  if (req_packet->payload_len == 0U) {
+    return true;
+  }
+
+  payload_str = sl_wisun_coap_get_payload_str(req_packet);
+  if (payload_str == NULL) {
+    return false;
+  }
+
+  res = sscanf(payload_str, " %lu %lu %c", &first, &second, &extra);
+  sl_free(payload_str);
+
+  if ((res != 2) || (first > UINT32_MAX) || (second > UINT32_MAX)) {
+    return false;
+  }
+
+  *first_ms = (uint32_t)first;
+  *second_ms = (uint32_t)second;
+  return true;
+}
+
+static void coap_disconnect_and_wait(void)
+{
+  sl_wisun_join_state_t join_state;
+
+  if (sl_wisun_get_join_state(&join_state) != SL_STATUS_OK) {
+    join_state = SL_WISUN_JOIN_STATE_OPERATIONAL;
+  }
+
+  if (join_state != SL_WISUN_JOIN_STATE_DISCONNECTED) {
+    sl_wisun_disconnect();
+    sl_wisun_app_core_wait_state(SL_WISUN_MSG_DISCONNECTED_IND_ID,
+                                 COAP_TEST_DISCONNECT_WAIT_MS);
+  }
+}
+
+static uint32_t app_scheduler_join_cb(void *context)
+{
+  uint8_t network_index = (uint8_t)(uintptr_t)context;
+
+  printfBothTime("scheduler: rejoin network[%u]\n", network_index);
+  return (uint32_t)app_join_network(network_index);
+}
 
 static uint32_t app_scheduler_reconnect_cb(void *context)
 {
-  (void)context;
-  printfBothTime("scheduler: disconnect + reconnect\n");
-  sl_wisun_disconnect();
-  sl_wisun_app_core_wait_state(SL_WISUN_MSG_DISCONNECTED_IND_ID, 5000);
-  sl_wisun_app_core_util_connect_and_wait();
+  uint32_t wait_before_join_ms = (uint32_t)(uintptr_t)context;
+  uint8_t network_index = app_parameters.network_index;
+
+  printfBothTime("scheduler: disconnect, schedule rejoin in %lu ms\n",
+                 (unsigned long)wait_before_join_ms);
+  coap_disconnect_and_wait();
+
+  if (!app_scheduler_action_schedule(app_scheduler_join_cb,
+                                     wait_before_join_ms,
+                                     0U,
+                                     (void *)(uintptr_t)network_index)) {
+    return 1U;
+  }
+
   return 0U;
 }
 
 static uint32_t app_scheduler_clear_and_reconnect_cb(void *context)
 {
   sl_status_t status;
+  uint32_t wait_before_join_ms = (uint32_t)(uintptr_t)context;
+  uint8_t network_index = app_parameters.network_index;
 
-  (void)context;
-  printfBothTime("scheduler: clear credential cache + reconnect\n");
-  sl_wisun_disconnect();
-  sl_wisun_app_core_wait_state(SL_WISUN_MSG_DISCONNECTED_IND_ID, 5000);
+  printfBothTime("scheduler: disconnect, clear credential cache, schedule rejoin in %lu ms\n",
+                 (unsigned long)wait_before_join_ms);
+  coap_disconnect_and_wait();
   status = sl_wisun_clear_credential_cache();
   if (status != SL_STATUS_OK) {
     return (uint32_t)status;
   }
-  sl_wisun_app_core_util_connect_and_wait();
+
+  if (!app_scheduler_action_schedule(app_scheduler_join_cb,
+                                     wait_before_join_ms,
+                                     0U,
+                                     (void *)(uintptr_t)network_index)) {
+    return 1U;
+  }
+
   return 0U;
+}
+
+static uint32_t app_scheduler_reboot_cb(void *context)
+{
+  uint32_t blackout_ms = (uint32_t)(uintptr_t)context;
+  CORE_DECLARE_IRQ_STATE;
+
+  printfBothTime("scheduler: reboot blackout critical section, reset in %lu ms\n",
+                 (unsigned long)blackout_ms);
+
+  //Enter critical section and wait blackout_ms then Reset
+  CORE_ENTER_CRITICAL();
+  uint32_t timer_frequency = sl_sleeptimer_get_timer_frequency();
+  uint64_t delay_ticks = (((uint64_t)blackout_ms * timer_frequency) + 999ULL) / 1000ULL;
+  uint64_t start_ticks = sl_sleeptimer_get_tick_count64();
+
+  while ((sl_sleeptimer_get_tick_count64() - start_ticks) < delay_ticks) {
+  }
+  NVIC_SystemReset();
+  //Useless but avoid warning
+  CORE_EXIT_CRITICAL();
+
+  return 0;
 }
 
 
@@ -167,6 +283,9 @@ void  print_coap_help (char* device_global_ipv6_string, char* border_router_ipv6
   printf("  '/status/neighbor -e <n>'     returns the neighbor information for neighbor at index n\n");
   printf("  '/statistics/stack/<group> -e reset' clears the Stack statistics for the selected group\n");
   printf("  '/statistics/app/all       -e reset' clears all statistics\n");
+  printf("  '/test/reconnect -e \"<x> <y>\"' disconnects after x ms, waits y ms, then rejoins\n");
+  printf("  '/test/clear_and_reconnect -e \"<x> <y>\"' clears credentials and reconnects with x/y ms timing\n");
+  printf("  '/test/reboot -e \"<x> <y>\"' starts in x ms, blocks app activity for y ms, then reboots\n");
   printf("\n");
 }
 
@@ -186,6 +305,40 @@ sl_wisun_coap_packet_t * app_coap_reply(char *response_string,
   resp_packet->payload_len    = (uint16_t)sl_strnlen(response_string, COAP_MAX_RESPONSE_LEN);
 
   return resp_packet;
+}
+
+static sl_wisun_coap_packet_t * coap_schedule_test_action(
+      const sl_wisun_coap_packet_t *const req_packet,
+      const char *action_name,
+      app_scheduler_action_fn_t action_fn)
+{
+  uint32_t start_delay_ms;
+  uint32_t quiet_ms;
+
+  if (!coap_parse_two_uint32_args(req_packet, &start_delay_ms, &quiet_ms)) {
+    snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
+             "Bad format: use -e \"<start_delay_ms> <quiet_ms>\"");
+    return app_coap_reply(coap_response, req_packet);
+  }
+
+  if (app_scheduler_action_schedule(action_fn,
+                                    start_delay_ms,
+                                    0U,
+                                    (void *)(uintptr_t)quiet_ms)) {
+    uint32_t remaining;
+    app_scheduler_action_get_remaining(action_fn, &remaining);
+    snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
+             "%s scheduled in %lu ms, quiet for %lu ms (remaining=%lu ms)",
+             action_name,
+             (unsigned long)start_delay_ms,
+             (unsigned long)quiet_ms,
+             (unsigned long)remaining);
+  } else {
+    snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
+             "Failed to schedule %s", action_name);
+  }
+
+  return app_coap_reply(coap_response, req_packet);
 }
 
 // CoAP Callback functions definition (one callback function per URI)
@@ -290,57 +443,29 @@ sl_wisun_coap_packet_t * coap_callback_device_type (
 
 sl_wisun_coap_packet_t * coap_callback_application (
       const  sl_wisun_coap_packet_t *const req_packet)  {
-#define MAX_APPLI_NAME 40
-  int res = 0;
-  char cmd[MAX_APPLI_NAME];
-  char* payload_str = NULL;
-
-  memset(cmd, 0, MAX_APPLI_NAME);
-  if (req_packet->payload_len) {
-    // Get payload in string format with last char = '\0'
-    payload_str = sl_wisun_coap_get_payload_str(req_packet);
-    if (payload_str != NULL){
-        res = sscanf((char *)payload_str, "%39s", cmd);
-        sl_free(payload_str);
-    }
-
-    if (res) {
-      if (strcmp(cmd, "clear_and_reconnect") == 0) {
-        if (app_scheduler_action_schedule(app_scheduler_clear_and_reconnect_cb,
-                                          0U,
-                                          0U,
-                                          NULL)) {
-          snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
-                  "clear_and_reconnect scheduled");
-        } else {
-          snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
-                  "Failed to schedule clear_and_reconnect");
-        }
-        return app_coap_reply(coap_response, req_packet);
-      }
-
-      if (strcmp(cmd, "reconnect") == 0) {
-        if (app_scheduler_action_schedule(app_scheduler_reconnect_cb,
-                                          0U,
-                                          0U,
-                                          NULL)) {
-          snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
-                  "reconnect scheduled");
-        } else {
-          snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
-                  "Failed to schedule reconnect");
-        }
-        return app_coap_reply(coap_response, req_packet);
-      }
-      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Unknown '%s' command", cmd);
-    }
-    else{
-      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Bad format command '%s", cmd);
-    }
-  } else {
-    snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", application);
-  }
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", application);
   return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_test_reconnect (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  return coap_schedule_test_action(req_packet,
+                                   "reconnect",
+                                   app_scheduler_reconnect_cb);
+}
+
+sl_wisun_coap_packet_t * coap_callback_test_clear_and_reconnect (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  return coap_schedule_test_action(req_packet,
+                                   "clear_and_reconnect",
+                                   app_scheduler_clear_and_reconnect_cb);
+}
+
+sl_wisun_coap_packet_t * coap_callback_test_reboot (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  return coap_schedule_test_action(req_packet,
+                                   "reboot",
+                                   app_scheduler_reboot_cb);
+}
 
 sl_wisun_coap_packet_t * coap_callback_version (
       const  sl_wisun_coap_packet_t *const req_packet)  {
@@ -352,10 +477,20 @@ sl_wisun_coap_packet_t * coap_callback_running (
   snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", dhms(now_sec()));
   return app_coap_reply(coap_response, req_packet); }
 
+sl_wisun_coap_packet_t * coap_callback_time_run_time (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", dhms(now_sec()));
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_time_saved_time (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", emergency_saved_running_time);
+  return app_coap_reply(coap_response, req_packet); }
+
 sl_wisun_coap_packet_t * coap_callback_parent (
       const  sl_wisun_coap_packet_t *const req_packet)  {
   refresh_parent_tag();
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", parent_tag);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "PRIMARY : %s, SECONDARY : %s", parent_tag, secondary_tag);
 return app_coap_reply(coap_response, req_packet); }
 
 sl_wisun_coap_packet_t * coap_callback_neighbor (
@@ -401,6 +536,41 @@ sl_wisun_coap_packet_t * coap_callback_join_states_sec (
           app_join_state_delay_sec[3],
           app_join_state_delay_sec[4],
           app_join_state_delay_sec[5]
+  );
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_join_states_4x_sec (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  // Cumulative seconds spent in each join state 4 sub-state:
+  // [4.1 = parent select, 4.2 = DHCP, 4.3 = address registration, 4.4 = DAO].
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "[%llu,%llu,%llu,%llu]",
+          app_join_state_4x_delay_sec[1],
+          app_join_state_4x_delay_sec[2],
+          app_join_state_4x_delay_sec[3],
+          app_join_state_4x_delay_sec[4]
+  );
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_join_states_count (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  // Number of times each main join state (1..5) was entered.
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "[%u,%u,%u,%u,%u]",
+          app_join_state_count[1],
+          app_join_state_count[2],
+          app_join_state_count[3],
+          app_join_state_count[4],
+          app_join_state_count[5]
+  );
+  return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_join_states_4x_count (
+      const  sl_wisun_coap_packet_t *const req_packet)  {
+  // Number of times each join state 4 sub-state (4.1..4.4) was entered.
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "[%u,%u,%u,%u]",
+          app_join_state_4x_count[1],
+          app_join_state_4x_count[2],
+          app_join_state_4x_count[3],
+          app_join_state_4x_count[4]
   );
   return app_coap_reply(coap_response, req_packet); }
 
@@ -474,6 +644,9 @@ sl_wisun_coap_packet_t * coap_callback_all_app_statistics (
   #define JSON_ALL_STATISTICS_FORMAT_STR  \
     "{\n"                                 \
     "  \"join_states_sec\":[%llu,%llu,%llu,%llu,%llu],\n" \
+    "  \"join_states_4x_sec\":[%llu,%llu,%llu,%llu],\n" \
+    "  \"join_states_count\":[%u,%u,%u,%u,%u],\n" \
+    "  \"join_states_4x_count\":[%u,%u,%u,%u],\n" \
     "  \"connections\": \"%d\",\n"         \
     "  \"network_connections\": \"%d\",\n" \
     "  \"connected_total\": \"%s\",\n"     \
@@ -495,6 +668,19 @@ sl_wisun_coap_packet_t * coap_callback_all_app_statistics (
             app_join_state_delay_sec[3],
             app_join_state_delay_sec[4],
             app_join_state_delay_sec[5],
+            app_join_state_4x_delay_sec[1],
+            app_join_state_4x_delay_sec[2],
+            app_join_state_4x_delay_sec[3],
+            app_join_state_4x_delay_sec[4],
+            app_join_state_count[1],
+            app_join_state_count[2],
+            app_join_state_count[3],
+            app_join_state_count[4],
+            app_join_state_count[5],
+            app_join_state_4x_count[1],
+            app_join_state_4x_count[2],
+            app_join_state_4x_count[3],
+            app_join_state_4x_count[4],
             connection_count,
             network_connection_count,
             connected_total_str,
@@ -1074,6 +1260,22 @@ uint8_t app_coap_resources_init() {
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
 
+  coap_resource.data.uri_path = "/time/run_time";
+  coap_resource.data.resource_type = "dhms";
+  coap_resource.data.interface = "time";
+  coap_resource.auto_response = coap_callback_time_run_time;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/time/saved_time";
+  coap_resource.data.resource_type = "dhms";
+  coap_resource.data.interface = "time";
+  coap_resource.auto_response = coap_callback_time_saved_time;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
   coap_resource.data.uri_path = "/status/parent";
   coap_resource.data.resource_type = "tag";
   coap_resource.data.interface = "node";
@@ -1103,6 +1305,30 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "array";
   coap_resource.data.interface = "node";
   coap_resource.auto_response = coap_callback_join_states_sec;
+  coap_resource.discoverable = false;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/statistics/app/join_states_4x_sec";
+  coap_resource.data.resource_type = "array";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_join_states_4x_sec;
+  coap_resource.discoverable = false;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/statistics/app/join_states_count";
+  coap_resource.data.resource_type = "array";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_join_states_count;
+  coap_resource.discoverable = false;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/statistics/app/join_states_4x_count";
+  coap_resource.data.resource_type = "array";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_join_states_4x_count;
   coap_resource.discoverable = false;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
@@ -1273,6 +1499,29 @@ uint8_t app_coap_resources_init() {
   count++;
 #endif /* __APP_REPORTER_H__ */
 
+  coap_resource.data.uri_path = "/test/reconnect";
+  coap_resource.data.resource_type = "text";
+  coap_resource.data.interface = "test";
+  coap_resource.auto_response = coap_callback_test_reconnect;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/test/clear_and_reconnect";
+  coap_resource.data.resource_type = "text";
+  coap_resource.data.interface = "test";
+  coap_resource.auto_response = coap_callback_test_clear_and_reconnect;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/test/reboot";
+  coap_resource.data.resource_type = "text";
+  coap_resource.data.interface = "test";
+  coap_resource.auto_response = coap_callback_test_reboot;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
 
 #ifdef    APP_WISUN_MULTICAST_OTA_H
 #ifdef    SL_CATALOG_WISUN_OTA_DFU_PRESENT

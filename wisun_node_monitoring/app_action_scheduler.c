@@ -37,7 +37,7 @@
 //                                   Includes
 // -----------------------------------------------------------------------------
 
-
+#include <stdio.h>
 #include "app_action_scheduler.h"
 
 #include <string.h>
@@ -45,7 +45,6 @@
 #include "sl_sleeptimer.h"
 #include "cmsis_os2.h"
 #include "em_core.h"
-#include "printf.h"
 
 // -----------------------------------------------------------------------------
 // Local state

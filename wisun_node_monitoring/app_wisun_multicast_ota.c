@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdio.h>
 
 #if __has_include("sl_wisun_ota_dfu.h")
   #include "sl_wisun_ota_dfu.h"
@@ -23,7 +24,6 @@ uint32_t udp_received_count;
 #include "btl_interface.h"
 #include "nvm3.h"
 #include "nvm3_default.h"
-#include "printf.h"
 
 #if __has_include("app_parameters.h")
   #include "app_parameters.h"

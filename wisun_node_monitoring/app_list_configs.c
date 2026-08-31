@@ -36,15 +36,18 @@
 
 void list_rf_configs (void) {
   uint8_t n;
+  app_wisun_phy_list_t *phy_list;
   app_wisun_phy_list_t *phy;
 
   n = 0;
-  phy = app_wisun_get_phy_list(NULL);
+  phy_list = app_wisun_get_phy_list(NULL);
+  phy = phy_list;
 
   while (phy != NULL) {
-    printf("phy[%d]:  '%s'\n", n, app_wisun_phy_to_str(&phy->phy_cfg));
+    printf("phy[%d]:  '%s'\n", n, phy->name);
     n++;
     phy = phy->next;
   }
+  app_wisun_destroy_phy_list(phy_list);
 }
 

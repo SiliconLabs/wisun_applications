@@ -38,9 +38,36 @@
 // -----------------------------------------------------------------------------
 //                                   Includes
 // -----------------------------------------------------------------------------
-#include "app.h"
+#include <stdbool.h>
+#include <stdint.h>
 
-#ifdef WITH_UDP_SERVER
+#include "socket/socket.h"
+
+// -----------------------------------------------------------------------------
+//                              Macros and Typedefs
+// -----------------------------------------------------------------------------
+
+#ifndef APP_UDP_SERVER_PORT_DEFAULT
+#define APP_UDP_SERVER_PORT_DEFAULT      7777U
+#endif
+
+#ifndef APP_UDP_SERVER_MAX_SOCKETS
+#define APP_UDP_SERVER_MAX_SOCKETS       4U
+#endif
+
+#ifndef APP_UDP_SERVER_MAX_CALLBACKS
+#define APP_UDP_SERVER_MAX_CALLBACKS     8U
+#endif
+
+#ifndef APP_UDP_SERVER_PREFIX_MAX_LEN
+#define APP_UDP_SERVER_PREFIX_MAX_LEN    16U
+#endif
+
+typedef bool (*app_udp_server_rx_callback_t)(int32_t sockid,
+                                             const uint8_t *payload,
+                                             uint16_t payload_len,
+                                             const sockaddr_in6_t *src_addr,
+                                             const sockaddr_in6_t *dst_addr);
 
 // -----------------------------------------------------------------------------
 //                          Public Function Declarations
@@ -52,6 +79,9 @@ void init_udp_server(void);
 /* UDP Server reception function, to be called from time to time */
 void check_udp_server_messages(void);
 
-#endif /* WITH_UDP_SERVER */
+int32_t app_udp_server_register(uint16_t port,
+                                const uint8_t *prefix,
+                                uint16_t prefix_len,
+                                app_udp_server_rx_callback_t callback);
 
 #endif /* APP_UDP_SERVER_H */

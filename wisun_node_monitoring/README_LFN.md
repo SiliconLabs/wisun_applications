@@ -18,3 +18,7 @@ To make sure all settings are correct, [lfn_checks.h](lfn_checks.h) is added to 
 This file can also be added to any LFN project, in order to make sure all settings are correct even for projects not based on the Wi-SUN Node Monitoring Application.
 
 - For each message, go the the corresponding line in [lfn_checks.h](lfn_checks.h) and use 'Go to definition' to go directly to the settings, and correct the value.
+
+## Power consumption optimisation
+
+For demonstration and debugging purposes, UART logging is enabled by default and outputs on VCOM. To achieve the lowest power consumption, you can disable it by uninstalling the **Tiny printf** component. This will save approximately 2.8 µA in EM2.

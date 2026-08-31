@@ -6,7 +6,9 @@ It showcases **Wi-SUN OTA multicast** using
 
 - [multicast_ota.py](linux_border_router_wsbrd/multicast_ota.py), a Python script running on the Linux host to send a selected FW file by chunks of 1024 bytes (matching the External SPI Flash page size), one chunk every n seconds
 - [app_wisun_multicast_ota.c](app_wisun_multicast_ota.c) the code to be added to the application to receive/store the chunks in external SPI Flash
-- [app_wisun_multicast_ota.h](linux_border_router_wsbrd/app_wisun_multicast_ota.h) the matching header file
+- [app_wisun_multicast_ota.h](app_wisun_multicast_ota.h) the matching header file
+
+Before sending multicast traffic from the Linux Border Router host, run [multicast_setup.sh](linux_border_router_wsbrd/multicast_setup.sh) so multicast packets are routed on the Wi-SUN `tun0` interface.
 
 ---
 
@@ -84,7 +86,7 @@ python multicast_ota.py ff03::01  7777        xG25_12_4_lzma.gbl  BRD4271A  45  
 
 (when `<chunk_index>` == `0`, all chunks are transmitted, otherwise only the chunk specified will be sent)
 
-- [multicast_ota.py](linux_border_router_wsbrd/multicast_ota.py) reads the `gbl` file (by default from the [/srv/tftp/](linux_border_router_wsbrd/multicast_ota.py#L162) folder).
+- [multicast_ota.py](linux_border_router_wsbrd/multicast_ota.py) reads the `gbl` file (by default from the `/srv/tftp/` folder).
   - Each 1024 bytes chunk is sent to `ff03::01` on UDP port `7777` for multicast OTA to all 'realm_local_nodes', i.e. all nodes (FFN + LFN) in the Wi-SUN network.
     >Use `ff03::02` for 'realm_local_routers', i.e. all FFN nodes in the Wi-SUN network.
   - A unicast IPv6 address can also be used to update a single device.
@@ -92,7 +94,7 @@ python multicast_ota.py ff03::01  7777        xG25_12_4_lzma.gbl  BRD4271A  45  
       - Testing on a single device before going for a network-wise multicast update.
       - Sending missing chunks to a single device to complete file transfer
   - Each chunk is transmitted with a header containing `OTA {gbl_filename} {chunk_index} {chunk_data_offset} {tx_timestamp} {tag}`, where:
-    - `OTA` is a fixed string used to route received UDP packets to [multicast_rx()](app_wisun_multicast_ota.c#L431) from the UDP server.
+    - `OTA` is a fixed string used to route received UDP packets to [multicast_rx()](app_wisun_multicast_ota.c) from the UDP server.
     - `gbl_filename` is the filename as set by `/ota/dfu -e gbl <gbl_filename>`
       - Setting this individually allows selecting which application will run on which device
     - `chunk_index` is the number of the chunk. It is used to:
@@ -110,15 +112,10 @@ python multicast_ota.py ff03::01  7777        xG25_12_4_lzma.gbl  BRD4271A  45  
 
 On the device side:
 
-- In [app_udp_server.c/_udp_handle_rx_payload()](app_udp_server.c#L213), a UDP message received with `OTA ` as the first 4 bytes is sent to [multicast_rx()](app_wisun_multicast_ota.c#L431),
-- In [`multicast_rx()`](app_wisun_multicast_ota.c#L431), the received message is
-  - Parsed and checked to make sure it contains
-    - ['OTA' on line 469](app_wisun_multicast_ota.c#L469)
-    - A matching ['gbl_file' on line 475](app_wisun_multicast_ota.c#L475)
-    - A matching ['tag_str' on line 477](app_wisun_multicast_ota.c#L477)
-    - if one of these is not matching, the chunk is not taken into account
-  - If ok, the `chunk_index` is [checked to make sure it's not a duplicate on line 493](app_wisun_multicast_ota.c#L493) (which can easily happen in multicast)
-  - If it's the first reception of this chunk, the raw data content is [stored in Flash on line 503](app_wisun_multicast_ota.c#L503)
+- [app_udp_server.c](app_udp_server.c) receives UDP payloads and dispatches them to handlers registered with `app_udp_server_register()`.
+- [app.c](app.c) registers the `OTA ` prefix on `APP_UDP_SERVER_PORT_DEFAULT` and routes matching UDP payloads to [multicast_rx()](app_wisun_multicast_ota.c).
+- `multicast_rx()` parses the payload header, validates the expected `OTA` command, GBL filename, and board tag, then ignores chunks that do not match.
+- Accepted chunks update the receive counters. The first copy of each chunk is written to bootloader storage; duplicates are counted but not written again.
 
 ### Transmission checking
 
@@ -198,7 +195,7 @@ pi@rns-wisun-196:~ $ coap-client -m get -N -B 7 -t text 'coap://[fd12:3456::62a4
 
 To apply the new firmware on a device with no missing chunk, the interface is a bit crude for the time being. It can be refined later on, adding new `/multicast_ota` CoAP commands.
 
-It uses the [multicast_ota.py](linux_border_router_wsbrd/multicast_ota.py) script with [specific strings](app_wisun_multicast_ota.c#L582) replacing the `<gbl_filename>`:
+It uses the [multicast_ota.py](linux_border_router_wsbrd/multicast_ota.py) script with specific strings replacing the `<gbl_filename>`:
 
 Verify image in flash (performed by bootloader by checking gbl format):
 
@@ -265,7 +262,9 @@ multicast_ota.py ff03::01 7777 "rebootAndInstall()" BRD4271A 1 10
 In the application code:
 
 - Add OTA DFU component
+- Add the bootloader interface component
 - Add the multicast OTA code to the project (app_wisun_multicast_ota.c/.h)
+- Include `app_wisun_multicast_ota.h` from the application code that registers UDP handlers.
 - Add `app_wisun_multicast_ota.c` to the `cmake_gcc/CMakeLists.txt` file, in the `add_executable` section.
 
 ```C
@@ -276,17 +275,15 @@ add_executable(<project_name>
 )
 ```
 
-- Add a check for the presence of `OTA ` at the start of any UDP message in your UDP receiver, and route it to `multicast_rx()` if yes.
-  - In the Wi-SUN Node Monitoring application, the corresponding code is already added in `app_udp_server.c/_udp_handle_rx_payload()`
+- Register a UDP handler for payloads starting with `OTA ` and route the payload to `multicast_rx()`.
+  - In the Wi-SUN Node Monitoring application, this is already done from `app.c` using `app_udp_server_register()`.
 
 ```C
 #ifdef APP_WISUN_MULTICAST_OTA_H
-  if (strncmp(msg->buff, "OTA ", 4) == 0) {
-    if (multicast_rx(msg->buff, msg->data_length, udp_ip_str) != 0) {
-      sl_free((void *)udp_ip_str);
-      return;
-    }
-  }
+  (void)app_udp_server_register(APP_UDP_SERVER_PORT_DEFAULT,
+                                (const uint8_t *)"OTA ",
+                                (uint16_t)(sizeof("OTA ") - 1U),
+                                _udp_multicast_ota_callback);
 #endif /* APP_WISUN_MULTICAST_OTA_H */
 ```
 

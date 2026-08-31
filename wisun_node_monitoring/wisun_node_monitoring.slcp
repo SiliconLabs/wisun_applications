@@ -27,6 +27,7 @@ source:
 - {path: app_action_scheduler.c}
 - {path: main.c}
 - {path: app_crash_handler.c}
+- {path: app_propagation.c}
 
 include:
 - path: .
@@ -45,6 +46,7 @@ include:
   - {path: app_wisun_multicast_ota.h}
   - {path: app_action_scheduler.h}
   - {path: app_crash_handler.h}
+  - {path: app_propagation.h}
 
 toolchain_settings:
 - value: -Wl,--wrap=__stack_chk_fail,--wrap=__assert_func
@@ -83,6 +85,7 @@ component:
   - {id: simple_button, condition: [brd4270b, hardware_board_mainboard], instance: [btn0, btn1]}
   - {id: simple_led,    condition: [brd4401c, hardware_board_mainboard], instance: [led0, led1]}
   - {id: simple_button, condition: [brd4401c, hardware_board_mainboard], instance: [btn0, btn1]}
+  - id: "device_init"
 
 define:
   - name: DEBUG_EFM_USER

@@ -39,8 +39,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "printf.h"
-
 #include "sl_common.h"
 #include "sl_string.h"
 #include "cmsis_nvic_virtual.h"
@@ -176,6 +174,7 @@ void print_network_parameters(int network_index) {
   printfBoth("network[%d] network_name     %s\n"           , i, network[i].network_name);
   printfBoth("network[%d] FAN type         %ld\n"          , i, network[i].phy.type);
   printfBoth("network[%d] use_special_connect_param %d\n"  , i, network[i].use_special_connect_param);
+  printfBoth("network[%d] first_breath              %d\n"  , i, network[i].first_breath);
   printfBoth("network[%d] network_size     %d\n"           , i, network[i].network_size);
   printfBoth("network[%d] Phy type         %ld\n"          , i, network[i].phy.type);
   printfBoth("network[%d] reg_domain       %d\n"           , i, network[i].phy.config.fan11.reg_domain);
@@ -194,6 +193,7 @@ void print_network_parameters(int network_index) {
   printfBoth("network[%d] max_security_neighbor_count %d\n", i, network[i].max_security_neighbor_count);
   printfBoth("network[%d] udp_notification_dest  %s\n"     , i, network[i].udp_notification_dest);
   printfBoth("network[%d] coap_notification_dest %s\n"     , i, network[i].coap_notification_dest);
+  printfBoth("network[%d] join_node_count             %d\n", i, network[i].join_node_count);
 }
 
 char* network_string(int i) {
@@ -203,6 +203,7 @@ char* network_string(int i) {
   "\"udp_notification_dest\": \"%s\",\n" \
   "\"coap_notification_dest\": \"%s\",\n" \
   "\"use_special_connect_param\": \"%d\",\n" \
+  "\"first_breath\": \"%d\",\n" \
   "\"network_size\": \"%d\",\n" \
   "\"phy_type\": \"%ld\",\n" \
   "\"reg_domain\": \"%d\",\n" \
@@ -211,13 +212,15 @@ char* network_string(int i) {
   "\"tx_power_ddbm\": \"%d\",\n" \
   "\"max_child_count\": \"%d\",\n" \
   "\"max_neighbor_count\": \"%d\",\n" \
-  "\"max_security_neighbor_count\": \"%d\""
+  "\"max_security_neighbor_count\": \"%d\",\n" \
+  "\"join_node_count\": \"%d\""
   snprintf(res_string, 1000, NETWORK_FORMAT_STR,
           i,
           network[i].network_name,
           network[i].udp_notification_dest,
           network[i].coap_notification_dest,
           network[i].use_special_connect_param,
+          network[i].first_breath,
           network[i].network_size,
           network[i].phy.type,
           network[i].phy.config.fan11.reg_domain,
@@ -226,7 +229,8 @@ char* network_string(int i) {
           network[i].tx_power_ddbm,
           network[i].max_child_count,
           network[i].max_neighbor_count,
-          network[i].max_security_neighbor_count);
+          network[i].max_security_neighbor_count,
+          network[i].join_node_count);
   printf("[%d]%s\n", __LINE__, res_string);
   return res_string;
 }
@@ -275,6 +279,7 @@ void set_app_parameters_defaults(int network_indexes) {
   const uint8_t                     PHY_MODE_ID[MAX_NETWORK_CONFIGS] = PHY_MODE_IDs;
   const uint8_t                    CHAN_PLAN_ID[MAX_NETWORK_CONFIGS] = CHAN_PLAN_IDs;
   const uint8_t           SPECIAL_CONNECT_PARAM[MAX_NETWORK_CONFIGS] = SPECIAL_CONNECT_PARAMs;
+  const uint8_t                  FIRST_BREATH[MAX_NETWORK_CONFIGS] = FIRST_BREATHs;
   const sl_wisun_network_size_t    NETWORK_SIZE[MAX_NETWORK_CONFIGS] = NETWORK_SIZEs;
   const uint16_t               PREFERRED_PAN_ID[MAX_NETWORK_CONFIGS] = PREFERRED_PAN_IDs;
   const sl_wisun_device_type_t      DEVICE_TYPE[MAX_NETWORK_CONFIGS] = DEVICE_TYPEs;
@@ -289,6 +294,7 @@ void set_app_parameters_defaults(int network_indexes) {
   const uint16_t                  AUTO_SEND_SEC[MAX_NETWORK_CONFIGS] = AUTO_SEND_SECs;
   const char*      UDP_NOTIFICATION_DESTINATION[MAX_NETWORK_CONFIGS] = UDP_NOTIFICATION_DESTINATIONs;
   const char*     COAP_NOTIFICATION_DESTINATION[MAX_NETWORK_CONFIGS] = COAP_NOTIFICATION_DESTINATIONs;
+  const uint16_t                JOIN_NODE_COUNT[MAX_NETWORK_CONFIGS] = JOIN_NODE_COUNTs;
   int i;
 
   // settings defined once for all networks
@@ -325,6 +331,7 @@ void set_app_parameters_defaults(int network_indexes) {
         network[i].network_size                  = NETWORK_SIZE[i];
       }
       network[i].use_special_connect_param             = SPECIAL_CONNECT_PARAM[i];
+      network[i].first_breath                 = FIRST_BREATH[i];
       network[i].phy.type                      = SL_WISUN_PHY_CONFIG_FAN11;
       network[i].preferred_pan_id              = PREFERRED_PAN_ID[i];
       network[i].regulation                    = REGULATION;
@@ -382,6 +389,7 @@ void set_app_parameters_defaults(int network_indexes) {
       network[i].mac.backoff_period_us = 0 ;
       network[i].mac.max_cca_retries   = 8;
       network[i].mac.max_frame_retries = 7;
+      network[i].join_node_count = JOIN_NODE_COUNT[i];
     }
     printf("\n");
   }
@@ -542,6 +550,9 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
         if  (!match) { match = (sl_strcasecmp(parameter_name, "use_special_connect_param") == 0);
           if (match) { network[index].use_special_connect_param = (uint8_t)value; }
         }
+        if  (!match) { match = (sl_strcasecmp(parameter_name, "first_breath") == 0);
+          if (match) { network[index].first_breath = (value != 0U); }
+        }
         if  (!match) { match = (sl_strcasecmp(parameter_name, "network_size") == 0);
           if (match) { network[index].network_size = (uint8_t)value; }
         }
@@ -588,6 +599,9 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
         }
         if  (!match) { match = (sl_strcasecmp(parameter_name, "max_security_neighbor_count") == 0);
           if (match) { network[index].max_security_neighbor_count = (uint16_t)value; }
+        }
+        if  (!match) { match = (sl_strcasecmp(parameter_name, "join_node_count") == 0);
+          if (match) { network[index].join_node_count = (uint16_t)value; }
         }
         // Conclusion
         if (match) {
@@ -681,6 +695,9 @@ sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, 
       if  (!match) { match = (sl_strcasecmp(parameter_name, "use_special_connect_param") == 0);
         if (match) { *value = (uint32_t)network[index].use_special_connect_param; }
       }
+      if  (!match) { match = (sl_strcasecmp(parameter_name, "first_breath") == 0);
+        if (match) { *value = (uint32_t)network[index].first_breath; }
+      }
       if  (!match) { match = (sl_strcasecmp(parameter_name, "network_size") == 0);
         if (match) { *value = (uint32_t)network[index].network_size; }
       }
@@ -728,6 +745,10 @@ sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, 
       if  (!match) { match = (sl_strcasecmp(parameter_name, "max_security_neighbor_count") == 0);
         if (match) { *value = (uint32_t)network[index].max_security_neighbor_count; }
       }
+      if  (!match) { match = (sl_strcasecmp(parameter_name, "join_node_count") == 0);
+        if (match) { *value = (uint32_t)network[index].join_node_count; }
+      }
+
       if  (match) {
           sprintf(value_str, "\"network[%d].%s\": \"%ld\"", index, parameter_name, *value);
           printfBothTime("%s\n", value_str);

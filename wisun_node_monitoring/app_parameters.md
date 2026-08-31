@@ -74,6 +74,7 @@ network[i].max_neighbor_count
 network[i].max_security_neighbor_count
 network[i].preferred_pan_id
 network[i].max_hop_count
+network[i].first_breath
 ```
 
 | CoAP request | CoAP URI           | payload                                       | usage                                                     |
@@ -81,6 +82,12 @@ network[i].max_hop_count
 | -m put       | settings/parameter | -e "`parameter_name`  `network_index`  value" | set `network[network_index].parameter_name` to `value`    |
 | -m get       | settings/parameter | -e "`parameter_name`  `network_index`"        | return `network[network_index].parameter_name` value      |
 | -m get       | settings/parameter | -e "network  `network_index`"                 | return all `network[network_index].parameter_name` values |
+
+Example:
+
+```bash
+coap-client-notls -m put -N -B 10 -t text coap://[<IPv6>]:5683/settings/parameter -e "first_breath 0 1"
+```
 
 ## Example Use Cases ##
 

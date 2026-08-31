@@ -27,6 +27,7 @@ source:
 - {path: app_action_scheduler.c}
 - {path: main.c}
 - {path: app_crash_handler.c}
+- {path: app_propagation.c}
 
 include:
 - path: .
@@ -45,6 +46,7 @@ include:
   - {path: app_wisun_multicast_ota.h}
   - {path: app_action_scheduler.h}
   - {path: app_crash_handler.h}
+  - {path: app_propagation.h}
   - {path: lfn_checks.h}
 
 toolchain_settings:
@@ -79,6 +81,7 @@ component:
   - id: "sl_wisun_coap"
   - id: "sl_wisun_ota_dfu"
   - id: segger_rtt_printf
+  - id: "device_init"
 
 define:
   - name: DEBUG_EFM_USER

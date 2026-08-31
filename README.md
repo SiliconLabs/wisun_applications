@@ -51,13 +51,10 @@ In Simplicity Studio 6 **Extensions** are used with local content already availa
 
 ## Create the Wi-SUN Applications Example Projects ##
 
-1. Connect the Silicon Labs Starter Kit and open Simplicity Studio 5.
-2. Select the **[Launcher]** perspective.
-3. From the **[Debug Adapters]** panel on the left top corner, select your Silicon Labs Starter Kit.
-4. Ensure that an SDK is selected in the **[General Information]** tile of the **[Overview]** tab.
-5. Select the **[EXAMPLE PROJECTS & DEMOS]** tab in **[Launcher]** perspective.
-6. Under **Provider** (at the bottom of the list), select **wisun_applications** and click **[create]** on the desired project.
-   1. If the project you are looking for is not listed in **wisun_applications**, it is possible that your debug adapter is not listed as compatible with the application. Try using a Silicon Labs debug adapter first, and check if it is listed in the project's **boardCompatibility** section of [templates.xml](templates.xml).
+1. Connect the Silicon Labs Starter Kit and open Simplicity Studio 6.
+2. Select the **[DEVICES]** panel and search for your board.
+3. Select the **[EXAMPLE PROJECTS & DEMOS]** and search for any application present in the extension e.g **Wi-SUN Node Monitoring Application**.
+4. If the project you are looking for is not listed in **wisun_applications**, it is possible that your debug adapter is not listed as compatible with the application. Try using a Silicon Labs debug adapter first, and check if it is listed in the project's **boardCompatibility** section of [templates.xml](templates.xml)
 
 ## Using Wi-SUN Crash Handler in Another Project ##
 

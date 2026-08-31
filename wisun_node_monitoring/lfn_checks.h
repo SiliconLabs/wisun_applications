@@ -94,6 +94,7 @@
   #pragma message("SL_WISUN_OTA_DFU_HOST_NOTIFY_ENABLED  !=  0U")
 #endif
 
+#if __has_include("sl_iostream_eusart_vcom_config.h")
 #include "sl_iostream_eusart_vcom_config.h"
 #if (SL_IOSTREAM_EUSART_INSTANCE_RESTRICT_ENERGY_MODE_TO_ALLOW_RECEPTION  !=  0)
   #pragma message("SL_IOSTREAM_EUSART_INSTANCE_RESTRICT_ENERGY_MODE_TO_ALLOW_RECEPTION  !=  0")
@@ -124,7 +125,7 @@
 #if (SL_IOSTREAM_USART_VCOM_FLOW_CONTROL_TYPE  !=  SL_IOSTREAM_USART_UART_FLOW_CTRL_NONE)
   #pragma message("SL_IOSTREAM_USART_VCOM_FLOW_CONTROL_TYPE  !=  SL_IOSTREAM_USART_UART_FLOW_CTRL_NONE")
 #endif
-
+#endif /* __has_include("sl_iostream_eusart_vcom_config.h") */
 #include "sl_sleeptimer_config.h"
 
 #if (SL_SLEEPTIMER_WALLCLOCK_CONFIG  !=  1)
@@ -144,4 +145,7 @@
   #pragma message("SL_CATALOG_SIMPLE_LED_PRESENT is not recommended for LFN, unless you agree on having the related LED consumption")
 #endif
 
+#if !defined(SL_CATALOG_DEVICE_INIT_DCDC_PRESENT)
+  #pragma message("SL_CATALOG_DEVICE_INIT_DCDC_PRESENT is highly recommended for LFN")
+#endif
 #endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */

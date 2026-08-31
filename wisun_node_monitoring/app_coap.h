@@ -53,7 +53,10 @@ extern uint64_t connection_time_sec;        // last connection time stamp
 extern uint64_t disconnection_time_sec;     // last disconnection time stamp
 extern uint64_t connected_total_sec;        // total time connected
 extern uint64_t disconnected_total_sec;     // total time disconnected
-extern uint64_t app_join_state_delay_sec[]; // array of delays to go to join states
+extern uint64_t app_join_state_delay_sec[];    // total time spent in join states 1..5 (cumulative across visits)
+extern uint64_t app_join_state_4x_delay_sec[]; // total time spent in join state 4 sub-states 4.1..4.4 (cumulative across visits)
+extern uint16_t app_join_state_count[];        // number of times each join state (1..5) was entered
+extern uint16_t app_join_state_4x_count[];     // number of times each join state 4 sub-state (4.1..4.4) was entered
 extern uint16_t auto_send_sec;              // auto-notification period
 extern uint8_t  trace_level;                // Trace level for all trace groups
 
@@ -63,6 +66,7 @@ extern char application[];
 extern char version[];
 extern char device_tag[];
 extern char parent_tag[];
+extern char secondary_tag[];
 extern char history_string[];
 extern char device_type_string[];
 extern sl_wisun_mac_address_t parent_mac;
