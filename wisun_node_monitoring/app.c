@@ -36,6 +36,7 @@
 // -----------------------------------------------------------------------------
 //                                   Includes
 // -----------------------------------------------------------------------------
+#include "app_parameters.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -360,11 +361,17 @@ uint16_t join_res = 0;
 uint64_t now = 0;
 uint64_t connection_timestamp;
 
+static app_settings_wisun_t *this_network;
+
+void app_update_current_network(void) {
+  this_network = get_network_parameters(get_app_parameters()->network_index);
+}
+
 sl_memory_heap_info_t app_heap_info;
 #define APP_TRACK_HEAP_PERIOD_LFN_S 45U // LFN heap print period; 0 disables periodic tracking
 #define APP_TRACK_HEAP_PERIOD_FFN_S  5U // FFN heap print period; 0 disables periodic tracking
 #define APP_TRACK_HEAP_PERIOD_S \
-  ((network[app_parameters.network_index].device_type == SL_WISUN_LFN) \
+  ((this_network->device_type == SL_WISUN_LFN) \
    ? APP_TRACK_HEAP_PERIOD_LFN_S : APP_TRACK_HEAP_PERIOD_FFN_S)
 size_t app_heap_peak_before_join;
 size_t app_heap_peak_after_join;
@@ -854,8 +861,6 @@ uint8_t app_join_network(uint8_t network_index) {
   const sl_wisun_regulation_params_t *regulation_params;
   const char *phy_str = NULL;
 
-  app_settings_wisun_t this_network;
-
 #if SL_RAIL_IEEE802154_SUPPORTS_G_MODE_SWITCH
   bool set_pom_ie = false;
 #endif
@@ -863,24 +868,26 @@ uint8_t app_join_network(uint8_t network_index) {
   app_parameter_mutex_acquire();
   sl_wisun_get_join_state(&join_state);
 
-  app_parameters.network_index = network_index % MAX_NETWORK_CONFIGS;
-  this_network = network[app_parameters.network_index];
+  network_index %= MAX_NETWORK_CONFIGS;
+  // Keep the index valid before using it to select a network configuration.
+  get_app_parameters()->network_index = network_index;
+  app_update_current_network();
   if (join_state != SL_WISUN_JOIN_STATE_DISCONNECTED) {
     printfBoth("Not disconnected: disconnecting...\r\n");
     sl_wisun_disconnect();
   }
 
-  ret = sl_wisun_set_device_type((sl_wisun_device_type_t)this_network.device_type);
+  ret = sl_wisun_set_device_type((sl_wisun_device_type_t)this_network->device_type);
   if (ret != SL_STATUS_OK) {
-    printfBoth("[Failed: unable to set device type to %d: %lu]\r\n", this_network.device_type, ret);
+    printfBoth("[Failed: unable to set device type to %d: %lu]\r\n", this_network->device_type, ret);
     ret = __LINE__; goto cleanup;
   }
 
   // Set device_type based on application settings
 #ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
-  if (this_network.device_type == SL_WISUN_LFN ) {
+  if (this_network->device_type == SL_WISUN_LFN ) {
       sprintf(device_type_string, "LFN (null profile)");
-      switch (this_network.lfn_profile) {
+      switch (this_network->lfn_profile) {
         case SL_WISUN_LFN_PROFILE_TEST: {
           sprintf(device_type_string, "LFN (Test Profile)");
           break;
@@ -901,13 +908,13 @@ uint8_t app_join_network(uint8_t network_index) {
   }
 #endif /* SL_CATALOG_WISUN_FFN_DEVICE_SUPPORT_PRESENT */
 #ifdef    SL_CATALOG_WISUN_FFN_DEVICE_SUPPORT_PRESENT
-  if (this_network.device_type == SL_WISUN_ROUTER ) {
+  if (this_network->device_type == SL_WISUN_ROUTER ) {
     sprintf(device_type_string, "FFN with LFN support");
   }
 #endif /* SL_CATALOG_WISUN_FFN_DEVICE_SUPPORT_PRESENT */
   printfBoth("network[%d].device_type %d (%s)\r\n",
-    app_parameters.network_index,
-    this_network.device_type,
+    network_index,
+    this_network->device_type,
     device_type_string);
 
 #ifdef TRACK_HEAP_PER_THREAD
@@ -916,9 +923,9 @@ uint8_t app_join_network(uint8_t network_index) {
 
   // For router with network_size != SL_WISUN_NETWORK_SIZE_AUTOMATIC or with special connection parameters
   // set connection parameters else keep it automatic (no call to sl_wisun_set_connection_parameters() API)
-  if ((this_network.device_type == SL_WISUN_ROUTER)&&
-       ((this_network.network_size != SL_WISUN_NETWORK_SIZE_AUTOMATIC)||(this_network.use_special_connect_param))) {
-    if (this_network.use_special_connect_param)
+  if ((this_network->device_type == SL_WISUN_ROUTER)&&
+       ((this_network->network_size != SL_WISUN_NETWORK_SIZE_AUTOMATIC)||(this_network->use_special_connect_param))) {
+    if (this_network->use_special_connect_param)
     {
       printfBoth("=== use_special_connect_param true, set connection param to SL_WISUN_PARAMS_PROFILE_SPECIAL ====\r\n");
       connection_params_adv = SL_WISUN_PARAMS_PROFILE_SPECIAL;
@@ -929,7 +936,7 @@ uint8_t app_join_network(uint8_t network_index) {
         ret = __LINE__; goto cleanup;
       }
     } else {
-      switch (this_network.network_size) {
+      switch (this_network->network_size) {
         case SL_WISUN_NETWORK_SIZE_SMALL:
           connection_params = SL_WISUN_PARAMS_PROFILE_SMALL;
           break;
@@ -946,17 +953,17 @@ uint8_t app_join_network(uint8_t network_index) {
           connection_params = SL_WISUN_PARAMS_PROFILE_CERTIF;
           break;
         default:
-          printfBoth("[Failed: unsupported network size %d ]\r\n", this_network.network_size);
+          printfBoth("[Failed: unsupported network size %d ]\r\n", this_network->network_size);
           ret = __LINE__; goto cleanup;
       }
-      connection_params.traffic.lowpan_mtu = this_network.lowpan_mtu;
-      connection_params.traffic.ipv6_mru = this_network.ipv6_mru;
-      connection_params.traffic.max_edfe_fragment_count = this_network.max_edfe_fragment_count;
-      connection_params.mac.min_be = this_network.mac.min_be;
-      connection_params.mac.max_be = this_network.mac.max_be;
-      connection_params.mac.backoff_period_us = this_network.mac.backoff_period_us;
-      connection_params.mac.max_cca_retries = this_network.mac.max_cca_retries;
-      connection_params.mac.max_frame_retries = this_network.mac.max_frame_retries;
+      connection_params.traffic.lowpan_mtu = this_network->lowpan_mtu;
+      connection_params.traffic.ipv6_mru = this_network->ipv6_mru;
+      connection_params.traffic.max_edfe_fragment_count = this_network->max_edfe_fragment_count;
+      connection_params.mac.min_be = this_network->mac.min_be;
+      connection_params.mac.max_be = this_network->mac.max_be;
+      connection_params.mac.backoff_period_us = this_network->mac.backoff_period_us;
+      connection_params.mac.max_cca_retries = this_network->mac.max_cca_retries;
+      connection_params.mac.max_frame_retries = this_network->mac.max_frame_retries;
 
       printfBoth("WARNING: sl_wisun_set_connection_parameters() AUTO connection parameter overrided\r\n");
       ret = sl_wisun_set_connection_parameters(&connection_params);
@@ -967,26 +974,26 @@ uint8_t app_join_network(uint8_t network_index) {
     }
   }
 
-  if ((this_network.device_type == SL_WISUN_ROUTER)&&
-       (this_network.network_size == SL_WISUN_NETWORK_SIZE_AUTOMATIC)&&
-       (this_network.use_special_connect_param == false)) {
+  if ((this_network->device_type == SL_WISUN_ROUTER)&&
+       (this_network->network_size == SL_WISUN_NETWORK_SIZE_AUTOMATIC)&&
+       (this_network->use_special_connect_param == false)) {
     printfBoth("app_set_option()\r\n");
     // Set option for network size AUTO
-    ret = app_set_option(&this_network);
+    ret = app_set_option(this_network);
     if (ret != SL_STATUS_OK) {
       printfBoth("[Failed: unable to set option : %lu]\r\n", ret);
       ret = __LINE__; goto cleanup;
     }
   }
 
-  ret = sl_wisun_config_neighbor_table(this_network.max_child_count, this_network.max_neighbor_count, this_network.max_security_neighbor_count);
+  ret = sl_wisun_config_neighbor_table(this_network->max_child_count, this_network->max_neighbor_count, this_network->max_security_neighbor_count);
   if (ret != SL_STATUS_OK) {
-    printfBoth("[Failed: unable to set neighbor table sizes (%d, %d, %d): %lu]\r\n", this_network.max_child_count, this_network.max_neighbor_count, this_network.max_security_neighbor_count, ret);
+    printfBoth("[Failed: unable to set neighbor table sizes (%d, %d, %d): %lu]\r\n", this_network->max_child_count, this_network->max_neighbor_count, this_network->max_security_neighbor_count, ret);
     ret = __LINE__; goto cleanup;
   }
 
-  if (this_network.device_type == SL_WISUN_ROUTER) {
-    ret = sl_wisun_set_preferred_pan(this_network.preferred_pan_id);
+  if (this_network->device_type == SL_WISUN_ROUTER) {
+    ret = sl_wisun_set_preferred_pan(this_network->preferred_pan_id);
     if (ret != SL_STATUS_OK) {
       printfBoth("[Failed: unable to set preferred PAN: %lu]\r\n", ret);
       ret = __LINE__; goto cleanup;
@@ -996,8 +1003,8 @@ uint8_t app_join_network(uint8_t network_index) {
 #ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
   // For LFN with lfn_profile != SL_WISUN_LFN_PROFILE_AUTOMATIC
   // set lfn parameters else keep it automatic (no call to sl_wisun_set_lfn_parameters() API)
-  if ((this_network.device_type == SL_WISUN_LFN) && (this_network.lfn_profile != SL_WISUN_LFN_PROFILE_AUTOMATIC)) {
-    switch (this_network.lfn_profile) {
+  if ((this_network->device_type == SL_WISUN_LFN) && (this_network->lfn_profile != SL_WISUN_LFN_PROFILE_AUTOMATIC)) {
+    switch (this_network->lfn_profile) {
       case SL_WISUN_LFN_PROFILE_TEST:
         lfn_params = SL_WISUN_PARAMS_LFN_TEST;
         break;
@@ -1008,7 +1015,7 @@ uint8_t app_join_network(uint8_t network_index) {
         lfn_params = SL_WISUN_PARAMS_LFN_ECO;
         break;
       default:
-        printfBoth("[Failed: unsupported LFN profile %d]\r\n", this_network.lfn_profile);
+        printfBoth("[Failed: unsupported LFN profile %d]\r\n", this_network->lfn_profile);
         ret = __LINE__; goto cleanup;
     }
 
@@ -1021,20 +1028,20 @@ uint8_t app_join_network(uint8_t network_index) {
   }
 #endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
 
-  ret = sl_wisun_set_rx_fifo_size(this_network.rx_fifo_size);
+  ret = sl_wisun_set_rx_fifo_size(this_network->rx_fifo_size);
   if (ret != SL_STATUS_OK) {
-    printfBoth("[Failed: unable to set RX FIFO size to %"PRId16": %lu]\r\n", this_network.rx_fifo_size, ret);
+    printfBoth("[Failed: unable to set RX FIFO size to %"PRId16": %lu]\r\n", this_network->rx_fifo_size, ret);
   }
 
-  ret = sl_wisun_set_tx_power_ddbm(this_network.tx_power_ddbm);
+  ret = sl_wisun_set_tx_power_ddbm(this_network->tx_power_ddbm);
   if (ret != SL_STATUS_OK) {
-    printfBoth("[Failed: unable to set TX power to %d: %lu]\r\n", this_network.tx_power_ddbm, ret);
+    printfBoth("[Failed: unable to set TX power to %d: %lu]\r\n", this_network->tx_power_ddbm, ret);
     ret = __LINE__; goto cleanup;
   }
 
-  ret = sl_wisun_set_fan_tps_version(this_network.fan_version);
+  ret = sl_wisun_set_fan_tps_version(this_network->fan_version);
   if (ret != SL_STATUS_OK) {
-    printf("[Failed: unable to set FAN TPS version %d: %lu]\r\n", this_network.fan_version, ret);
+    printf("[Failed: unable to set FAN TPS version %d: %lu]\r\n", this_network->fan_version, ret);
     ret = __LINE__; goto cleanup;
   }
 
@@ -1104,9 +1111,9 @@ uint8_t app_join_network(uint8_t network_index) {
       certificate_options |= SL_WISUN_CERTIFICATE_OPTION_APPEND;
     }
 
-    credential = sl_wisun_keychain_get_credential((sl_wisun_keychain_t)this_network.keychain, this_network.keychain_index);
+    credential = sl_wisun_keychain_get_credential((sl_wisun_keychain_t)this_network->keychain, this_network->keychain_index);
     if (!credential) {
-      printfBoth("[Failed: unable to load credential for keychain %d]\r\n", this_network.keychain_index);
+      printfBoth("[Failed: unable to load credential for keychain %d]\r\n", this_network->keychain_index);
       //ret = __LINE__; goto cleanup;
     }
     if (credential->certificate.keychain == SL_WISUN_KEYCHAIN_NVM) {
@@ -1137,22 +1144,22 @@ uint8_t app_join_network(uint8_t network_index) {
   }
 
 /*
-  ret = app_settings_get_channel_mask(this_network.allowed_channels, &channel_mask);
+  ret = app_settings_get_channel_mask(this_network->allowed_channels, &channel_mask);
   ret = sl_wisun_set_channel_mask(&channel_mask);
   if (ret != SL_STATUS_OK) {
     printfBoth("[Failed: unable to set channel mask: %lu]\r\n", ret);
     res = __LINE__; goto cleanup;
   }
 */
-  if (this_network.device_type == SL_WISUN_ROUTER) {
-    ret = sl_wisun_set_unicast_settings(this_network.uc_dwell_interval_ms);
+  if (this_network->device_type == SL_WISUN_ROUTER) {
+    ret = sl_wisun_set_unicast_settings(this_network->uc_dwell_interval_ms);
     if (ret != SL_STATUS_OK) {
       printfBoth("[Failed: unable to set unicast settings: %lu]\r\n", ret);
       ret = __LINE__; goto cleanup;
     }
   }
 
-  switch(this_network.regulation) {
+  switch(this_network->regulation) {
     case SL_WISUN_REGULATION_NONE:
       regulation_params = &SL_WISUN_REGULATION_PARAMS_NONE;
       break;
@@ -1175,14 +1182,14 @@ uint8_t app_join_network(uint8_t network_index) {
     ret = __LINE__; goto cleanup;
   }
 
-  ret = sl_wisun_set_regulation_tx_thresholds(this_network.regulation_warning_threshold,
-                                              this_network.regulation_alert_threshold);
+  ret = sl_wisun_set_regulation_tx_thresholds(this_network->regulation_warning_threshold,
+                                              this_network->regulation_alert_threshold);
   if (ret != SL_STATUS_OK) {
     printfBoth("[Failed: unable to set regulation TX thresholds: %lu]\r\n", ret);
   }
 
 #if 0
-  ret = sl_wisun_set_pti_state(this_network.pti_state);
+  ret = sl_wisun_set_pti_state(this_network->pti_state);
   if (ret != SL_STATUS_OK) {
     printf("[Failed to set PTI state]\r\n");
     ret = __LINE__; goto cleanup;
@@ -1198,37 +1205,37 @@ uint8_t app_join_network(uint8_t network_index) {
 #endif /* SLI_WISUN_DISABLE_SECURITY */
 /*
   // As per RFC3748, "The Identity Response field MUST NOT be null terminated"
-  ret = sl_wisun_set_eap_identity(strlen(this_network.eap_identity),
-                                  (const uint8_t *)this_network.eap_identity);
+  ret = sl_wisun_set_eap_identity(strlen(this_network->eap_identity),
+                                  (const uint8_t *)this_network->eap_identity);
   if (ret != SL_STATUS_OK) {
     printfBoth("[Failed to set EAP identity]\r\n");
     ret = __LINE__; goto cleanup;
   }
 */
-  if (this_network.device_type == SL_WISUN_ROUTER) {
-    ret = sl_wisun_set_first_breath(this_network.first_breath);
+  if (this_network->device_type == SL_WISUN_ROUTER) {
+    ret = sl_wisun_set_first_breath(this_network->first_breath);
     if (ret != SL_STATUS_OK) {
       printfBoth("[Failed: unable to set First Breath to %d: %lu]\r\n",
-                 this_network.first_breath,
+                 this_network->first_breath,
                  ret);
       ret = __LINE__; goto cleanup;
     }
     printfBothTime("First Breath %s before join\r\n",
-                   this_network.first_breath ? "enabled" : "disabled");
+                   this_network->first_breath ? "enabled" : "disabled");
   }
 
-  phy_str = app_wisun_phy_to_str(&(network[app_parameters.network_index].phy));
+  phy_str = app_wisun_phy_to_str(&this_network->phy);
   printfBothTime("Joining Network[%d]: \"%s\": %s]\r\n",
-        app_parameters.network_index,
-        this_network.network_name,
+        network_index,
+        this_network->network_name,
         phy_str);
   sl_free((void *)phy_str);
-  ret = sl_wisun_join((const uint8_t *)this_network.network_name, &this_network.phy);
+  ret = sl_wisun_join((const uint8_t *)this_network->network_name, &this_network->phy);
   if (ret == SL_STATUS_OK) {
-    phy_str = app_wisun_phy_to_str(&(network[app_parameters.network_index].phy));
+    phy_str = app_wisun_phy_to_str(&this_network->phy);
     printfBothTime("[Connecting to Network[%d]: \"%s\": %s]\r\n",
-          app_parameters.network_index,
-          this_network.network_name,
+          network_index,
+          this_network->network_name,
           phy_str);
     sl_free((void *)phy_str);
   } else {
@@ -1236,9 +1243,9 @@ uint8_t app_join_network(uint8_t network_index) {
     if (ret == SL_STATUS_FAIL) {
         sl_wisun_get_join_state(&join_state);
         if (join_state == SL_WISUN_JOIN_STATE_DISCONNECTED) {
-            phy_str = app_wisun_phy_to_str(&(network[app_parameters.network_index].phy));
+            phy_str = app_wisun_phy_to_str(&this_network->phy);
             printfBoth("Network[%d]: Incorrect PHY selection: Will never connect on %s\n",
-                app_parameters.network_index,
+                network_index,
                 phy_str);
             sl_free((void *)phy_str);
         }
@@ -1300,7 +1307,7 @@ cleanup:
 
   if (ret != SL_STATUS_OK) {
       if (ret != SL_STATUS_FAIL) {
-          printfBoth("app_join_network(%d) failed around line %ld\n", app_parameters.network_index, ret);
+          printfBoth("app_join_network(%d) failed around line %ld\n", network_index, ret);
       } else {
           printfBoth("sl_wisun_join() failed: the most probable cause is an unknown PHY. Check you Radio configuration\n");
       }
@@ -1337,11 +1344,14 @@ void app_task(void *args)
 #ifdef    APP_PARAMETERS_H
   init_app_parameters();
 #endif /* APP_PARAMETERS_H */
+  app_parameter_mutex_acquire();
+  app_update_current_network();
+  app_parameter_mutex_release();
 
 #ifdef    SL_WISUN_CRASH_HANDLER_H
   sl_wisun_check_previous_crash();
   if (strlen(app_crash_handler_get_previous_crash_info())) {
-      app_parameters.nb_crashes++;
+      get_app_parameters()->nb_crashes++;
       save_app_parameters();
       printfBoth("Info on previous crash: %s\n",
                  app_crash_handler_get_previous_crash_info());
@@ -1377,8 +1387,8 @@ void app_task(void *args)
   printfBoth("Wi-SUN Stack V%d.%d.%d\n", SL_WISUN_VERSION_MAJOR, SL_WISUN_VERSION_MINOR, SL_WISUN_VERSION_PATCH);
 
   printfBoth("Network[%d] %s\n",
-    app_parameters.network_index,
-    network[app_parameters.network_index].network_name);
+    get_app_parameters()->network_index,
+    this_network->network_name);
 
 
 #ifdef    SL_CATALOG_APP_OS_STAT_PRESENT
@@ -1387,7 +1397,7 @@ void app_task(void *args)
   #endif /* APP_OS_STAT_UPDATE_PERIOD_TIME_MS */
 #endif /* SL_CATALOG_APP_OS_STAT_PRESENT */
   printfBoth("network_size %s\n", app_wisun_trace_util_nw_size_to_str(
-    network[app_parameters.network_index].network_size));
+    this_network->network_size));
 
 #ifdef    WISUN_CONFIG_BROADCAST_RETRIES
   printfBoth("Broadcast Retries %d\n", WISUN_CONFIG_BROADCAST_RETRIES);
@@ -1432,8 +1442,11 @@ void app_task(void *args)
   if (startup_option > 0) {
     if (startup_option <= 3) {
       printfBoth("Changing network_index from %d to %d based on buttons\n",
-                      app_parameters.network_index, startup_option);
-      app_parameters.network_index = startup_option;
+                      get_app_parameters()->network_index, startup_option);
+      app_parameter_mutex_acquire();
+      get_app_parameters()->network_index = startup_option;
+      app_update_current_network();
+      app_parameter_mutex_release();
     }
   }
 #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
@@ -1543,10 +1556,10 @@ void app_task(void *args)
   _app_start_pre_join_actions();
   app_heap_peak_before_join = sl_memory_get_heap_high_watermark();
   // connect to the wisun network
-  join_res = app_join_network(app_parameters.network_index);
+  join_res = app_join_network(get_app_parameters()->network_index);
 
 #ifdef    WITH_DIRECT_CONNECT
-  if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
+  if (this_network->device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
     // Register our Direct Connect custom callback function with the event manager (aka 'em')
     app_wisun_em_custom_callback_register(SL_WISUN_MSG_DIRECT_CONNECT_LINK_AVAILABLE_IND_ID, app_direct_connect_custom_callback);
     app_wisun_em_custom_callback_register(SL_WISUN_MSG_DIRECT_CONNECT_LINK_STATUS_IND_ID   , app_direct_connect_custom_callback);
@@ -1563,11 +1576,11 @@ void app_task(void *args)
       if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) break;
       now = now_sec();
       if (join_res == SL_STATUS_OK) {
-          phy_str = app_wisun_phy_to_str(&network[app_parameters.network_index].phy);
+          phy_str = app_wisun_phy_to_str(&this_network->phy);
           printfBothTime("Waiting for %s connection to network[%d]: \"%s\": %s. join_state %d\n",
                     device_type_string,
-                    app_parameters.network_index,
-                    network[app_parameters.network_index].network_name,
+                    get_app_parameters()->network_index,
+                    this_network->network_name,
                     phy_str,
                     join_state);
           sl_free((void *)phy_str);
@@ -1580,28 +1593,31 @@ void app_task(void *args)
             } else {
                 printfBoth("Check the traces and the app_join_network() code around line %d\n", join_res);
             }
-            phy_str = app_wisun_phy_to_str(&network[app_parameters.network_index].phy);
+            phy_str = app_wisun_phy_to_str(&this_network->phy);
             printfBoth("Will not connect to \"%s\": %s. join_res %d\n",
-                      network[app_parameters.network_index].network_name,
+                      this_network->network_name,
                       phy_str,
                       join_res);
             sl_free((void *)phy_str);
-            app_parameters.network_index = (app_parameters.network_index + 1) % MAX_NETWORK_CONFIGS;
-            phy_str = app_wisun_phy_to_str(&network[app_parameters.network_index].phy);
+            app_parameter_mutex_acquire();
+            get_app_parameters()->network_index = (get_app_parameters()->network_index + 1) % MAX_NETWORK_CONFIGS;
+            app_update_current_network();
+            app_parameter_mutex_release();
+            phy_str = app_wisun_phy_to_str(&this_network->phy);
             printfBoth("Attempting to connect to network[%d]: \"%s\": %s\n",
-                      app_parameters.network_index,
-                      network[app_parameters.network_index].network_name,
+                      get_app_parameters()->network_index,
+                      this_network->network_name,
                       phy_str);
             sl_free((void *)phy_str);
             join_call_time_sec = app_timestamp_reset();
 
             _app_start_pre_join_actions();
 
-            join_res = app_join_network(app_parameters.network_index);
+            join_res = app_join_network(get_app_parameters()->network_index);
         }
       }
 
-    if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
+    if (this_network->device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
       // If using Direct connect, the wait time must be lower than the direct connect timeout (check udp server)
       (void) sl_wisun_app_core_wait_state((1 << SL_WISUN_APP_CORE_STATE_NETWORK_CONNECTED),
                                       20*1000);
@@ -1687,7 +1703,7 @@ void app_task(void *args)
   }
 #endif /* SL_WISUN_CRASH_HANDLER_H */
 
-  printfBothTime("network[%d].auto_send_sec %d\n", app_parameters.network_index, network[app_parameters.network_index].auto_send_sec);
+  printfBothTime("network[%d].auto_send_sec %d\n", get_app_parameters()->network_index, this_network->auto_send_sec);
 
   previous_join_state = join_state;
 
@@ -1785,7 +1801,7 @@ static void _app_restart_led_action(void)
   (void)app_scheduler_action_stop(_app_led_action);
   if (app_operational_actions_ready
       && (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL)
-      && (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER)
+      && (this_network->device_type == SL_WISUN_ROUTER)
       && !app_scheduler_action_schedule(_app_led_action, 1000U, 1000U, NULL)) {
     printfBothTime("Failed to schedule LED action\n");
   }
@@ -1836,7 +1852,7 @@ static void _app_start_pre_join_actions(void)
   }
 #ifdef SL_CATALOG_POWER_MANAGER_PRESENT
   (void)app_scheduler_action_stop(_app_power_manager_action);
-  if ((network[app_parameters.network_index].device_type == SL_WISUN_LFN)
+  if ((this_network->device_type == SL_WISUN_LFN)
       && (APP_POWER_MANAGER_PERIOD_LFN_S != 0U)
       && !app_scheduler_action_schedule(_app_power_manager_action,
                                         0,
@@ -1847,7 +1863,7 @@ static void _app_start_pre_join_actions(void)
 #endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
 #ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
   (void)app_scheduler_action_stop(_app_button_action);
-  if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
+  if (this_network->device_type == SL_WISUN_ROUTER) {
     (void)app_scheduler_action_schedule(_app_button_action,
                                         0,
                                         BUTTON_CHECK_DELAY * 1000U,
@@ -1870,13 +1886,13 @@ void app_restart_send_status(void)
 
   sl_wisun_get_join_state(&join_state);
   (void)app_scheduler_action_stop(_app_send_status);
-  if ((network[app_parameters.network_index].auto_send_sec == 0U)
+  if ((this_network->auto_send_sec == 0U)
       || (join_state != SL_WISUN_JOIN_STATE_OPERATIONAL)
       || !app_operational_actions_ready) {
     return;
   }
 
-  period_ms = (uint32_t)network[app_parameters.network_index].auto_send_sec * 1000U;
+  period_ms = (uint32_t)this_network->auto_send_sec * 1000U;
   if (!app_scheduler_action_schedule(_app_send_status,
                                      0,
                                      period_ms,
@@ -2170,7 +2186,7 @@ char* _connection_json_string (void) {
     sec_string,
     msg_count,
     network_info.pan_id, network_info.pan_id,
-    network[app_parameters.network_index].preferred_pan_id, network[app_parameters.network_index].preferred_pan_id,
+    this_network->preferred_pan_id, this_network->preferred_pan_id,
     network_info.hop_count,
     (uint32_t)app_join_state_delay_sec[1],
     (uint32_t)app_join_state_delay_sec[2],
@@ -2409,7 +2425,6 @@ static uint32_t _first_breath_close_action(void *context)
 static uint32_t _first_breath_send_action(void *context)
 {
   bool enabled;
-  uint8_t network_index;
   char dest[IPV6_STR_LEN];
   char running_sec_string[21];
   int tclass;
@@ -2419,9 +2434,8 @@ static uint32_t _first_breath_send_action(void *context)
   (void)context;
 
   app_parameter_mutex_acquire();
-  network_index = app_parameters.network_index;
-  enabled = network[network_index].first_breath;
-  snprintf(dest, sizeof(dest), "%s", network[network_index].udp_notification_dest);
+  enabled = this_network->first_breath;
+  snprintf(dest, sizeof(dest), "%s", this_network->udp_notification_dest);
   app_parameter_mutex_release();
 
   if (!enabled) {
@@ -2475,7 +2489,7 @@ static uint32_t _first_breath_send_action(void *context)
                      "}\n",
                      running_sec_string,
                      device_tag,
-                     network_index);
+                     get_app_parameters()->network_index);
   if ((msg_len < 0) || (msg_len >= (int)sizeof(first_breath_msg))) {
     (void)_first_breath_close_action(NULL);
     return (uint32_t)SL_STATUS_WOULD_OVERFLOW;
@@ -2533,15 +2547,15 @@ sl_status_t _select_destinations(void) {
   IF_ERROR(ret, "[Failed: unable to retrieve the Device Global IPv6: 0x%04x]\n", (uint16_t)ret);
 
   // Set the UDP notification destination
-  printfBothTime("UDP_NOTIFICATION_DEST: %s\n", network[app_parameters.network_index].udp_notification_dest);
-  sl_wisun_stoip6(network[app_parameters.network_index].udp_notification_dest, strlen(network[app_parameters.network_index].udp_notification_dest)
+  printfBothTime("UDP_NOTIFICATION_DEST: %s\n", this_network->udp_notification_dest);
+  sl_wisun_stoip6(this_network->udp_notification_dest, strlen(this_network->udp_notification_dest)
                 , udp_notification_sockaddr_in6.sin6_addr.address);
   sl_wisun_ip6tos(udp_notification_sockaddr_in6.sin6_addr.address, udp_notification_ipv6_string);
   printfBothTime("UDP  Notification destination: %s/%5d\n" , udp_notification_ipv6_string, UDP_NOTIFICATION_PORT);
 
   // Set the CoAP notification destination
-  printfBothTime("COAP_NOTIFICATION_DEST: %s\n", network[app_parameters.network_index].coap_notification_dest);
-  sl_wisun_stoip6(network[app_parameters.network_index].coap_notification_dest   , strlen(network[app_parameters.network_index].coap_notification_dest)
+  printfBothTime("COAP_NOTIFICATION_DEST: %s\n", this_network->coap_notification_dest);
+  sl_wisun_stoip6(this_network->coap_notification_dest   , strlen(this_network->coap_notification_dest)
                 , coap_notification_sockaddr_in6.sin6_addr.address);
   sl_wisun_ip6tos(coap_notification_sockaddr_in6.sin6_addr.address, coap_notification_ipv6_string);
   printfBothTime("COAP Notification destination: %s/%5d\n"  , coap_notification_ipv6_string, COAP_NOTIFICATION_PORT);

@@ -204,7 +204,7 @@ static uint32_t app_scheduler_join_cb(void *context)
 static uint32_t app_scheduler_reconnect_cb(void *context)
 {
   uint32_t wait_before_join_ms = (uint32_t)(uintptr_t)context;
-  uint8_t network_index = app_parameters.network_index;
+  uint8_t network_index = get_app_parameters()->network_index;
 
   printfBothTime("scheduler: disconnect, schedule rejoin in %lu ms\n",
                  (unsigned long)wait_before_join_ms);
@@ -224,7 +224,7 @@ static uint32_t app_scheduler_clear_and_reconnect_cb(void *context)
 {
   sl_status_t status;
   uint32_t wait_before_join_ms = (uint32_t)(uintptr_t)context;
-  uint8_t network_index = app_parameters.network_index;
+  uint8_t network_index = get_app_parameters()->network_index;
 
   printfBothTime("scheduler: disconnect, clear credential cache, schedule rejoin in %lu ms\n",
                  (unsigned long)wait_before_join_ms);
@@ -938,6 +938,7 @@ sl_wisun_coap_packet_t * coap_callback_auto_send (
   char* payload_str = NULL;
   int sec = 0;
   int res = 0;
+  app_settings_wisun_t *current_network;
   if (req_packet->payload_len) {
     // Get payload in string format with last char = '\0'
     payload_str = sl_wisun_coap_get_payload_str(req_packet);
@@ -946,15 +947,21 @@ sl_wisun_coap_packet_t * coap_callback_auto_send (
         sl_free(payload_str);
     }
     if (res == 1) {
-        network[app_parameters.network_index].auto_send_sec = (uint16_t)sec;
+        app_parameter_mutex_acquire();
+        current_network = get_network_parameters(get_app_parameters()->network_index);
+        current_network->auto_send_sec = (uint16_t)sec;
         // Apply the new interval immediately
         app_restart_send_status();
+        app_parameter_mutex_release();
     } else {
         snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "invalid payload");
         return app_coap_reply(coap_response, req_packet);
     }
   }
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", network[app_parameters.network_index].auto_send_sec);
+  app_parameter_mutex_acquire();
+  current_network = get_network_parameters(get_app_parameters()->network_index);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", current_network->auto_send_sec);
+  app_parameter_mutex_release();
 return app_coap_reply(coap_response, req_packet); }
 
 sl_wisun_coap_packet_t * coap_callback_heap_statistics(
@@ -1101,16 +1108,23 @@ return app_coap_reply(coap_response, req_packet); }
 sl_wisun_coap_packet_t * coap_callback_reporter_start (
     const  sl_wisun_coap_packet_t *const req_packet)  {
   char* payload_str = NULL;
+  app_settings_wisun_t *current_network;
   if (req_packet->payload_len) {
       // Get payload in string format with last char = '\0'
       payload_str = sl_wisun_coap_get_payload_str(req_packet);
       if (payload_str != NULL ){
-          app_start_reporter(network[app_parameters.network_index].udp_notification_dest, 1000, (char *)payload_str);
+          app_parameter_mutex_acquire();
+          current_network = get_network_parameters(get_app_parameters()->network_index);
+          app_start_reporter(current_network->udp_notification_dest, 1000, (char *)payload_str);
+          app_parameter_mutex_release();
           sl_free(payload_str);
       }
     } else {
         // if no payload, accept all lines
-      app_start_reporter(network[app_parameters.network_index].udp_notification_dest, 1000, (char *)"*");
+      app_parameter_mutex_acquire();
+      current_network = get_network_parameters(get_app_parameters()->network_index);
+      app_start_reporter(current_network->udp_notification_dest, 1000, (char *)"*");
+      app_parameter_mutex_release();
     }
     snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "started");
   return app_coap_reply(coap_response, req_packet); }

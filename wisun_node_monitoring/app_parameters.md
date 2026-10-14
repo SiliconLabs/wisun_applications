@@ -39,7 +39,6 @@ The [app_wisun_parameters_t](app_parameters.h#L162) structure contains the items
 ```text
 nb_boots           (read-only)
 nb_crashes         (read-only)
-auto_send_sec
 network_count      (read-only)
 network_index
 ```
@@ -53,7 +52,7 @@ There is an additional `app_parameters` option to retrieve all at once
 | -m get       | settings/parameter | -e "`app_parameters`"                         | return all `app_parameters` values                     |
 | -m get       | settings/parameter | -e "network_index     `value`"                | Set the network_index, save the parameters (to get ready to use this network) and return `app_parameters.parameter_name` value           |
 
-## `app_wisun_network_settings_t` set/get ##
+## `app_settings_wisun_t` set/get ##
 
 The [app_settings_wisun_t](app_parameters.h#L143) structure is inspired by the [app_settings_wisun_t](https://github.com/SiliconLabs/simplicity_sdk/blob/sisdk-2025.6/protocol/wisun/app/wisun_soc_cli/app_settings.h#L79) structure from the Wi-SUN SoC CLI code, with support only for FAN1.1.
 
@@ -75,6 +74,7 @@ network[i].max_security_neighbor_count
 network[i].preferred_pan_id
 network[i].max_hop_count
 network[i].first_breath
+network[i].auto_send_sec
 ```
 
 | CoAP request | CoAP URI           | payload                                       | usage                                                     |
@@ -100,13 +100,10 @@ pi@rns-wisun-200:~ $ coap-client-notls -m get -N -B 10 -t text coap://[fd12:3456
 "nb_boots": "1"
 pi@rns-wisun-200:~ $ coap-client-notls -m get -N -B 10 -t text coap://[fd12:3456::62a4:23ff:fe37:aee6]:5683/settings/parameter -e "nb_crashes"
 "nb_crashes": "0"
-pi@rns-wisun-200:~ $ coap-client-notls -m get -N -B 10 -t text coap://[fd12:3456::62a4:23ff:fe37:aee6]:5683/settings/parameter -e "auto_send_sec"
-"auto_send_sec": "900"
 pi@rns-wisun-200:~ $ coap-client-notls -m get -N -B 10 -t text coap://[fd12:3456::62a4:23ff:fe37:aee6]:5683/settings/parameter -e "app_parameters"
 "app_params_version": "10000",
 "nb_boots": "1",
 "nb_crashes": "0",
-"auto_send_sec": "900",
 "network_count": "3",
 "network_index": "0"
 ```

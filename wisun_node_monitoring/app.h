@@ -130,6 +130,8 @@ extern "C" {
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
 uint8_t app_join_network(uint8_t network_index);
+/** Refresh the selected network pointer while holding the app parameter mutex. */
+void app_update_current_network(void);
 void app_task(void *args);
 /** Replace pending status sends with the configured periodic schedule; disabled
  * when auto_send_sec is zero or the node is not operational.

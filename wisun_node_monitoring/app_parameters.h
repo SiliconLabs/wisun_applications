@@ -315,13 +315,6 @@ typedef struct {
 //  char eap_identity[SL_WISUN_EAP_IDENTITY_SIZE+1];
 } app_settings_wisun_t;
 
-// Wi-SUN settings to join
-typedef struct app_wisun_join_settings {
-  char    network_name[SL_WISUN_NETWORK_NAME_SIZE + 1];
-  uint8_t network_size;
-  sl_wisun_phy_config_t phy;
-} app_wisun_network_settings_t;
-
 // Application parameters
 typedef struct {
   uint32_t app_params_version;   // Read at boot, set all to defaults
@@ -329,25 +322,21 @@ typedef struct {
                                  //    This is to avoid clearing the Wi-SUN stack cache
   uint16_t nb_boots;             // Number of reboots since last NVM clear
   uint16_t nb_crashes;           // Number of crashes since last NVM clear
-  uint16_t auto_send_sec;        // Notification period in seconds
+  uint16_t reserved;             // Preserve the former unused auto_send_sec storage slot
   uint8_t  network_count;        // Number of network settings
   uint8_t  network_index;        // Selector for network settings
-  uint16_t network_struct_size;   // Store sizeof(app_wisun_network_settings_t)
+  uint16_t network_struct_size;   // Store sizeof(app_settings_wisun_t)
                                  // Read at boot, set all parameters to defaults if
-                                 //   sizeof(app_wisun_network_settings_t) != network_struct_size
+                                 //   sizeof(app_settings_wisun_t) != network_struct_size
                                  //    This is to avoid missmatching after application update
 } app_wisun_parameters_t;
-
-extern app_settings_wisun_t network[MAX_NETWORK_CONFIGS];
-
-// -----------------------------------------------------------------------------
-//                                Global Variables
-// -----------------------------------------------------------------------------
-extern app_wisun_parameters_t app_parameters;
 
 // -----------------------------------------------------------------------------
 //                          Public Function Declarations
 // -----------------------------------------------------------------------------
+
+app_settings_wisun_t* get_network_parameters(int network_index);
+app_wisun_parameters_t* get_app_parameters(void);
 
 void app_parameter_mutex_acquire();
 void app_parameter_mutex_release();

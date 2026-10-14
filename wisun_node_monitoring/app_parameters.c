@@ -82,6 +82,14 @@ static uint32_t app_scheduler_clear_credential_cache_and_reboot_cb(void *context
 
 app_wisun_parameters_t app_parameters;
 app_settings_wisun_t network[MAX_NETWORK_CONFIGS];
+
+app_settings_wisun_t* get_network_parameters(int network_index) {
+  return &network[network_index];
+}
+
+app_wisun_parameters_t* get_app_parameters(void) {
+  return &app_parameters;
+}
 char res_string[1000];
 
 // -----------------------------------------------------------------------------
@@ -428,7 +436,7 @@ sl_status_t init_app_parameters() {
   return status;
 }
 
-sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, char* value_str) {
+static sl_status_t set_app_parameter_unlocked(char* parameter_name, int index, uint32_t value, char* value_str) {
   bool match = false;
 
   printfBothTime("set_app_parameter(%s, index %d, value %ld, %s)\n", parameter_name, index, value, value_str);
@@ -436,6 +444,7 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
   if  (!match) { match = (sl_strcasecmp(parameter_name, "network_index") == 0);
     if (match) {
         app_parameters.network_index = (uint16_t)value;
+        app_update_current_network();
         save_app_parameters();
         printfBothTime("Prepared to reboot on network %ld\n", value);
     }
@@ -444,6 +453,7 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
     if (match) {
         // Set all defaults
         set_app_parameters_defaults(value);
+        app_update_current_network();
         // Save default settings if passed a value different from 0
         if (value & ((1 << MAX_NETWORK_CONFIGS) -1)) {
             save_app_parameters();
@@ -629,6 +639,16 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
       printfBothTime("%s\n", value_str);
       return SL_STATUS_OK;
   }
+}
+
+sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, char* value_str) {
+  sl_status_t status;
+
+  app_parameter_mutex_acquire();
+  status = set_app_parameter_unlocked(parameter_name, index, value, value_str);
+  app_parameter_mutex_release();
+
+  return status;
 }
 
 sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, char* value_str) {
