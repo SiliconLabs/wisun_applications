@@ -245,6 +245,7 @@ The URIs are
 |statistic/app/connections        |  | '%d'           ||
 |statistic/app/connected_total    |  | 'ddd-hh:mm:ss' ||
 |statistic/app/availability       |  | '%6.2f'        ||
+|statistics/app/heap              | heap peak before join, heap peak after join, current heap usage, current heap peak, and total heap (bytes) | json ||
 |statistic/app/all                | all of the 'statistics/app' group above     | json ||
 |statistics/stack/phy             | statistics from [sl_wisun_statistics_phy_t](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-statistics-phy-t)               | json | '-e reset' resets these statistics |
 |statistics/stack/mac             | statistics from [sl_wisun_statistics_mac_t](https://docs.silabs.com/wisun/latest/wisun-stack-api/sl-wisun-statistics-mac-t)               | json | '-e reset' resets these statistics |

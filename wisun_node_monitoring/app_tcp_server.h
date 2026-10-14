@@ -41,6 +41,11 @@
 
 #include "app.h"
 
+// TCP server need to be set to either SO_NONBLOCK or SO_EVENT_MODE, if defined
+// Comment the lines if the corresponding server is not required
+// NB: Do NOT use SO_NONBLOCK for low-Power use, as it keeps the server loop active!
+#define WITH_TCP_SERVER    SO_EVENT_MODE
+
 #ifdef WITH_TCP_SERVER
 
 // -----------------------------------------------------------------------------

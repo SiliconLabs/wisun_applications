@@ -46,6 +46,7 @@ extern "C" {
 //                                   Includes
 // -----------------------------------------------------------------------------
 #include <string.h>
+#include <stddef.h>
 
 #include "sl_component_catalog.h"
 
@@ -112,22 +113,10 @@ extern "C" {
 
 #define HISTORY
 
-// UDP and TCP server need to be set to either SO_NONBLOCK or SO_EVENT_MODE, if defined
-// Comment the lines if the corresponding server is not required
-// NB: Do NOT use SO_NONBLOCK for low-Power use, as it keeps the server loop active!
-#define WITH_UDP_SERVER    SO_EVENT_MODE
-#define WITH_TCP_SERVER    SO_EVENT_MODE
-
 #ifndef   SL_CATALOG_WISUN_COAP_PRESENT
 #define   SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE 1024
 #endif /* SL_CATALOG_WISUN_COAP_PRESENT */
 
-// -----------------------------------------------------------------------------
-//                                Global Variables
-// -----------------------------------------------------------------------------
-extern char crash_info_string[];
-extern bool send_asap;
-extern char emergency_saved_running_time[];
 // -----------------------------------------------------------------------------
 //                          Public Function Declarations
 // -----------------------------------------------------------------------------
@@ -142,7 +131,19 @@ extern char emergency_saved_running_time[];
 
 uint8_t app_join_network(uint8_t network_index);
 void app_task(void *args);
-void app_do_your_things();
+/** Replace pending status sends with the configured periodic schedule; disabled
+ * when auto_send_sec is zero or the node is not operational.
+ */
+void app_restart_send_status(void);
+/** Queue one immediate status send without changing the periodic schedule. */
+void app_send_status_asap(void);
+void app_get_heap_statistics(size_t *peak_before_join,
+                             size_t *peak_after_join,
+                             size_t *current_heap,
+                             size_t *heap_peak,
+                             size_t *heap_total);
+/** Get the timestamp captured by the EMERGENCY propagation callback. */
+const char *app_get_emergency_saved_running_time(void);
 void app_reset_statistics(void);
 void refresh_parent_tag(void);
 

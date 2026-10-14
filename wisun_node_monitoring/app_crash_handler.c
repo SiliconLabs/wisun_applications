@@ -21,7 +21,12 @@
 
 // Crash info string, filled by sl_wisun_check_previous_crash()
 #define SL_CRASH_STR_MAX_LEN            300
-char crash_info_string[SL_CRASH_STR_MAX_LEN];
+static char crash_info_string[SL_CRASH_STR_MAX_LEN];
+
+const char *app_crash_handler_get_previous_crash_info(void)
+{
+  return crash_info_string;
+}
 
 int sl_wisun_check_previous_crash(void) {
   int ret = 0;

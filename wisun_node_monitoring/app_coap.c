@@ -27,8 +27,9 @@
 * "/statistics/app/disconnected_total"  How much time the device has been disconnected since the first connection
 * "/statistics/app/connections"         How many times the device connected
 * "/statistics/app/connected_total"     How much time the device has been connected since the first connection
-* "/statistics/app/availability"        connected_total / (connected_total + disconnected_total) ratio
-* "/statistics/app/all"                 All 'app' statistics
+ * "/statistics/app/availability"        connected_total / (connected_total + disconnected_total) ratio
+ * "/statistics/app/heap"                Heap peaks before/after join, current usage, and current peak
+ * "/statistics/app/all"                 All 'app' statistics
 * "/statistics/stack/phy"               PHY statistics stored in sl_wisun_statistics_phy_t
 * "/statistics/stack/mac"               MAC statistics stored in sl_wisun_statistics_mac_t
 * "/statistics/stack/fhss"              FHSS statistics stored in sl_wisun_statistics_fhss_t
@@ -95,6 +96,7 @@
 #include "sl_wisun_app_core.h"
 
 #include "app.h"
+#include "app_crash_handler.h"
 #include "app_parameters.h"
 #include "app_coap.h"
 #include "app_check_neighbors.h"
@@ -407,15 +409,16 @@ sl_wisun_coap_packet_t * coap_callback_all_statuses (
 
 sl_wisun_coap_packet_t * coap_callback_send_status_msg (
       const  sl_wisun_coap_packet_t *const req_packet)  {
-  send_asap = true;
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "send_asap flag set to true" );
+  app_send_status_asap();
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "status action scheduled" );
   return app_coap_reply(coap_response, req_packet);
 }
 
 sl_wisun_coap_packet_t * coap_callback_crash_report (
     const  sl_wisun_coap_packet_t *const req_packet)  {
-  if (strlen(crash_info_string)) {
-      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", crash_info_string);
+  if (strlen(app_crash_handler_get_previous_crash_info())) {
+      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s",
+               app_crash_handler_get_previous_crash_info());
   } else {
       snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "No previous crash info");
   }
@@ -484,7 +487,8 @@ sl_wisun_coap_packet_t * coap_callback_time_run_time (
 
 sl_wisun_coap_packet_t * coap_callback_time_saved_time (
       const  sl_wisun_coap_packet_t *const req_packet)  {
-  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s", emergency_saved_running_time);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%s",
+           app_get_emergency_saved_running_time());
   return app_coap_reply(coap_response, req_packet); }
 
 sl_wisun_coap_packet_t * coap_callback_parent (
@@ -943,6 +947,8 @@ sl_wisun_coap_packet_t * coap_callback_auto_send (
     }
     if (res == 1) {
         network[app_parameters.network_index].auto_send_sec = (uint16_t)sec;
+        // Apply the new interval immediately
+        app_restart_send_status();
     } else {
         snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "invalid payload");
         return app_coap_reply(coap_response, req_packet);
@@ -950,6 +956,36 @@ sl_wisun_coap_packet_t * coap_callback_auto_send (
   }
   snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "%u", network[app_parameters.network_index].auto_send_sec);
 return app_coap_reply(coap_response, req_packet); }
+
+sl_wisun_coap_packet_t * coap_callback_heap_statistics(
+      const sl_wisun_coap_packet_t *const req_packet)
+{
+  size_t peak_before_join;
+  size_t peak_after_join;
+  size_t current_heap;
+  size_t heap_peak;
+  size_t heap_total;
+
+  app_get_heap_statistics(&peak_before_join,
+                          &peak_after_join,
+                          &current_heap,
+                          &heap_peak,
+                          &heap_total);
+  snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
+           "{\n"
+           "\"heap_peak_before_join\":\"%zu\",\n"
+           "\"heap_peak_after_join\":\"%zu\",\n"
+           "\"heap_current\":\"%zu\",\n"
+           "\"heap_peak\":\"%zu\",\n"
+           "\"heap_total\":\"%zu\"\n"
+           "}\n",
+           peak_before_join,
+           peak_after_join,
+           current_heap,
+           heap_peak,
+           heap_total);
+  return app_coap_reply(coap_response, req_packet);
+}
 
 #ifdef    APP_RTT_TRACES_H
 sl_wisun_coap_packet_t * coap_callback_trace_level (
@@ -1394,6 +1430,14 @@ uint8_t app_coap_resources_init() {
 #endif /* HISTORY */
 
 #endif /* COAP_APP_STATISTICS */
+
+  coap_resource.data.uri_path = "/statistics/app/heap";
+  coap_resource.data.resource_type = "json";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_heap_statistics;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
 
 #ifdef    COAP_STACK_STATISTICS
   coap_resource.data.uri_path = "/statistics/stack/phy";

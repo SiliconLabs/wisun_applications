@@ -1,6 +1,9 @@
 /***************************************************************************//**
 * @file app_action_scheduler.c
-* @brief Action scheduler for a Wi-SUN Node
+* @brief Timed-action scheduler for a Wi-SUN Node.
+*
+* Schedules delayed and periodic application work from one low-power timer and
+* executes callbacks in a worker thread.
 *******************************************************************************
 * # License
 * <b>Copyright 2023 Silicon Laboratories Inc. www.silabs.com</b>
@@ -38,10 +41,9 @@
 // -----------------------------------------------------------------------------
 
 #include <stdio.h>
-#include "app_action_scheduler.h"
-
 #include <string.h>
 
+#include "app_action_scheduler.h"
 #include "sl_sleeptimer.h"
 #include "cmsis_os2.h"
 #include "em_core.h"
@@ -53,12 +55,13 @@
 static app_scheduler_action_state_t g_scheduler_queue[APP_SCHEDULER_MAX_SLOTS];
 static uint8_t g_scheduler_count;
 static sl_sleeptimer_timer_handle_t g_scheduler_timer;
+static app_scheduler_action_fn_t g_scheduler_executing_action;
+static bool g_scheduler_executing_action_cancelled;
 
 static osThreadId_t g_scheduler_task_id;
 static osEventFlagsId_t g_scheduler_flags;
 
 #define APP_SCHEDULER_FLAG_EXECUTE         (1U << 0)
-#define APP_SCHEDULER_TASK_SIZE_BYTES      (1 * 2048UL)
 
 static const osThreadAttr_t g_scheduler_task_attr = {
   .name = "scheduler_action",
@@ -184,6 +187,8 @@ static void process_due_actions(void)
       if (g_scheduler_queue[0].deadline_ms <= current_ms) {
         local = g_scheduler_queue[0];
         queue_remove(0U);
+        g_scheduler_executing_action = local.action_fn;
+        g_scheduler_executing_action_cancelled = false;
         have_due = true;
       }
     }
@@ -197,28 +202,49 @@ static void process_due_actions(void)
     // User code runs outside the critical section to avoid blocking scheduling.
     CORE_EXIT_CRITICAL();
 
+    // Preserve a fixed-rate cadence by deriving the next deadline from the
+    // deadline that made this action due, before the callback can add delay.
+    if (local.periodic) {
+      local.start_ms = local.deadline_ms;
+      local.deadline_ms += (uint64_t)local.period_ms;
+      requeue = true;
+    }
+
     uint32_t result = execute_action(&local);
     if (result != 0U) {
       printf("scheduler: action callback failed with code %lu\n",
                      (unsigned long)result);
     }
 
-    // Periodic actions use fixed-delay scheduling: the next period starts after
-    // the current callback finishes.
+    // Do not catch up by running actions back-to-back when a callback or the
+    // system delayed us beyond one or more scheduled periods.
     if (local.periodic) {
-      local.start_ms = now_ms();
-      local.deadline_ms = local.start_ms + (uint64_t)local.period_ms;
-      requeue = true;
+      current_ms = now_ms();
+      if (local.deadline_ms <= current_ms) {
+        local.deadline_ms += (((current_ms - local.deadline_ms)
+                               / (uint64_t)local.period_ms) + 1U)
+                             * (uint64_t)local.period_ms;
+      }
     }
 
+    CORE_ENTER_CRITICAL();
+    // stop() can run while this callback executes. In that case the action is
+    // no longer in the queue, so honor its cancellation here and prevent this
+    // periodic instance from re-adding itself with its old period.
+    if ((g_scheduler_executing_action == local.action_fn)
+        && g_scheduler_executing_action_cancelled) {
+      requeue = false;
+    }
+    g_scheduler_executing_action = NULL;
+    g_scheduler_executing_action_cancelled = false;
+
     if (requeue) {
-      CORE_ENTER_CRITICAL();
       if (g_scheduler_count < APP_SCHEDULER_MAX_SLOTS) {
         queue_insert(&local);
       }
-      rearm_timer_locked();
-      CORE_EXIT_CRITICAL();
     }
+    rearm_timer_locked();
+    CORE_EXIT_CRITICAL();
   }
 }
 
@@ -258,6 +284,8 @@ void app_scheduler_action_init(void)
   memset(g_scheduler_queue, 0, sizeof(g_scheduler_queue));
   g_scheduler_count = 0U;
   memset(&g_scheduler_timer, 0, sizeof(g_scheduler_timer));
+  g_scheduler_executing_action = NULL;
+  g_scheduler_executing_action_cancelled = false;
 
   g_scheduler_flags = osEventFlagsNew(NULL);
   g_scheduler_task_id = osThreadNew(scheduler_task, NULL, &g_scheduler_task_attr);
@@ -313,6 +341,13 @@ bool app_scheduler_action_stop(app_scheduler_action_fn_t action_fn)
     } else {
       i++;
     }
+  }
+
+  // A periodic callback is removed from the queue while it runs.  Mark it so
+  // it cannot requeue itself after a caller has stopped it.
+  if (g_scheduler_executing_action == action_fn) {
+    g_scheduler_executing_action_cancelled = true;
+    stopped = true;
   }
 
   if (stopped) {

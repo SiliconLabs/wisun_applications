@@ -201,10 +201,25 @@ void _tcp_custom_callback(sl_wisun_evt_t *evt) {
     if (evt->header.id == SL_WISUN_MSG_SOCKET_DATA_AVAILABLE_IND_ID) {
         tcp_received_sockid = evt->evt.socket_data_available.socket_id;
       if (tcp_client_sockid == tcp_received_sockid) {
-        tcp_data_length = recv(tcp_client_sockid, tcp_buff, SL_WISUN_TCP_SERVER_BUFF_SIZE - 1, 0);
-        tcp_socket_data_received = (tcp_data_length > 0);
-        if (tcp_data_length == 0) {
+        tcp_r = recv(tcp_client_sockid,
+                     tcp_buff,
+                     SL_WISUN_TCP_SERVER_BUFF_SIZE - 1,
+                     0);
+        if (tcp_r > 0) {
+          count_tcp_rx++;
+          tcp_data_length = (uint16_t)tcp_r;
+          tcp_buff[tcp_data_length] = 0;
+          tcp_ip_str = app_wisun_trace_util_get_ip_str((void *)&tcp_client_addr.sin6_addr);
+          printfBothTime("TCP Rx %2ld from %s (%d bytes): %s\n",
+                         count_tcp_rx,
+                         tcp_ip_str,
+                         tcp_data_length,
+                         tcp_buff);
+          sl_free((void *)tcp_ip_str);
+        } else if (tcp_r == 0) {
           tcp_r = close(tcp_client_sockid);
+          tcp_client_sockid = SOCKET_INVALID_ID;
+          tcp_client_connected = false;
         }
       } else {
         // printfBothTime("socket_data_received on socket %ld: not for the TCP server\n", evt->evt.socket_data_available.socket_id);

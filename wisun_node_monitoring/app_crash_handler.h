@@ -18,7 +18,6 @@
 
 #include "sl_wisun_crash_handler.h"
 
-// Crash info string, filled by sl_wisun_check_previous_crash()
-extern char crash_info_string[];
-
 int sl_wisun_check_previous_crash(void);
+/** Get the crash report populated by sl_wisun_check_previous_crash(). */
+const char *app_crash_handler_get_previous_crash_info(void);

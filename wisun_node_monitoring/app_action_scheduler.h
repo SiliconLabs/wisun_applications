@@ -46,7 +46,19 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define APP_SCHEDULER_MAX_SLOTS 8U
+/**
+ * Maximum number of pending scheduler actions.
+ */
+#ifndef APP_SCHEDULER_MAX_SLOTS
+#define APP_SCHEDULER_MAX_SLOTS 12U
+#endif
+
+/**
+ * Scheduler worker stack in bytes. Highly dependant of action shceduled stack usage
+ */
+#ifndef APP_SCHEDULER_TASK_SIZE_BYTES
+#define APP_SCHEDULER_TASK_SIZE_BYTES (4U * 1024U)
+#endif
 
 typedef uint32_t (*app_scheduler_action_fn_t)(void *context);
 
@@ -65,11 +77,12 @@ typedef struct {
 void app_scheduler_action_init(void);
 
 /**
- * Schedule a scheduler action.
+ * Schedule an action. The action is executed in the task context.
  *
  * @param action_fn    Callback to execute when the delay expires.
  * @param delay_ms     Delay in milliseconds.
- * @param period_ms    Period for repeated execution, 0 for one-shot scheduling.
+ * @param period_ms    Fixed-rate period for repeated execution; overdue periods
+ *                     are skipped. Use 0 for one-shot scheduling.
  * @param context      Optional user context passed to the action callback.
  * @return true on success (timer started), false on error.
  */
@@ -79,7 +92,8 @@ bool app_scheduler_action_schedule(app_scheduler_action_fn_t action_fn,
                                    void *context);
 
 /**
- * Stop all scheduled instances of the given callback.
+ * Stop all scheduled instances of the given callback. If its periodic callback
+ * is currently running, it will not be requeued after it returns.
  *
  * @param action_fn Callback to stop.
  * @return true if at least one instance was stopped.

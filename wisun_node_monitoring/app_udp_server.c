@@ -1,6 +1,10 @@
 /***************************************************************************//**
  * @file app_udp_server.c
- * @brief UDP server for a Wi-SUN Node
+ * @brief Event-driven UDP server for a Wi-SUN Node.
+ *
+ * Provides shared UDP sockets with prefix-based datagram dispatch.  In event
+ * mode, received frames are deferred to a worker thread, avoiding application
+ * main-loop polling while keeping socket-event processing lightweight.
  *******************************************************************************
  * # License
  * <b>Copyright 2023 Silicon Laboratories Inc. www.silabs.com</b>
@@ -162,6 +166,9 @@ void init_udp_server(void)
 #endif /* (WITH_UDP_SERVER == SO_EVENT_MODE) */
 
 #if (WITH_UDP_SERVER == SO_EVENT_MODE)
+  // The event callback only receives and queues datagrams. Payload dispatch is
+  // deliberately deferred to the worker so application handlers cannot block
+  // the Wi-SUN event-manager context.
   udp_r = app_wisun_em_custom_callback_register(SL_WISUN_MSG_SOCKET_DATA_AVAILABLE_IND_ID,
                                                 _udp_custom_callback);
   assert_res(udp_r, "_udp_custom_callback() registration");
@@ -214,6 +221,9 @@ int32_t app_udp_server_register(uint16_t port,
     return SOCKET_INVALID_ID;
   }
 
+  // A port owns one bound socket, while several prefix handlers may share it.
+  // Re-registering an existing port/prefix updates the handler without opening
+  // another socket or changing registration order.
   for (i = 0U; i < APP_UDP_SERVER_MAX_CALLBACKS; i++) {
     if (udp_callbacks[i].used
         && (udp_callbacks[i].local_port == port)
@@ -236,6 +246,8 @@ int32_t app_udp_server_register(uint16_t port,
     return SOCKET_INVALID_ID;
   }
 
+  // Ensure the bind succeeds before consuming a callback-table entry, keeping
+  // a failed registration from leaving a partially registered handler behind.
   sockid = _udp_ensure_socket(port);
   if (sockid == SOCKET_INVALID_ID) {
     return SOCKET_INVALID_ID;
@@ -305,6 +317,8 @@ static bool _udp_dispatch_rx_payload(const udp_rx_msg_t *msg)
       continue;
     }
 
+    // Prefix registrations are ordered: the first matching handler owns the
+    // datagram, so overlapping prefixes must be registered deliberately.
     return udp_callbacks[i].callback(msg->sockid,
                                      msg->buff,
                                      msg->data_length,
@@ -319,6 +333,8 @@ static int32_t _udp_ensure_socket(uint16_t port)
 {
   uint32_t i;
 
+  // Registrations on the same UDP port deliberately share one socket; dispatch
+  // later distinguishes them by payload prefix rather than by socket id.
   for (i = 0U; i < APP_UDP_SERVER_MAX_SOCKETS; i++) {
     if (udp_sockets[i].used && (udp_sockets[i].local_port == port)) {
       return udp_sockets[i].sockid;
@@ -327,6 +343,8 @@ static int32_t _udp_ensure_socket(uint16_t port)
 
   for (i = 0U; i < APP_UDP_SERVER_MAX_SOCKETS; i++) {
     if (!udp_sockets[i].used) {
+      // Marking the entry used is deferred to _udp_open_socket() until socket,
+      // bind, and packet-info setup have all succeeded.
       if (_udp_open_socket(&udp_sockets[i], port, _udp_socket_type())) {
         return udp_sockets[i].sockid;
       }
@@ -382,6 +400,8 @@ static bool _udp_enable_pktinfo(int32_t sockid)
 {
   int enabled = 1;
 
+  // Sockets bind to in6addr_any. Packet info preserves the actual destination
+  // IPv6 address so handlers can distinguish unicast/multicast destinations.
   udp_r = setsockopt(sockid,
                      IPPROTO_IPV6,
                      IPV6_RECVPKTINFO,
@@ -395,6 +415,8 @@ static bool _udp_enable_pktinfo(int32_t sockid)
 static int32_t _udp_socket_type(void)
 {
 #if (WITH_UDP_SERVER == SO_EVENT_MODE)
+  // Events signal availability, not a guaranteed single datagram. Keep recv
+  // non-blocking so the worker can drain a socket without ever stalling.
   return SOCK_DGRAM | SOCK_NONBLOCK;
 #elif (WITH_UDP_SERVER == SO_NONBLOCK)
   return SOCK_DGRAM | SOCK_NONBLOCK;
@@ -424,6 +446,8 @@ static bool _udp_recv_socket(int32_t sockid, uint16_t local_port, udp_rx_msg_t *
   rx_hdr.msg_namelen = sizeof(msg->client_addr);
   rx_hdr.msg_iov = &iov;
   rx_hdr.msg_iovlen = 1;
+  // recvmsg() returns IPV6_PKTINFO in this ancillary buffer when enabled;
+  // recvfrom() would lose the destination address.
   rx_hdr.msg_control = control;
   rx_hdr.msg_controllen = sizeof(control);
 
@@ -541,6 +565,8 @@ static bool _udp_worker_init(void)
   }
 
   if (udp_rx_pool_id == NULL) {
+    // Fixed-size pool bounds receive memory and gives queued messages a stable
+    // owner until the worker has finished dispatching them.
     udp_rx_pool_id = osMemoryPoolNew(UDP_WORKER_QUEUE_LEN,
                                      sizeof(udp_rx_msg_t),
                                      NULL);
@@ -550,6 +576,8 @@ static bool _udp_worker_init(void)
   }
 
   if (udp_rx_queue_id == NULL) {
+    // The queue transfers pool-buffer ownership from the event callback to the
+    // worker task without running application code in event-manager context.
     udp_rx_queue_id = osMessageQueueNew(UDP_WORKER_QUEUE_LEN,
                                         sizeof(udp_rx_msg_t *),
                                         NULL);
@@ -594,6 +622,8 @@ static void _udp_custom_callback(sl_wisun_evt_t *evt)
     return;
   }
 
+  // Receive one datagram while handling the availability event, then let the
+  // worker invoke the potentially expensive prefix callback.
   msg = (udp_rx_msg_t *)osMemoryPoolAlloc(udp_rx_pool_id, 0U);
   if (msg == NULL) {
     printfTimeRTT("UDP cstm callback alloc fail\n");
@@ -645,9 +675,9 @@ static void _udp_worker_task(void *argument)
     (void)osMemoryPoolFree(udp_rx_pool_id, msg);
     msg = NULL;
 
-    //if (osMessageQueueGetCount(udp_rx_queue_id) == 0U) {
-      _udp_drain_socket(sockid, local_port);
-    //}
+    // Socket-data indications may be coalesced. Drain any datagrams that
+    // arrived before the next indication rather than waiting for another event.
+    _udp_drain_socket(sockid, local_port);
   }
 }
 

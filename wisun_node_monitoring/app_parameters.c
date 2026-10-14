@@ -519,7 +519,10 @@ sl_status_t set_app_parameter(char* parameter_name, int index, uint32_t value, c
           }
         }
         if  (!match) { match = (sl_strcasecmp(parameter_name, "auto_send_sec") == 0);
-          if (match) { network[index].auto_send_sec = (uint16_t)value; }
+          if (match) {
+            network[index].auto_send_sec = (uint16_t)value;
+            app_restart_send_status();
+          }
         }
         if  (!match) { match = (sl_strcasecmp(parameter_name, "udp_notif_dest") == 0);
           if (match) {

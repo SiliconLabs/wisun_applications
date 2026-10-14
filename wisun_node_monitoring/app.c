@@ -38,6 +38,7 @@
 // -----------------------------------------------------------------------------
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 #pragma message ("Build date: " __DATE__ " " __TIME__)
 
 #include "sl_assert.h"
@@ -55,9 +56,7 @@
 
 #include "app.h"
 
-#if __has_include("app_action_scheduler.h")
-  #include "app_action_scheduler.h"
-#endif
+#include "app_action_scheduler.h"
 
 #include "sl_event_system.h"
 
@@ -117,15 +116,12 @@
   #define PREVIOUS_CRASH_FORMAT_STRING ""
 #endif /* SL_WISUN_CRASH_HANDLER_H */
 
-#define   APP_TRACK_HEAP
-#define   APP_TRACK_HEAP_DIFF
-#ifdef    APP_TRACK_HEAP
-  #define TRACK_HEAP_FORMAT_STRING "\"heap_used\":\"%.2f\",\n"
-  #define TRACK_HEAP_VALUE         1.0*app_heap_info.used_size / (app_heap_info.total_size / 100),
-#else  /* APP_TRACK_HEAP */
-  #define TRACK_HEAP_FORMAT_STRING /* */
-  #define TRACK_HEAP_VALUE         /* */
-#endif /* APP_TRACK_HEAP */
+#define TRACK_HEAP_FORMAT_STRING "\"heap_used\":\"%.2f\",\n" \
+                                 "\"heap_peak\":\"%.2f\",\n"
+#define TRACK_HEAP_VALUE         (app_heap_info.total_size != 0U ? \
+                                  1.0 * app_heap_info.used_size / (app_heap_info.total_size / 100.0) : 0.0), \
+                                 (app_heap_info.total_size != 0U ? \
+                                  100.0 * sl_memory_get_heap_high_watermark() / app_heap_info.total_size : 0.0),
 
 #define UDP_RECEIVER_BUFFER_SIZE 2048
 #define UDP_NOTIFICATION_PORT_RX 5003
@@ -144,15 +140,11 @@
 #endif /* SL_CATALOG_WISUN_OTA_DFU_PRESENT */
 
 #if __has_include("app_tcp_server.h")
-  #ifdef WITH_TCP_SERVER
-    #include "app_tcp_server.h"
-  #endif /* WITH_TCP_SERVER */
+  #include "app_tcp_server.h"
 #endif
 
 #if __has_include("app_udp_server.h")
-  #ifdef WITH_UDP_SERVER
-    #include "app_udp_server.h"
-  #endif /* WITH_UDP_SERVER */
+  #include "app_udp_server.h"
 #endif
 
 #if __has_include("app_propagation.h")
@@ -190,31 +182,6 @@ int printf(const char* format, ...){
 #define IF_ERROR_RETURN(ret, ...)            if (ret != SL_STATUS_OK) {printfBothTime("\n"); printfBoth(__VA_ARGS__); return ret;}
 #define IF_ERROR_INCR(ret, error_count, ...) if (ret != SL_STATUS_OK) {printfBothTime("\n"); printfBoth(__VA_ARGS__); error_count++;}
 
-#ifdef    APP_RTT_TRACES_H
-  #define TRACES_WHILE_CONNECTING \
-    app_set_all_traces(SL_WISUN_TRACE_LEVEL_INFO, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_SOCK   , SL_WISUN_TRACE_LEVEL_INFO , true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_BOOT   , SL_WISUN_TRACE_LEVEL_DEBUG, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_DEBUG, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_TIM_SRV, SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_MAC    , SL_WISUN_TRACE_LEVEL_WARN , true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_FSM    , SL_WISUN_TRACE_LEVEL_WARN , true);
-
-  #define TRACES_WHEN_CONNECTED \
-    app_set_all_traces(SL_WISUN_TRACE_LEVEL_INFO, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_RF     , SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_RPL    , SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_TIM_SRV, SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_FHSS   , SL_WISUN_TRACE_LEVEL_ERROR, true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_MAC    , SL_WISUN_TRACE_LEVEL_WARN , true); \
-    app_set_trace(SL_WISUN_TRACE_GROUP_FSM    , SL_WISUN_TRACE_LEVEL_WARN , true);
-#else  /* APP_RTT_TRACES_H */
-  #define TRACES_WHILE_CONNECTING /* empty */
-  #define TRACES_WHEN_CONNECTED   /* empty */
-#endif /* APP_RTT_TRACES_H */
-
 #ifdef    HISTORY
 #define APPEND_TO_HISTORY(...) { \
   history_len = strlen(history_string); \
@@ -228,11 +195,6 @@ int printf(const char* format, ...){
 #define START_JSON "{\n"
 
 #define END_JSON   "}\n"
-
-#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-  uint8_t change_leds;
-  uint8_t previous_change_leds;
-#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
 #define DEVICE_CHIP_ITEMS \
   device_global_ipv6_string,\
@@ -305,13 +267,11 @@ int printf(const char* format, ...){
 void        _join_state_custom_callback(sl_wisun_evt_t *evt);
 void        _first_breath_ready_custom_callback(sl_wisun_evt_t *evt);
 
-#ifdef APP_ACTION_SCHEDULER_H
 static void event_ext_init(void);
 static void event_ext_task(void *argument);
 static void event_ext_handle_wisun_ind(sl_wisun_evt_t *wisun_evt);
 static uint32_t _first_breath_send_action(void *context);
 static uint32_t _first_breath_close_action(void *context);
-#endif /* APP_ACTION_SCHEDULER_H */
 
 #ifdef    APP_CHECK_NEIGHBORS_H
 void        _check_neighbors(void);
@@ -349,7 +309,7 @@ static bool _udp_direct_connect_callback(int32_t sockid,
                                          const sockaddr_in6_t *dst_addr);
 #endif /* WITH_DIRECT_CONNECT */
 #endif /* APP_UDP_SERVER_H */
-char*       _connection_json_string();
+char*       _connection_json_string(void);
 char*       _status_json_string (char * start_text);
 char        device_mac_string[40];
 sl_wisun_network_info_t network_info;
@@ -363,6 +323,23 @@ sl_status_t _coap_notify(char* json_string);
 
 uint8_t print_and_send_messages (char *in_msg, bool _with_time,
                             bool _to_console, bool _to_rtt, bool _to_udp, bool _to_coap);
+
+static uint32_t _app_send_status(void *context);
+static uint32_t _app_refresh_heap(void *context);
+#ifdef SL_CATALOG_POWER_MANAGER_PRESENT
+static uint32_t _app_power_manager_action(void *context);
+#endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+static uint32_t _app_led_action(void *context);
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+#ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
+static uint32_t _app_button_action(void *context);
+#endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
+static void _app_start_pre_join_actions(void);
+static void _app_start_operational_actions(void);
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+static void _app_restart_led_action(void);
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
 // -----------------------------------------------------------------------------
 //                                Global Variables
@@ -379,23 +356,28 @@ sl_wisun_neighbor_info_t parent_info;   // local storage of the parent info
 sl_wisun_neighbor_info_t secondary_info;// local storage of the secondary parent info
 uint8_t  min_join_state   = 0;       // Used to log Join State changes and check how 'low' it goes
 bool with_time, to_console, to_rtt, to_udp, to_coap;
-bool     send_asap;                  // Used to trigger sending the status as soon as possible
 uint16_t join_res = 0;
 uint64_t now = 0;
 uint64_t connection_timestamp;
-uint64_t connected_delay_sec;
-uint64_t next_status_sec;
 
-#ifdef    APP_TRACK_HEAP
 sl_memory_heap_info_t app_heap_info;
-#define APP_TRACK_HEAP_PERIOD_S  5 //second
- #ifdef    APP_TRACK_HEAP_DIFF
+#define APP_TRACK_HEAP_PERIOD_LFN_S 45U // LFN heap print period; 0 disables periodic tracking
+#define APP_TRACK_HEAP_PERIOD_FFN_S  5U // FFN heap print period; 0 disables periodic tracking
+#define APP_TRACK_HEAP_PERIOD_S \
+  ((network[app_parameters.network_index].device_type == SL_WISUN_LFN) \
+   ? APP_TRACK_HEAP_PERIOD_LFN_S : APP_TRACK_HEAP_PERIOD_FFN_S)
+size_t app_heap_peak_before_join;
+size_t app_heap_peak_after_join;
 size_t app_previous_heap_free;
- #endif /* APP_TRACK_HEAP_DIFF */
-bool   refresh_heap;
-#endif /* APP_TRACK_HEAP */
 
-bool time_to_send_status = true;
+#ifdef    SL_CATALOG_POWER_MANAGER_PRESENT
+#define APP_POWER_MANAGER_PERIOD_LFN_S 45U // LFN power-manager print period; 0 disables periodic tracking
+#endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
+
+#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
+uint8_t change_leds = 0;
+uint8_t previous_change_leds = UINT8_MAX; //init previous_change_leds != change_leds to force led update at startup
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
 char chip[8];
 char device_tag[8];
@@ -404,11 +386,12 @@ char secondary_tag[8];
 char application[100];
 char version[80];
 char device_type_string[25];
-char emergency_saved_running_time[21] = "not_set";
+static char emergency_saved_running_time[21] = "not_set";
 uint32_t parent_rsl_in  = 0;
 uint32_t parent_rsl_out = 0;
 
 bool just_disconnected = false;
+static bool app_operational_actions_ready;
 #ifdef    HISTORY
 uint16_t history_len;
 #endif /* HISTORY */
@@ -472,7 +455,6 @@ uint8_t  trace_level = SL_WISUN_TRACE_LEVEL_INFO;    // Trace level for all trac
 #define EVENT_EXT_TASK_STACK_SIZE_BYTES (1 * 2048UL)
 #define COAP_NOTIFICATION_PORT 5685
 
-#ifdef APP_ACTION_SCHEDULER_H
 static sl_event_queue_t event_ext_queue = NULL;
 static osThreadId_t event_ext_task_id = NULL;
 
@@ -486,7 +468,6 @@ static const osThreadAttr_t event_ext_task_attr = {
   .priority = osPriorityNormal,
   .tz_module = 0
 };
-#endif /* APP_ACTION_SCHEDULER_H */
 
 #define SL_WISUN_STATUS_CONNECTION_URI_PATH  "/status/connection"
 #define SL_WISUN_STATUS_JSON_STR_MAX_LEN 512
@@ -494,7 +475,6 @@ static const osThreadAttr_t event_ext_task_attr = {
 #ifdef    SL_SIMPLE_BUTTON_INSTANCES_H
   bool B0;
   bool B1;
-  bool check_buttons;
   #define BUTTON_CHECK_DELAY 2
 #endif /* SL_SIMPLE_BUTTON_INSTANCES_H */
 
@@ -1333,16 +1313,11 @@ cleanup:
 void app_task(void *args)
 {
   (void) args;
-  uint32_t osdelay_msec;
   const char *phy_str = NULL;
 
 #ifdef    SL_CATALOG_SIMPLE_BUTTON_PRESENT
   uint8_t startup_option = 0;
 #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
-
-#ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-  previous_change_leds = 5;
-#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
 #ifdef    SL_CATALOG_GECKO_BOOTLOADER_INTERFACE_PRESENT
   BootloaderStorageInformation_t storage_info;
@@ -1352,9 +1327,7 @@ void app_task(void *args)
   app_timestamp_init();
 #endif /* APP_TIMESTAMP_H */
 
-#ifdef    APP_ACTION_SCHEDULER_H
   event_ext_init();
-#endif /* APP_ACTION_SCHEDULER_H */
 
 #ifdef    SL_CATALOG_POWER_MANAGER_PRESENT
   printfBoth("With     Power Manager (for low power)\n");
@@ -1367,10 +1340,11 @@ void app_task(void *args)
 
 #ifdef    SL_WISUN_CRASH_HANDLER_H
   sl_wisun_check_previous_crash();
-  if (strlen(crash_info_string)) {
+  if (strlen(app_crash_handler_get_previous_crash_info())) {
       app_parameters.nb_crashes++;
       save_app_parameters();
-      printfBoth("Info on previous crash: %s\n", crash_info_string);
+      printfBoth("Info on previous crash: %s\n",
+                 app_crash_handler_get_previous_crash_info());
   }
 #endif /* SL_WISUN_CRASH_HANDLER_H */
 
@@ -1418,9 +1392,6 @@ void app_task(void *args)
 #ifdef    WISUN_CONFIG_BROADCAST_RETRIES
   printfBoth("Broadcast Retries %d\n", WISUN_CONFIG_BROADCAST_RETRIES);
 #endif /* WISUN_CONFIG_BROADCAST_RETRIES */
-  TRACES_WHILE_CONNECTING;
-
-
 #ifdef    HISTORY
   snprintf(history_string, SL_WISUN_COAP_RESOURCE_HND_SOCK_BUFF_SIZE, "%s", "");
 #endif /* HISTORY */
@@ -1458,7 +1429,6 @@ void app_task(void *args)
   B1 = ( sl_button_get_state(&sl_button_btn1) == SL_SIMPLE_BUTTON_PRESSED );
   startup_option = (B1 << 1) + B0;
   printfBoth("Startup option %d ('%d%d')\n", startup_option, B1, B0);
-  check_buttons = true;
   if (startup_option > 0) {
     if (startup_option <= 3) {
       printfBoth("Changing network_index from %d to %d based on buttons\n",
@@ -1468,11 +1438,11 @@ void app_task(void *args)
   }
 #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
 
-  // Use flags to select trace destinations
-  // Traces can only be sent over UDP or CoAP once connected, so
-  //  to_udp and to_coap are false by default.
+  // Use flags to select periodic status destinations
+  // Status can only be sent over UDP or CoAP once connected
   with_time = to_console = to_rtt = true;
-  to_udp = to_coap = false;
+  to_udp = true;
+  to_coap = false;
 
   // Register our join state custom callback function with the event manager (aka 'em')
   app_wisun_em_custom_callback_register(SL_WISUN_MSG_JOIN_STATE_IND_ID , _join_state_custom_callback);
@@ -1568,6 +1538,10 @@ void app_task(void *args)
 
   // Reset the time to when we call app_join_network()
   join_call_time_sec = app_timestamp_reset();
+  sl_memory_get_heap_info(&app_heap_info);
+  app_previous_heap_free = app_heap_info.free_size;
+  _app_start_pre_join_actions();
+  app_heap_peak_before_join = sl_memory_get_heap_high_watermark();
   // connect to the wisun network
   join_res = app_join_network(app_parameters.network_index);
 
@@ -1586,16 +1560,6 @@ void app_task(void *args)
 #endif /* TRACK_HEAP_PER_THREAD */
 
   while (1) {
-      #ifdef    WITH_DIRECT_CONNECT
-      if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) { // Only FFNs support Direct Connect
-       // To allow a Direct Connect connection, regularly check UDP messages
-        #ifdef    APP_UDP_SERVER_H
-        #if (WITH_UDP_SERVER == SO_NONBLOCK)
-        check_udp_server_messages();
-        #endif /* (WITH_UDP_SERVER == SO_NONBLOCK) */
-        #endif /* APP_UDP_SERVER_H */
-      }
-      #endif /* WITH_DIRECT_CONNECT */
       if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) break;
       now = now_sec();
       if (join_res == SL_STATUS_OK) {
@@ -1607,10 +1571,6 @@ void app_task(void *args)
                     phy_str,
                     join_state);
           sl_free((void *)phy_str);
-
-#ifdef   SL_CATALOG_POWER_MANAGER_PRESENT
-          print_power_manager_delays();
-#endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
 
       } else {
         if (join_res != SL_STATUS_OK) {
@@ -1634,6 +1594,9 @@ void app_task(void *args)
                       phy_str);
             sl_free((void *)phy_str);
             join_call_time_sec = app_timestamp_reset();
+
+            _app_start_pre_join_actions();
+
             join_res = app_join_network(app_parameters.network_index);
         }
       }
@@ -1650,10 +1613,6 @@ void app_task(void *args)
                                       60*1000);
     }
 
-    #ifdef TRACK_HEAP_PER_THREAD
-      sl_memory_manager_print_per_thread_alloc_free(0x01);
-    #endif /* TRACK_HEAP_PER_THREAD */
-
   }
 
 
@@ -1661,14 +1620,11 @@ void app_task(void *args)
   /  We only reach this part once connected  /
   *******************************************/
   connection_timestamp = now_sec();
+  app_heap_peak_after_join = sl_memory_get_heap_high_watermark();
 
   // Get ready to listen to and send notifications to the Border Router
   //  also get ready for CoAP communication
   _open_udp_sockets();
-
-  // Once connected for the first time, reduce RTT traces to the minimum
-  TRACES_WHEN_CONNECTED;
-
 
   #ifdef    SL_CATALOG_WISUN_OTA_DFU_PRESENT
   in6_addr_t global_ipv6;
@@ -1717,65 +1673,30 @@ void app_task(void *args)
   print_coap_help(device_global_ipv6_string, border_router_ipv6_string);
 #endif /* SL_CATALOG_WISUN_COAP_PRESENT */
 
-  // Print and send initial connection message
-  to_udp  = true;
-  to_coap = false;
-  print_and_send_messages (_connection_json_string(""),
+  // Send intial connection message
+  print_and_send_messages (_connection_json_string(),
               with_time, to_console, to_rtt, to_udp, to_coap);
 
 
 
 #ifdef    SL_WISUN_CRASH_HANDLER_H
-  if (strlen(crash_info_string)) {
+  if (strlen(app_crash_handler_get_previous_crash_info())) {
       osDelay(2UL);
-      print_and_send_messages (crash_info_string,
+      print_and_send_messages ((char *)app_crash_handler_get_previous_crash_info(),
                   with_time, to_console, to_rtt, to_udp, to_coap);
   }
 #endif /* SL_WISUN_CRASH_HANDLER_H */
 
-#ifdef    APP_TRACK_HEAP
-  sl_memory_get_heap_info(&app_heap_info);
-  #ifdef    APP_TRACK_HEAP_DIFF
-  app_previous_heap_free = app_heap_info.free_size;
-  #endif /* APP_TRACK_HEAP_DIFF */
-  refresh_heap = true;
-#endif /* APP_TRACK_HEAP */
-
   printfBothTime("network[%d].auto_send_sec %d\n", app_parameters.network_index, network[app_parameters.network_index].auto_send_sec);
-
-  if (network[app_parameters.network_index].device_type == SL_WISUN_LFN) {
-  #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-    set_leds(0, 0);
-  #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
-
-  }
-
-  #ifdef   SL_CATALOG_POWER_MANAGER_PRESENT
-  print_power_manager_pm_transitions();
-  print_power_manager_delays();
-  #endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
 
   previous_join_state = join_state;
 
-    ///////////////////////////////////////////////////////////////////////////
-    // Put your application code here!                                       //
-    ///////////////////////////////////////////////////////////////////////////
-  next_status_sec = now_sec() - connection_timestamp;
-  while (1) {
-    app_do_your_things();
-    // Wait auto_send_sec
-    if (network[app_parameters.network_index].auto_send_sec == 0) {
-      osdelay_msec = 60*1000;
-    } else {
-      osdelay_msec = network[app_parameters.network_index].auto_send_sec*1000;
-    }
+  _app_start_operational_actions();
 
-    //Router Device never sleep decrease polling time for best performances
-    if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
-      osdelay_msec = 1;
-    }
-
-    osDelay(osdelay_msec);
+  // Periodic application work is now performed by the action scheduler.
+  // This thread has no polling work left once the node is operational.
+  while (true) {
+    (void)osThreadSuspend(osThreadGetId());
   }
 }
 
@@ -1783,144 +1704,223 @@ void app_task(void *args)
 //                          Static Function Definitions
 // -----------------------------------------------------------------------------
 
-void app_do_your_things() {
+static uint32_t _app_send_status(void *context)
+{
+  (void)context;
   now = now_sec();
-  // Use the connection time as reference, in order to spread messages in time
-  // when several devices are powered on at the same time
-  connected_delay_sec = now - connection_timestamp;
+  sl_wisun_get_join_state(&join_state);
 
-  // We can only send messages outside if connected
-  if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
-    to_udp  = true;
-    to_coap = false;
-
-    #ifdef    APP_TCP_SERVER_H
-      check_tcp_server_messages();
-    #endif /* APP_TCP_SERVER_H */
-
-    #ifdef    APP_UDP_SERVER_H
-    #if (WITH_UDP_SERVER == SO_NONBLOCK)
-    check_udp_server_messages();
-    #endif /* (WITH_UDP_SERVER == SO_NONBLOCK) */
-    #endif /* APP_UDP_SERVER_H */
-
-  #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-    if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
-      // 1 Sec join state 5 indicator
-      change_leds = connected_delay_sec % 4;
-      if (change_leds != previous_change_leds) {
-          if (change_leds == 0) set_leds(0, 1);
-          if (change_leds == 1) set_leds(1, 1);
-          if (change_leds == 2) set_leds(1, 0);
-          if (change_leds == 3) set_leds(0, 0);
-          previous_change_leds = change_leds;
-      }
-    }
-  #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
-
-  } else {
-
-#ifdef    WITH_DIRECT_CONNECT
-  // Direct Connect connection is possible even when not connected to the Wi-SUN network
-  #ifdef    APP_UDP_SERVER_H
-  #if (WITH_UDP_SERVER == SO_NONBLOCK)
-  check_udp_server_messages();
-  #endif /* (WITH_UDP_SERVER == SO_NONBLOCK) */
-  #endif /* APP_UDP_SERVER_H */
-#endif /* WITH_DIRECT_CONNECT */
-
-    to_udp = to_coap = false;
-  #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-    if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
-      // 1 Sec non join state 5 indicator
-      change_leds = connected_delay_sec % 4;
-      if (change_leds != previous_change_leds) {
-          if (change_leds == 0         ) leds_f_join_state(join_state);
-          if (change_leds == join_state) set_leds(0, 0);
-          previous_change_leds = change_leds;
-      }
-    }
-  #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
-
+  //Status only sent when Operational
+  if (join_state != SL_WISUN_JOIN_STATE_OPERATIONAL) {
+    return 0U;
   }
 
-  if (connected_delay_sec >= next_status_sec || send_asap) {
-    time_to_send_status = true;
-    next_status_sec = connected_delay_sec + network[app_parameters.network_index].auto_send_sec;
-  } else {
-    time_to_send_status = false;
-  }
-  send_asap = false;
+  print_and_send_messages(_status_json_string(""),
+                          with_time, to_console, to_rtt, to_udp, to_coap);
+  return 0U;
+}
 
-  // Print status message once then disable status
-  if (time_to_send_status == true) {
-#ifdef   SL_CATALOG_POWER_MANAGER_PRESENT
-    if (to_console) {
-      print_power_manager_delays();
-    }
+static uint32_t _app_refresh_heap(void *context)
+{
+  (void)context;
+  sl_memory_get_heap_info(&app_heap_info);
+  if (app_previous_heap_free == 0U) {
+    app_previous_heap_free = app_heap_info.free_size;
+  }
+  if (app_previous_heap_free != app_heap_info.free_size) {
+    printfBothTime("heap free %8d used %8d %6.2f%% (free diff %5d)\n",
+                   app_heap_info.free_size,
+                   app_heap_info.used_size,
+                   1.0 * app_heap_info.used_size / (app_heap_info.total_size / 100.0),
+                   app_heap_info.free_size - app_previous_heap_free);
+  }
+  app_previous_heap_free = app_heap_info.free_size;
+
+  #ifdef TRACK_HEAP_PER_THREAD
+    sl_memory_manager_print_per_thread_alloc_free(0x01);
+  #endif /* TRACK_HEAP_PER_THREAD */
+
+  return 0U;
+}
+#ifdef SL_CATALOG_POWER_MANAGER_PRESENT
+static uint32_t _app_power_manager_action(void *context)
+{
+  (void)context;
+
+  print_power_manager_pm_transitions();
+  print_power_manager_delays();
+
+  return 0U;
+}
 #endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
 
-    print_and_send_messages (_status_json_string(""), with_time, to_console, to_rtt, to_udp, to_coap);
-    #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-    if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
-      sl_led_toggle(&sl_led_led0);
-      sl_led_toggle(&sl_led_led1);
-    }
-    #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+static uint32_t _app_led_action(void *context)
+{
+  (void)context;
+  uint64_t connected_sec;
+
+  connected_sec = now_sec() - connection_timestamp;
+  change_leds = connected_sec % 4U;
+  if (change_leds == previous_change_leds) {
+    return 0U;
   }
 
-#ifdef    APP_TRACK_HEAP
-  // Refresh heap info once then disable the refresh
-  if ((refresh_heap) && (connected_delay_sec % APP_TRACK_HEAP_PERIOD_S != 1)) {
-    sl_memory_get_heap_info(&app_heap_info);
-  #ifdef    APP_TRACK_HEAP_DIFF
-    if (app_previous_heap_free == 0) { app_previous_heap_free = app_heap_info.free_size; }
-    if (app_previous_heap_free != app_heap_info.free_size) {
-      printfBothTime("heap free %8d used %8d %6.2f%% (free diff %5d)\n",
-                  app_heap_info.free_size,
-                  app_heap_info.used_size,
-                  1.0*app_heap_info.used_size / (app_heap_info.total_size / 100),
-                  app_heap_info.free_size - app_previous_heap_free
-      );
-      refresh_heap = false;
-    }
-    app_previous_heap_free = app_heap_info.free_size;
-  #endif /* APP_TRACK_HEAP_DIFF */
-    refresh_heap = false;
+  sl_wisun_get_join_state(&join_state);
+  if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
+    if (change_leds == 0U) set_leds(0, 1);
+    if (change_leds == 1U) set_leds(1, 1);
+    if (change_leds == 2U) set_leds(1, 0);
+    if (change_leds == 3U) set_leds(0, 0);
+  } else {
+    leds_f_join_state(join_state);
   }
-  // Enable heap info refresh for next time
-  if (connected_delay_sec % APP_TRACK_HEAP_PERIOD_S == 1) { refresh_heap = true; }
-#endif /* APP_TRACK_HEAP */
+  previous_change_leds = change_leds;
+  return 0U;
+}
 
-#ifdef    SL_CATALOG_SIMPLE_BUTTON_PRESENT
-  if (connected_delay_sec % BUTTON_CHECK_DELAY == 0) {
-    if (check_buttons == true) {
-      check_buttons = false;
-      B0 = ( sl_button_get_state(&sl_button_btn0) == SL_SIMPLE_BUTTON_PRESSED );
-      B1 = ( sl_button_get_state(&sl_button_btn1) == SL_SIMPLE_BUTTON_PRESSED );
-      #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-        if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
-          if (B0) sl_led_turn_on(&sl_led_led0);
-          if (B1) sl_led_turn_on(&sl_led_led1);
-        }
-      #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
-      if (B0 + B1) {
-        print_and_send_messages (_button_json_string(""),
-                  with_time, to_console, to_rtt, to_udp, to_coap);
-      #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
-        if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
-          sl_led_turn_off(&sl_led_led0);
-          sl_led_turn_off(&sl_led_led1);
-        }
-      #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
-      }
-    }
+static void _app_restart_led_action(void)
+{
+  sl_wisun_get_join_state(&join_state);
+  (void)app_scheduler_action_stop(_app_led_action);
+  if (app_operational_actions_ready
+      && (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL)
+      && (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER)
+      && !app_scheduler_action_schedule(_app_led_action, 1000U, 1000U, NULL)) {
+    printfBothTime("Failed to schedule LED action\n");
   }
-  if (connected_delay_sec % BUTTON_CHECK_DELAY == 1) {
-    check_buttons = true;
+}
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+
+#ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
+static uint32_t _app_button_action(void *context)
+{
+  (void)context;
+  B0 = (sl_button_get_state(&sl_button_btn0) == SL_SIMPLE_BUTTON_PRESSED);
+  B1 = (sl_button_get_state(&sl_button_btn1) == SL_SIMPLE_BUTTON_PRESSED);
+  if (!(B0 || B1)) {
+    return 0U;
   }
+
+  
+
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+  if (B0) sl_led_turn_on(&sl_led_led0);
+  if (B1) sl_led_turn_on(&sl_led_led1);
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+
+  sl_wisun_get_join_state(&join_state);
+  if (join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
+    print_and_send_messages(_button_json_string(""),
+                            with_time, to_console, to_rtt, to_udp, to_coap);
+  }
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+  sl_led_turn_off(&sl_led_led0);
+  sl_led_turn_off(&sl_led_led1);
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+  return 0U;
+}
 #endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
 
+static void _app_start_pre_join_actions(void)
+{
+  // A failed join can select another network profile; replace actions so their
+  // period and device-type constraints follow the profile about to be joined.
+  (void)app_scheduler_action_stop(_app_refresh_heap);
+  if ((APP_TRACK_HEAP_PERIOD_S != 0U)
+      && !app_scheduler_action_schedule(_app_refresh_heap,
+                                        0U,
+                                        APP_TRACK_HEAP_PERIOD_S * 1000U,
+                                        NULL)) {
+    printfBothTime("Failed to schedule heap monitoring action\n");
+  }
+#ifdef SL_CATALOG_POWER_MANAGER_PRESENT
+  (void)app_scheduler_action_stop(_app_power_manager_action);
+  if ((network[app_parameters.network_index].device_type == SL_WISUN_LFN)
+      && (APP_POWER_MANAGER_PERIOD_LFN_S != 0U)
+      && !app_scheduler_action_schedule(_app_power_manager_action,
+                                        0,
+                                        APP_POWER_MANAGER_PERIOD_LFN_S * 1000U,
+                                        NULL)) {
+    printfBothTime("Failed to schedule power-manager action\n");
+  }
+#endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
+#ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
+  (void)app_scheduler_action_stop(_app_button_action);
+  if (network[app_parameters.network_index].device_type == SL_WISUN_ROUTER) {
+    (void)app_scheduler_action_schedule(_app_button_action,
+                                        0,
+                                        BUTTON_CHECK_DELAY * 1000U,
+                                        NULL);
+  }
+#endif /* SL_CATALOG_SIMPLE_BUTTON_PRESENT */
+}
+
+static void _app_start_operational_actions(void)
+{
+  app_operational_actions_ready = true;
+  app_restart_send_status();
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+  _app_restart_led_action();
+#endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+}
+void app_restart_send_status(void)
+{
+  uint32_t period_ms;
+
+  sl_wisun_get_join_state(&join_state);
+  (void)app_scheduler_action_stop(_app_send_status);
+  if ((network[app_parameters.network_index].auto_send_sec == 0U)
+      || (join_state != SL_WISUN_JOIN_STATE_OPERATIONAL)
+      || !app_operational_actions_ready) {
+    return;
+  }
+
+  period_ms = (uint32_t)network[app_parameters.network_index].auto_send_sec * 1000U;
+  if (!app_scheduler_action_schedule(_app_send_status,
+                                     0,
+                                     period_ms,
+                                     NULL)) {
+    printfBothTime("Failed to schedule periodic status action\n");
+  }
+}
+
+void app_send_status_asap(void)
+{
+  sl_wisun_get_join_state(&join_state);
+  if ((join_state == SL_WISUN_JOIN_STATE_OPERATIONAL)
+      && app_operational_actions_ready
+      && !app_scheduler_action_schedule(_app_send_status, 0U, 0U, NULL)) {
+    printfBothTime("Failed to schedule immediate status action\n");
+  }
+}
+
+void app_get_heap_statistics(size_t *peak_before_join,
+                             size_t *peak_after_join,
+                             size_t *current_heap,
+                             size_t *heap_peak,
+                             size_t *heap_total)
+{
+  if (peak_before_join != NULL) {
+    *peak_before_join = app_heap_peak_before_join;
+  }
+  if (peak_after_join != NULL) {
+    *peak_after_join = app_heap_peak_after_join;
+  }
+  if (current_heap != NULL) {
+    *current_heap = sl_memory_get_used_heap_size();
+  }
+  if (heap_peak != NULL) {
+    *heap_peak = sl_memory_get_heap_high_watermark();
+  }
+  if (heap_total != NULL) {
+    *heap_total = sl_memory_get_total_heap_size();
+  }
+}
+
+const char *app_get_emergency_saved_running_time(void)
+{
+  return emergency_saved_running_time;
 }
 
 void app_reset_statistics(void) {
@@ -1986,6 +1986,14 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
   uint64_t now = now_sec();
 
   join_state = (sl_wisun_join_state_t)evt->evt.join_state.join_state;
+  // In case device not operational stop send status & Led
+  if (app_operational_actions_ready
+      && (join_state != SL_WISUN_JOIN_STATE_OPERATIONAL)) {
+    (void)app_scheduler_action_stop(_app_send_status);
+  #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+    (void)app_scheduler_action_stop(_app_led_action);
+  #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+  }
   if (join_state >  SL_WISUN_JOIN_STATE_OPERATIONAL) {
     if ((join_state >= SL_WISUN_JOIN_STATE_PARENT_SELECT) && (join_state <= SL_WISUN_JOIN_STATE_DAO)) {
       // Join state 4 sub-state (4.1 = parent select, 4.2 = DHCP,
@@ -2076,12 +2084,16 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
       // if sockets are opened, print and send connection message
       // This will occur in case of a reconnection
       if (udp_notification_socket_id) {
-        to_udp = true;
-        to_coap = false;
-        print_and_send_messages (_connection_json_string(""),
+        print_and_send_messages (_connection_json_string(),
             with_time, to_console, to_rtt, to_udp, to_coap);
       }
-      TRACES_WHEN_CONNECTED;
+      // Restart also send status & Led
+      if (app_operational_actions_ready) {
+        app_restart_send_status();
+      #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+        _app_restart_led_action();
+      #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
+      }
     }
     // Prepare counting disconnected time
     if (previous_join_state == SL_WISUN_JOIN_STATE_OPERATIONAL) {
@@ -2096,7 +2108,6 @@ void  _join_state_custom_callback(sl_wisun_evt_t *evt) {
     #endif /* HISTORY */
 
       just_disconnected = true;
-      TRACES_WHILE_CONNECTING;
     }
     previous_join_state = join_state;
     #ifdef    SL_CATALOG_SIMPLE_LED_PRESENT
@@ -2126,7 +2137,7 @@ void  _check_neighbors(void) {
 }
 #endif /* APP_CHECK_NEIGHBORS_H */
 
-char* _connection_json_string () {
+char* _connection_json_string (void) {
   #define CONNECTION_JSON_FORMAT_STR                    \
     START_JSON                                          \
     DEVICE_CHIP_JSON_FORMAT                             \
@@ -2298,7 +2309,6 @@ char* _status_json_string (char * start_text) {
   return json_string;
 }
 
-#ifdef APP_ACTION_SCHEDULER_H
 static void event_ext_init(void)
 {
   sl_status_t status;
@@ -2499,8 +2509,6 @@ static uint32_t _first_breath_send_action(void *context)
 
   return 0U;
 }
-#endif /* APP_ACTION_SCHEDULER_H */
-
 void _first_breath_ready_custom_callback(sl_wisun_evt_t *evt)
 {
   sl_status_t status = (sl_status_t)evt->evt.fb_ready.status;
@@ -2510,13 +2518,9 @@ void _first_breath_ready_custom_callback(sl_wisun_evt_t *evt)
     return;
   }
 
-#ifdef APP_ACTION_SCHEDULER_H
   if (!app_scheduler_action_schedule(_first_breath_send_action, 0U, 0U, NULL)) {
     printfBothTime("Failed to schedule First Breath UDP send\n");
   }
-#else
-  printfBothTime("First Breath ready, but action scheduler is not present\n");
-#endif /* APP_ACTION_SCHEDULER_H */
 }
 
 sl_status_t _select_destinations(void) {

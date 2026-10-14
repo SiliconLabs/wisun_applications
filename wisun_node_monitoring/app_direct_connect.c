@@ -51,6 +51,7 @@
 
 #include "app_timestamp.h"
 #include "app_rtt_traces.h"
+#include "app_crash_handler.h"
 
 #include "app_direct_connect.h"
 
@@ -70,8 +71,6 @@
 uint8_t direct_connect_pmk[SL_WISUN_PMK_LEN] = {
     0x34, 0xba, 0x32, 0x26, 0xa0, 0xb2, 0xad, 0x66, 0x7c, 0x9f, 0x66, 0x02, 0xe5, 0xdb, 0x75, 0x77,
     0xdd, 0xbd, 0x5d, 0x2b, 0x34, 0x3a, 0x93, 0x06, 0x2b, 0x90, 0xc0, 0x7b, 0xe2, 0x8e, 0x4e, 0x54 };
-
-extern char crash_info_string[];
 
 // -----------------------------------------------------------------------------
 //                                Static Variables
@@ -210,12 +209,16 @@ char *      app_direct_connect_cli(char *cli_msg) {
       return direct_connect_cli_response;
   }
   if (strcmp(cli_msg, "wisun crash_report") == 0) {
-      if (strlen(crash_info_string)) {
-          return crash_info_string;
+      const char *crash_info = app_crash_handler_get_previous_crash_info();
+      if (strlen(crash_info)) {
+          snprintf(direct_connect_cli_response,
+                   sizeof(direct_connect_cli_response),
+                   "%s",
+                   crash_info);
+          return direct_connect_cli_response;
       } else {
           return "No previous crash info";
       }
-    return crash_info_string;
   }
   return direct_connect_cli_response;
 }
