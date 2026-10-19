@@ -25,6 +25,7 @@ source:
 - {path: app_udp_server.c}
 - {path: app_wisun_multicast_ota.c}
 - {path: app_action_scheduler.c}
+- {path: app_fb_lg.c}
 - {path: main.c}
 - {path: app_crash_handler.c}
 - {path: app_propagation.c}
@@ -45,6 +46,7 @@ include:
   - {path: app_udp_server.h}
   - {path: app_wisun_multicast_ota.h}
   - {path: app_action_scheduler.h}
+  - {path: app_fb_lg.h}
   - {path: app_crash_handler.h}
   - {path: app_propagation.h}
 

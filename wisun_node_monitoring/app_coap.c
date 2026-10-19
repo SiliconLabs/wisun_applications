@@ -98,6 +98,7 @@
 #include "app.h"
 #include "app_crash_handler.h"
 #include "app_parameters.h"
+#include "app_fb_lg.h"
 #include "app_coap.h"
 #include "app_check_neighbors.h"
 
@@ -139,6 +140,8 @@ static uint32_t app_scheduler_join_cb(void *context);
 static uint32_t app_scheduler_reconnect_cb(void *context);
 static uint32_t app_scheduler_clear_and_reconnect_cb(void *context);
 static uint32_t app_scheduler_reboot_cb(void *context);
+static sl_wisun_coap_packet_t *coap_callback_test_lastgasp(
+  const sl_wisun_coap_packet_t *const req_packet);
 
 static bool coap_parse_two_uint32_args(const sl_wisun_coap_packet_t *const req_packet,
                                        uint32_t *first_ms,
@@ -288,6 +291,7 @@ void  print_coap_help (char* device_global_ipv6_string, char* border_router_ipv6
   printf("  '/test/reconnect -e \"<x> <y>\"' disconnects after x ms, waits y ms, then rejoins\n");
   printf("  '/test/clear_and_reconnect -e \"<x> <y>\"' clears credentials and reconnects with x/y ms timing\n");
   printf("  '/test/reboot -e \"<x> <y>\"' starts in x ms, blocks app activity for y ms, then reboots\n");
+  printf("  '/test/lastgasp -e \"<x> <y>\"' enables/sends Last Gasp in x ms, reboots y ms later\n");
   printf("\n");
 }
 
@@ -468,6 +472,48 @@ sl_wisun_coap_packet_t * coap_callback_test_reboot (
   return coap_schedule_test_action(req_packet,
                                    "reboot",
                                    app_scheduler_reboot_cb);
+}
+
+static sl_wisun_coap_packet_t *coap_callback_test_lastgasp(
+  const sl_wisun_coap_packet_t *const req_packet)
+{
+  uint32_t enable_delay_ms;
+  uint32_t reboot_delay_ms;
+  app_settings_wisun_t *current_param;
+  bool current_network_is_router;
+
+  if (!coap_parse_two_uint32_args(req_packet,
+                                  &enable_delay_ms,
+                                  &reboot_delay_ms)) {
+    snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
+             "Bad format: use -e \"<enable_delay_ms> <reboot_delay_ms>\"");
+    return app_coap_reply(coap_response, req_packet);
+  }
+
+  app_parameter_mutex_acquire();
+  current_param = get_network_parameters(get_app_parameters()->network_index);
+  current_network_is_router = (current_param != NULL)
+                              && (current_param->device_type == SL_WISUN_ROUTER);
+  app_parameter_mutex_release();
+  if (!current_network_is_router) {
+    snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
+             "Last Gasp is only supported by FFN routers");
+    return app_coap_reply(coap_response, req_packet);
+  }
+
+  if (app_fb_lg_schedule_last_gasp(enable_delay_ms, reboot_delay_ms)) {
+    snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
+             "Last Gasp test scheduled: enable/send in %lu ms, reboot %lu ms after send",
+             (unsigned long)enable_delay_ms,
+             (unsigned long)reboot_delay_ms);
+  } else {
+    snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
+             "Could not schedule Last Gasp test (unsupported device/build, test already pending, or scheduler full)");
+  }
+
+  printfBothTime("CoAP last gasp : %s",coap_response);
+
+  return app_coap_reply(coap_response, req_packet);
 }
 
 sl_wisun_coap_packet_t * coap_callback_version (
@@ -1577,6 +1623,14 @@ uint8_t app_coap_resources_init() {
   coap_resource.data.resource_type = "text";
   coap_resource.data.interface = "test";
   coap_resource.auto_response = coap_callback_test_reboot;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+
+  coap_resource.data.uri_path = "/test/lastgasp";
+  coap_resource.data.resource_type = "text";
+  coap_resource.data.interface = "test";
+  coap_resource.auto_response = coap_callback_test_lastgasp;
   coap_resource.discoverable = true;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;

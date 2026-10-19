@@ -59,7 +59,7 @@
 
 #include "app_action_scheduler.h"
 
-#include "sl_event_system.h"
+#include "app_fb_lg.h"
 
 #if __has_include("app_list_configs.h")
   /* app_list_configs.c/.h can be added/removed from the project */
@@ -266,13 +266,6 @@ int printf(const char* format, ...){
 //                          Static Function Declarations
 // -----------------------------------------------------------------------------
 void        _join_state_custom_callback(sl_wisun_evt_t *evt);
-void        _first_breath_ready_custom_callback(sl_wisun_evt_t *evt);
-
-static void event_ext_init(void);
-static void event_ext_task(void *argument);
-static void event_ext_handle_wisun_ind(sl_wisun_evt_t *wisun_evt);
-static uint32_t _first_breath_send_action(void *context);
-static uint32_t _first_breath_close_action(void *context);
 
 #ifdef    APP_CHECK_NEIGHBORS_H
 void        _check_neighbors(void);
@@ -367,6 +360,10 @@ void app_update_current_network(void) {
   this_network = get_network_parameters(get_app_parameters()->network_index);
 }
 
+const char *app_fb_lg_get_udp_notification_destination(void) {
+  return (this_network != NULL) ? this_network->udp_notification_dest : NULL;
+}
+
 sl_memory_heap_info_t app_heap_info;
 #define APP_TRACK_HEAP_PERIOD_LFN_S 45U // LFN heap print period; 0 disables periodic tracking
 #define APP_TRACK_HEAP_PERIOD_FFN_S  5U // FFN heap print period; 0 disables periodic tracking
@@ -434,47 +431,25 @@ in6_addr_t border_router_ipv6;
 
 sockaddr_in6_t udp_notification_sockaddr_in6;
 sockaddr_in6_t coap_notification_sockaddr_in6;
-sockaddr_in6_t first_breath_sockaddr_in6;
 
 // IPv6 address strings (for printing)
 char  device_global_ipv6_string[40];
 char  border_router_ipv6_string[40];
 char  udp_notification_ipv6_string[40];
 char  coap_notification_ipv6_string[40];
-char  first_breath_ipv6_string[40];
 
 // Notification sockets
 sl_wisun_socket_id_t udp_notification_socket_id = 0;
 sl_wisun_socket_id_t coap_notification_socket_id = 0;
-sl_wisun_socket_id_t first_breath_socket_id = SOCKET_INVALID_ID;
 
 char udp_msg[1024];
 char coap_msg[1024];
-char first_breath_msg[256];
 
 uint8_t  trace_level = SL_WISUN_TRACE_LEVEL_INFO;    // Trace level for all trace groups
 
 // UDP ports
 #define UDP_NOTIFICATION_PORT  1237
-#define FIRST_BREATH_NOTIFICATION_PORT 1238
-#define FIRST_BREATH_SOCKET_CLOSE_DELAY_MS (60U * 1000U)
-#define EVENT_EXT_QUEUE_SIZE 8U
-#define EVENT_EXT_TASK_STACK_SIZE_BYTES (1 * 2048UL)
 #define COAP_NOTIFICATION_PORT 5685
-
-static sl_event_queue_t event_ext_queue = NULL;
-static osThreadId_t event_ext_task_id = NULL;
-
-static const osThreadAttr_t event_ext_task_attr = {
-  .name = "event_ext",
-  .attr_bits = osThreadDetached,
-  .cb_mem = NULL,
-  .cb_size = 0,
-  .stack_mem = NULL,
-  .stack_size = EVENT_EXT_TASK_STACK_SIZE_BYTES,
-  .priority = osPriorityNormal,
-  .tz_module = 0
-};
 
 #define SL_WISUN_STATUS_CONNECTION_URI_PATH  "/status/connection"
 #define SL_WISUN_STATUS_JSON_STR_MAX_LEN 512
@@ -1334,7 +1309,7 @@ void app_task(void *args)
   app_timestamp_init();
 #endif /* APP_TIMESTAMP_H */
 
-  event_ext_init();
+  app_fb_lg_init();
 
 #ifdef    SL_CATALOG_POWER_MANAGER_PRESENT
   printfBoth("With     Power Manager (for low power)\n");
@@ -2323,218 +2298,6 @@ char* _status_json_string (char * start_text) {
   );
 
   return json_string;
-}
-
-static void event_ext_init(void)
-{
-  sl_status_t status;
-
-  status = sl_event_queue_create(EVENT_EXT_QUEUE_SIZE,
-                                 &event_ext_queue);
-  if (status != SL_STATUS_OK) {
-    printfBothTime("Failed to create event_ext queue: 0x%04x\n",
-                   (uint16_t)status);
-    return;
-  }
-
-  status = sl_event_subscribe(SL_EVENT_CLASS_WISUN,
-                              SL_WISUN_EVENT_IND_MASK,
-                              event_ext_queue);
-  if (status != SL_STATUS_OK) {
-    printfBothTime("Failed to subscribe event_ext queue: 0x%04x\n",
-                   (uint16_t)status);
-    (void)sl_event_queue_delete(event_ext_queue);
-    event_ext_queue = NULL;
-    return;
-  }
-
-  event_ext_task_id = osThreadNew(event_ext_task,
-                                  NULL,
-                                  &event_ext_task_attr);
-  if (event_ext_task_id == NULL) {
-    printfBothTime("Failed to create event_ext task\n");
-    (void)sl_event_queue_delete(event_ext_queue);
-    event_ext_queue = NULL;
-  }
-}
-
-static void event_ext_task(void *argument)
-{
-  uint8_t event_prio = 0U;
-  sl_event_t *event = NULL;
-  sl_wisun_evt_t *wisun_evt;
-
-  (void)argument;
-
-  for (;;) {
-    if (sl_event_queue_get(event_ext_queue,
-                           &event_prio,
-                           osWaitForever,
-                           &event) != SL_STATUS_OK) {
-      continue;
-    }
-
-    wisun_evt = (sl_wisun_evt_t *)event->event_data;
-    if (wisun_evt != NULL) {
-      event_ext_handle_wisun_ind(wisun_evt);
-    }
-
-    // This queue shares stack event objects; always release after inspection.
-    (void)sl_event_process(&event);
-  }
-}
-
-static void event_ext_handle_wisun_ind(sl_wisun_evt_t *wisun_evt)
-{
-  switch (wisun_evt->header.id) {
-    case SL_WISUN_MSG_FB_READY_IND_ID:
-      _first_breath_ready_custom_callback(wisun_evt);
-      break;
-    case SL_WISUN_MSG_RX_FRAME_IND_ID:
-    case SL_WISUN_MSG_LOGGER_EVENT_IND_ID:
-    case SL_WISUN_MSG_DIRECT_CONNECT_ID_SOLICIT_IND_ID:
-    case SL_WISUN_MSG_DIRECT_CONNECT_ID_RECEIVED_IND_ID:
-    case SL_WISUN_MSG_DIRECT_CONNECT_CLIENT_STATE_CHANGED_IND_ID:
-      printfBothTime("event_ext: Wi-SUN ind 0x%02x not handled by SDK event manager\n",
-                     (unsigned int)wisun_evt->header.id);
-      break;
-    default:
-      break;
-  }
-}
-
-static uint32_t _first_breath_close_action(void *context)
-{
-  (void)context;
-
-  if (first_breath_socket_id == SOCKET_INVALID_ID) {
-    return 0U;
-  }
-
-  printfBothTime("Closing First Breath socket (id %d)\n",
-                 (int)first_breath_socket_id);
-  if (close(first_breath_socket_id) == SOCKET_RETVAL_ERROR) {
-    first_breath_socket_id = SOCKET_INVALID_ID;
-    return (uint32_t)SL_STATUS_FAIL;
-  }
-
-  first_breath_socket_id = SOCKET_INVALID_ID;
-  return 0U;
-}
-
-static uint32_t _first_breath_send_action(void *context)
-{
-  bool enabled;
-  char dest[IPV6_STR_LEN];
-  char running_sec_string[21];
-  int tclass;
-  int msg_len;
-  int socket_ret;
-
-  (void)context;
-
-  app_parameter_mutex_acquire();
-  enabled = this_network->first_breath;
-  snprintf(dest, sizeof(dest), "%s", this_network->udp_notification_dest);
-  app_parameter_mutex_release();
-
-  if (!enabled) {
-    return 0U;
-  }
-
-  if (first_breath_socket_id != SOCKET_INVALID_ID) {
-    (void)app_scheduler_action_stop(_first_breath_close_action);
-    (void)_first_breath_close_action(NULL);
-  }
-
-  memset(&first_breath_sockaddr_in6, 0, sizeof(first_breath_sockaddr_in6));
-  if (!sl_wisun_stoip6(dest,
-                       strlen(dest),
-                       first_breath_sockaddr_in6.sin6_addr.address)) {
-    printfBothTime("First Breath invalid UDP destination: %s\n", dest);
-    return (uint32_t)SL_STATUS_INVALID_PARAMETER;
-  }
-
-  sl_wisun_ip6tos(first_breath_sockaddr_in6.sin6_addr.address,
-                  first_breath_ipv6_string);
-  first_breath_sockaddr_in6.sin6_family = AF_INET6;
-  first_breath_sockaddr_in6.sin6_port = htons(FIRST_BREATH_NOTIFICATION_PORT);
-
-  first_breath_socket_id = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
-  if (first_breath_socket_id == SOCKET_INVALID_ID) {
-    printfBothTime("Failed to open First Breath socket\n");
-    return (uint32_t)SL_STATUS_FAIL;
-  }
-
-  tclass = IPV6_TCLASS_FROM_DSCP(DSCP_EF);
-  socket_ret = setsockopt(first_breath_socket_id,
-                          IPPROTO_IPV6,
-                          IPV6_TCLASS,
-                          &tclass,
-                          (socklen_t)sizeof(tclass));
-  if (socket_ret == SOCKET_RETVAL_ERROR) {
-    printfBothTime("Failed to set First Breath socket DSCP_EF\n");
-    (void)_first_breath_close_action(NULL);
-    return (uint32_t)SL_STATUS_FAIL;
-  }
-
-  snprintf(running_sec_string, sizeof(running_sec_string), "%s", dhms(now_sec()));
-  msg_len = snprintf(first_breath_msg,
-                     sizeof(first_breath_msg),
-                     "{\n"
-                     "\"first_breath\":\"true\",\n"
-                     "\"running\":\"%s\",\n"
-                     "\"device\":\"%s\",\n"
-                     "\"network\":\"%d\"\n"
-                     "}\n",
-                     running_sec_string,
-                     device_tag,
-                     get_app_parameters()->network_index);
-  if ((msg_len < 0) || (msg_len >= (int)sizeof(first_breath_msg))) {
-    (void)_first_breath_close_action(NULL);
-    return (uint32_t)SL_STATUS_WOULD_OVERFLOW;
-  }
-
-  if (sendto(first_breath_socket_id,
-             (uint8_t *)first_breath_msg,
-             (size_t)msg_len,
-             0,
-             (const struct sockaddr *)&first_breath_sockaddr_in6,
-             sizeof(first_breath_sockaddr_in6)) == SOCKET_RETVAL_ERROR) {
-    printfBothTime("Failed to send First Breath UDP to %s/%d\n",
-                   first_breath_ipv6_string,
-                   FIRST_BREATH_NOTIFICATION_PORT);
-    (void)_first_breath_close_action(NULL);
-    return (uint32_t)SL_STATUS_TRANSMIT;
-  }
-
-  printfBothTime("First Breath UDP sent to %s/%d (%d bytes)\n",
-                 first_breath_ipv6_string,
-                 FIRST_BREATH_NOTIFICATION_PORT,
-                 msg_len);
-
-  if (!app_scheduler_action_schedule(_first_breath_close_action,
-                                     FIRST_BREATH_SOCKET_CLOSE_DELAY_MS,
-                                     0U,
-                                     NULL)) {
-    printfBothTime("Failed to schedule First Breath socket close\n");
-    return (uint32_t)SL_STATUS_FAIL;
-  }
-
-  return 0U;
-}
-void _first_breath_ready_custom_callback(sl_wisun_evt_t *evt)
-{
-  sl_status_t status = (sl_status_t)evt->evt.fb_ready.status;
-
-  if (status != SL_STATUS_OK) {
-    printfBothTime("First Breath ready event status 0x%04x\n", (uint16_t)status);
-    return;
-  }
-
-  if (!app_scheduler_action_schedule(_first_breath_send_action, 0U, 0U, NULL)) {
-    printfBothTime("Failed to schedule First Breath UDP send\n");
-  }
 }
 
 sl_status_t _select_destinations(void) {

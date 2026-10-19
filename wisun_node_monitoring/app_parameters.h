@@ -43,6 +43,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "sl_component_catalog.h"
 #include "nvm3_default.h"
 #include "sl_wisun_types.h"
 #include "sl_wisun_connection_params_api.h"
