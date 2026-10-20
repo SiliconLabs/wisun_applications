@@ -11,7 +11,15 @@
 
 #include "app_action_scheduler.h"
 #include "app_fb_lg.h"
-#include "app_timestamp.h"
+#if __has_include("app_timestamp.h")
+  #include "app_timestamp.h"
+#else
+  #define printfRTT printf
+  #define printfTimeRTT printf
+  #define printfBoth printf
+  #define printfBothTime printf
+  #define printfTime printf
+#endif
 #include "cmsis_os2.h"
 #include "sl_event_system.h"
 #include "sl_wisun_api.h"

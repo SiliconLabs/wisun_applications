@@ -38,6 +38,8 @@
 // -----------------------------------------------------------------------------
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
+
 #include "cmsis_os2.h"
 #include "SEGGER_RTT.h"
 #include "socket/socket.h"
@@ -48,17 +50,10 @@
 #include "app_reporter.h"
 
 
-#if defined(SL_CATALOG_MICRIUMOS_KERNEL_PRESENT)
-#include "os.h"
-#endif
-#if defined(SL_CATALOG_FREERTOS_KERNEL_PRESENT)
-#include "FreeRTOS.h"
-#endif
-
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
-#define APP_REPORTER_TASK_STACK_SIZE 2500 // in units of CPU_INT32U
+#define APP_REPORTER_TASK_STACK_SIZE 1024 // in units of CPU_INT32U
 #define REPORTER_PORT                        3770
 uint32_t reporter_started = 0;
 

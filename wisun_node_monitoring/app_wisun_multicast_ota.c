@@ -1,5 +1,42 @@
+/***************************************************************************//**
+* @file app_wisun_multicast_ota.c
+ * @brief Receives multicast OTA firmware chunks over UDP, tracks download status,
+ *        and schedules image installation through the bootloader.
+*******************************************************************************
+* # License
+* <b>Copyright 2023 Silicon Laboratories Inc. www.silabs.com</b>
+*******************************************************************************
+*
+* SPDX-License-Identifier: Zlib
+*
+* The licensor of this software is Silicon Laboratories Inc.
+*
+* This software is provided 'as-is', without any express or implied
+* warranty. In no event will the authors be held liable for any damages
+* arising from the use of this software.
+*
+* Permission is granted to anyone to use this software for any purpose,
+* including commercial applications, and to alter it and redistribute it
+* freely, subject to the following restrictions:
+*
+* 1. The origin of this software must not be misrepresented; you must not
+*    claim that you wrote the original software. If you use this software
+*    in a product, an acknowledgment in the product documentation would be
+*    appreciated but is not required.
+* 2. Altered source versions must be plainly marked as such, and must not be
+*    misrepresented as being the original software.
+* 3. This notice may not be removed or altered from any source distribution.
+*
+******************************************************************************
+*
+* EXPERIMENTAL QUALITY
+* This code has not been formally tested and is provided as-is.  It is not suitable for production environments.
+* This code will not be maintained.
+*
+******************************************************************************/
 #include <stdint.h>
 #include <stdio.h>
+#include <assert.h>
 
 #if __has_include("sl_wisun_ota_dfu.h")
   #include "sl_wisun_ota_dfu.h"
@@ -10,20 +47,11 @@
 
 #ifdef    APP_WISUN_MULTICAST_OTA_H
 
-#include "cmsis_os2.h"
-#include "app.h"
-
-uint32_t udp_index;
-uint32_t udp_previous_index;
-uint32_t udp_lost_count;
-uint32_t udp_received_count;
-
-#include "sl_memory_manager.h"
-
-
 #include "btl_interface.h"
 #include "nvm3.h"
 #include "nvm3_default.h"
+
+#include "sl_wisun_api.h"
 
 #if __has_include("app_parameters.h")
   #include "app_parameters.h"
@@ -31,16 +59,36 @@ uint32_t udp_received_count;
 
 #if __has_include("app_action_scheduler.h")
   #include "app_action_scheduler.h"
+#else
+  #include "cmsis_os2.h"
 #endif
 
-extern char device_tag[];
-//extern sl_wisun_ota_dfu_settings_t _settings;
+#if __has_include("app_timestamp.h")
+  #include "app_timestamp.h"
+#else
+  #define printfRTT printf
+  #define printfTimeRTT printf
+  #define printfBoth printf
+  #define printfBothTime printf
+  #define printfTime printf
+#endif
+
+#ifndef SL_BOARD_NAME
+  #define SL_BOARD_NAME "Custom_Board"
+#endif
 
 typedef enum {
   APP_OTA_CLEAR_NVM_NO = 0,
   APP_OTA_CLEAR_NVM_APP = 1,
   APP_OTA_CLEAR_NVM_FULL = 2,
 } app_ota_clear_nvm_t;
+
+static char device_tag[8];
+
+extern uint8_t __Vectors[];
+extern uint8_t __etext[];
+extern uint8_t __data_start__[];
+extern uint8_t __data_end__[];
 
 /// Resent packet count
 uint32_t _resent_count;
@@ -75,6 +123,44 @@ uint32_t  missed_rx_index[MAX_CHUNKS];
 char    information_string[INFO_STRING_LENGTH];
 BootloaderStorageInformation_t storage_info;
 BootloaderStorageSlot_t slot0;
+
+void multicast_ota_init(void)
+{
+  sl_wisun_mac_address_t device_mac;
+
+  if (sl_wisun_get_mac_address(&device_mac) != SL_STATUS_OK) {
+    printf("Failed to get device MAC address; multicast OTA initialization aborted\n");
+    return;
+  }
+  (void)snprintf(device_tag, sizeof(device_tag), "%02x%02x",
+                 device_mac.address[6], device_mac.address[7]);
+
+#if MULTICAST_OTA_STORE_IN_FLASH == 1
+  bootloader_getStorageInfo(&storage_info);
+
+  int32_t ret_val = bootloader_getStorageSlotInfo(0, &slot0);
+  if (ret_val != BOOTLOADER_OK) {
+    printf("bootloader_getStorageSlotInfo(0) failed: 0x%08lx; multicast OTA initialization aborted\n",
+           (unsigned long)ret_val);
+    return;
+  }
+
+  // __Vectors is app_start; __etext plus the .data load image is app_end.
+#define APP_FLASH_START ((uint64_t)(uintptr_t)__Vectors)
+#define APP_FLASH_END   ((uint64_t)(uintptr_t)__etext \
+                         + (uint64_t)((uintptr_t)__data_end__ - (uintptr_t)__data_start__))
+  if ((storage_info.storageType == INTERNAL_FLASH)
+      && ((uint64_t)slot0.address < APP_FLASH_END)
+      && (APP_FLASH_START < ((uint64_t)slot0.address + slot0.length))) {
+    printf("OTA storage slot overlaps application flash; refusing erase\n");
+    return;
+  }
+#undef APP_FLASH_END
+#undef APP_FLASH_START
+#endif /* MULTICAST_OTA_STORE_IN_FLASH == 1 */
+
+  clear_ota_data();
+}
 
 static uint32_t app_scheduler_ota_reboot_install_cb(void *context)
 {

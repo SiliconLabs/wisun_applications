@@ -52,6 +52,12 @@ extern "C" {
 
 #if __has_include("app_timestamp.h")
   #include "app_timestamp.h"
+#else
+  #define printfRTT printf
+  #define printfTimeRTT printf
+  #define printfBoth printf
+  #define printfBothTime printf
+  #define printfTime printf
 #endif
 
 #if __has_include("app_parameters.h")
@@ -95,10 +101,6 @@ extern "C" {
   #endif
 #endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
 
-#ifndef printfBothTime
-    #define printfTime     printf
-    #define printfBothTime printf
-#endif /*printfBothTime*/
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
@@ -130,8 +132,10 @@ extern "C" {
 #endif /* SL_CATALOG_SIMPLE_LED_PRESENT */
 
 uint8_t app_join_network(uint8_t network_index);
-/** Refresh the selected network pointer while holding the app parameter mutex. */
+/** Copy the selected network into the active settings while holding the app parameter mutex. */
 void app_update_current_network(void);
+void app_get_udp_notification_destination(char *destination, size_t size);
+sl_wisun_device_type_t app_get_current_network_device_type(void);
 void app_task(void *args);
 /** Replace pending status sends with the configured periodic schedule; disabled
  * when auto_send_sec is zero or the node is not operational.

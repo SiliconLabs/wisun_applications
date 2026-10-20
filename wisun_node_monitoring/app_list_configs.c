@@ -31,7 +31,6 @@
 //                                   Includes
 // -----------------------------------------------------------------------------
 #include <stdio.h>
-#include "app.h"
 #include "sl_wisun_trace_util.h"  // for app_wisun_phy_to_str()
 
 void list_rf_configs (void) {

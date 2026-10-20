@@ -44,7 +44,6 @@
 // -----------------------------------------------------------------------------
 
 #include "app_udp_server.h"
-#include "app.h"
 
 #ifdef WITH_UDP_SERVER
 
@@ -53,10 +52,18 @@
 #include <string.h>
 
 #include "cmsis_os2.h"
-#include "sl_string.h"
-#include "sl_wisun_api.h"
 #include "sl_wisun_app_core_util.h"
 #include "sl_wisun_trace_util.h"
+
+#if __has_include("app_timestamp.h")
+  #include "app_timestamp.h"
+#else
+  #define printfRTT printf
+  #define printfTimeRTT printf
+  #define printfBoth printf
+  #define printfBothTime printf
+  #define printfTime printf
+#endif
 
 // -----------------------------------------------------------------------------
 // Macros and Typedefs
@@ -586,7 +593,7 @@ static bool _udp_worker_init(void)
     }
   }
 
-  printf("%s/%s starting '%s' thread with stack_size of %4lu bytes\n",
+  printfBoth("%s/%s starting '%s' thread with stack_size of %4lu bytes\n",
          __FILE__,
          __FUNCTION__,
          udp_worker_attr.name,

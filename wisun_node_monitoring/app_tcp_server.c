@@ -49,7 +49,15 @@
 #include "sl_wisun_app_core_util.h"
 #include "sl_wisun_trace_util.h"
 #include "sl_memory_manager.h"
-#include "app_timestamp.h"
+#if __has_include("app_timestamp.h")
+  #include "app_timestamp.h"
+#else
+  #define printfRTT printf
+  #define printfTimeRTT printf
+  #define printfBoth printf
+  #define printfBothTime printf
+  #define printfTime printf
+#endif
 #include "app_rtt_traces.h"
 
 // -----------------------------------------------------------------------------

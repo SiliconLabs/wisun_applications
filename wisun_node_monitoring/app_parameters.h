@@ -48,15 +48,15 @@
 #include "sl_wisun_types.h"
 #include "sl_wisun_connection_params_api.h"
 
+#if __has_include("ltn_config.h")
+  #include "ltn_config.h"
+#endif
+
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
 // -----------------------------------------------------------------------------
 #define IPV6_STR_LEN       41 // + trailing null
 #define NVM3_APP_KEY   0xf013
-
-#if __has_include("ltn_config.h")
-  #include "ltn_config.h"
-#endif
 
 #ifndef   START_FLASHES_A
   #define START_FLASHES_A     3
@@ -347,6 +347,9 @@ sl_status_t init_app_parameters();
 sl_status_t read_app_parameters();
 sl_status_t save_app_parameters();
 sl_status_t delete_app_parameters();
+
+/** Notifies the application after active parameters affecting runtime behavior change. */
+void app_parameters_changed_callback(void);
 
 // Set and Print application parameters
 void        print_network_parameters(int network_index);

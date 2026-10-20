@@ -37,9 +37,6 @@
 #ifndef    APP_CHECK_NEIGHBORS_H
 #define    APP_CHECK_NEIGHBORS_H
 #include <stdio.h>
-#include <assert.h>
-#include "cmsis_os2.h"
-#include "sl_cmsis_os2_common.h"
 #include "sl_wisun_api.h"
 
 

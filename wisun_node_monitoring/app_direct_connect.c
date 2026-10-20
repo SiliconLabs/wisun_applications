@@ -41,7 +41,6 @@
 #include "psa/crypto.h"
 #include "em_system.h"
 
-#include "sl_string.h"
 #include "sl_wisun_api.h"
 
 #ifdef    SEMAILBOX_PRESENT
@@ -49,7 +48,15 @@
  #include "sl_se_manager_util.h"
 #endif /* SEMAILBOX_PRESENT */
 
-#include "app_timestamp.h"
+#if __has_include("app_timestamp.h")
+  #include "app_timestamp.h"
+#else
+  #define printfRTT printf
+  #define printfTimeRTT printf
+  #define printfBoth printf
+  #define printfBothTime printf
+  #define printfTime printf
+#endif
 #include "app_rtt_traces.h"
 #include "app_crash_handler.h"
 

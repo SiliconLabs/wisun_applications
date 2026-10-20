@@ -85,6 +85,7 @@
 // -----------------------------------------------------------------------------
 #include <stdint.h>
 #include <string.h>
+#include <assert.h>
 #include "cmsis_nvic_virtual.h"
 #include "sl_string.h"
 #include "sl_memory_manager.h"
@@ -110,6 +111,16 @@
 #if __has_include("app_wisun_multicast_ota.h")
   // app_wisun_multicast_ota/c/.h can be added/removed from the project
   #include "app_wisun_multicast_ota.h"
+#endif
+
+#if __has_include("app_timestamp.h")
+  #include "app_timestamp.h"
+#else
+  #define printfRTT printf
+  #define printfTimeRTT printf
+  #define printfBoth printf
+  #define printfBothTime printf
+  #define printfTime printf
 #endif
 
 #include "app_action_scheduler.h"
@@ -479,7 +490,6 @@ static sl_wisun_coap_packet_t *coap_callback_test_lastgasp(
 {
   uint32_t enable_delay_ms;
   uint32_t reboot_delay_ms;
-  app_settings_wisun_t *current_param;
   bool current_network_is_router;
 
   if (!coap_parse_two_uint32_args(req_packet,
@@ -490,11 +500,8 @@ static sl_wisun_coap_packet_t *coap_callback_test_lastgasp(
     return app_coap_reply(coap_response, req_packet);
   }
 
-  app_parameter_mutex_acquire();
-  current_param = get_network_parameters(get_app_parameters()->network_index);
-  current_network_is_router = (current_param != NULL)
-                              && (current_param->device_type == SL_WISUN_ROUTER);
-  app_parameter_mutex_release();
+  current_network_is_router = (app_get_current_network_device_type() == SL_WISUN_ROUTER);
+
   if (!current_network_is_router) {
     snprintf(coap_response, COAP_MAX_RESPONSE_LEN,
              "Last Gasp is only supported by FFN routers");
@@ -996,9 +1003,10 @@ sl_wisun_coap_packet_t * coap_callback_auto_send (
         app_parameter_mutex_acquire();
         current_network = get_network_parameters(get_app_parameters()->network_index);
         current_network->auto_send_sec = (uint16_t)sec;
-        // Apply the new interval immediately
-        app_restart_send_status();
+        // Apply the new interval immediately.
+        app_update_current_network();
         app_parameter_mutex_release();
+        app_restart_send_status();
     } else {
         snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "invalid payload");
         return app_coap_reply(coap_response, req_packet);
@@ -1154,23 +1162,19 @@ return app_coap_reply(coap_response, req_packet); }
 sl_wisun_coap_packet_t * coap_callback_reporter_start (
     const  sl_wisun_coap_packet_t *const req_packet)  {
   char* payload_str = NULL;
-  app_settings_wisun_t *current_network;
+  char destination[IPV6_STR_LEN];
   if (req_packet->payload_len) {
       // Get payload in string format with last char = '\0'
       payload_str = sl_wisun_coap_get_payload_str(req_packet);
       if (payload_str != NULL ){
-          app_parameter_mutex_acquire();
-          current_network = get_network_parameters(get_app_parameters()->network_index);
-          app_start_reporter(current_network->udp_notification_dest, 1000, (char *)payload_str);
-          app_parameter_mutex_release();
+          app_get_udp_notification_destination(destination, sizeof(destination));
+          app_start_reporter(destination, 1000, (char *)payload_str);
           sl_free(payload_str);
       }
     } else {
         // if no payload, accept all lines
-      app_parameter_mutex_acquire();
-      current_network = get_network_parameters(get_app_parameters()->network_index);
-      app_start_reporter(current_network->udp_notification_dest, 1000, (char *)"*");
-      app_parameter_mutex_release();
+      app_get_udp_notification_destination(destination, sizeof(destination));
+      app_start_reporter(destination, 1000, (char *)"*");
     }
     snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "started");
   return app_coap_reply(coap_response, req_packet); }

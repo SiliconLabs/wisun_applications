@@ -42,11 +42,12 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 
 #include "app_action_scheduler.h"
 #include "sl_sleeptimer.h"
 #include "cmsis_os2.h"
-#include "em_core.h"
+#include "sl_core.h"
 
 // -----------------------------------------------------------------------------
 // Local state

@@ -38,8 +38,9 @@
 // -----------------------------------------------------------------------------
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <assert.h>
 
-#include "sl_common.h"
 #include "sl_string.h"
 #include "cmsis_nvic_virtual.h"
 #include "nvm3_default_config.h"
@@ -48,18 +49,20 @@
 #include "sl_wisun_api.h"
 #include "sl_wisun_config.h"
 
-#include "app.h"
+#include "cmsis_os2.h"
 
-#if __has_include("app_parameters.h")
-  #include "app_parameters.h"
-#endif
+
+#include "app_parameters.h"
+
 
 #if __has_include("app_timestamp.h")
   #include "app_timestamp.h"
-#endif
-
-#if __has_include("app_rtt_traces.h")
-  #include "app_rtt_traces.h"
+#else
+  #define printfRTT printf
+  #define printfTimeRTT printf
+  #define printfBoth printf
+  #define printfBothTime printf
+  #define printfTime printf
 #endif
 
 #if __has_include("app_action_scheduler.h")
@@ -75,6 +78,10 @@
 // -----------------------------------------------------------------------------
 static uint32_t app_scheduler_reboot_cb(void *context);
 static uint32_t app_scheduler_clear_credential_cache_and_reboot_cb(void *context);
+
+__attribute__((weak)) void app_parameters_changed_callback(void)
+{
+}
 
 // -----------------------------------------------------------------------------
 //                                Global Variables
@@ -443,9 +450,13 @@ static sl_status_t set_app_parameter_unlocked(char* parameter_name, int index, u
 
   if  (!match) { match = (sl_strcasecmp(parameter_name, "network_index") == 0);
     if (match) {
+        if (value >= MAX_NETWORK_CONFIGS) {
+            return SL_STATUS_INVALID_PARAMETER;
+        }
         app_parameters.network_index = (uint16_t)value;
-        app_update_current_network();
-        save_app_parameters();
+        if (save_app_parameters() == SL_STATUS_OK) {
+            app_parameters_changed_callback();
+        }
         printfBothTime("Prepared to reboot on network %ld\n", value);
     }
   }
@@ -453,10 +464,11 @@ static sl_status_t set_app_parameter_unlocked(char* parameter_name, int index, u
     if (match) {
         // Set all defaults
         set_app_parameters_defaults(value);
-        app_update_current_network();
         // Save default settings if passed a value different from 0
         if (value & ((1 << MAX_NETWORK_CONFIGS) -1)) {
-            save_app_parameters();
+            if (save_app_parameters() == SL_STATUS_OK) {
+                app_parameters_changed_callback();
+            }
             sprintf(value_str, "set defaults and autosaved for networks matching 0x%02lx bitfield", value);
         } else {
             sprintf(value_str, "set all defaults (no autosave), use 'save' before rebooting");
@@ -469,6 +481,7 @@ static sl_status_t set_app_parameter_unlocked(char* parameter_name, int index, u
     if (match) {
       value = (uint16_t)save_app_parameters();
       if (value == SL_STATUS_OK) {
+          app_parameters_changed_callback();
           sprintf(value_str, "saved to nvm3 with success %d networks", MAX_NETWORK_CONFIGS);
       } else {
           sprintf(value_str, "nvm3 save  error: %ld", value);
@@ -519,7 +532,7 @@ static sl_status_t set_app_parameter_unlocked(char* parameter_name, int index, u
   #endif /* APP_ACTION_SCHEDULER_H */
   if  (!match) {
     // Network settings (require the network_index, provide as 'index')
-    if (index < MAX_NETWORK_CONFIGS) {
+    if (index >= 0 && index < MAX_NETWORK_CONFIGS) {
         if  (!match) { match = (sl_strcasecmp(parameter_name, "network_name") == 0);
           if (match) {
               snprintf(network[index].network_name, SL_WISUN_NETWORK_NAME_SIZE, "%s", value_str);
@@ -531,7 +544,6 @@ static sl_status_t set_app_parameter_unlocked(char* parameter_name, int index, u
         if  (!match) { match = (sl_strcasecmp(parameter_name, "auto_send_sec") == 0);
           if (match) {
             network[index].auto_send_sec = (uint16_t)value;
-            app_restart_send_status();
           }
         }
         if  (!match) { match = (sl_strcasecmp(parameter_name, "udp_notif_dest") == 0);
@@ -868,6 +880,7 @@ sl_status_t read_app_parameters()   {
 
 sl_status_t save_app_parameters()   {
   sl_status_t status;
+  sl_status_t write_status;
   int i;
   status = nvm3_writeData(nvm3_defaultHandle, NVM3_APP_KEY, &app_parameters, sizeof(app_parameters));
   if (status != SL_STATUS_OK) {
@@ -876,10 +889,13 @@ sl_status_t save_app_parameters()   {
                      NVM3_APP_KEY, sizeof(app_parameters), status);
   } else {
       for (i=0; i<MAX_NETWORK_CONFIGS; i++) {
-          status = nvm3_writeData(nvm3_defaultHandle, NVM3_APP_KEY+1+i, &network[i], sizeof(app_settings_wisun_t));
-          if (status != SL_STATUS_OK) {
+          write_status = nvm3_writeData(nvm3_defaultHandle, NVM3_APP_KEY+1+i, &network[i], sizeof(app_settings_wisun_t));
+          if (write_status != SL_STATUS_OK) {
+              if (status == SL_STATUS_OK) {
+                  status = write_status;
+              }
               printfBoth("nvm3_writeData(nvm3_defaultHandle, 0x%04x, app_parameters, %d) returned 0x%04lX\n",
-                           NVM3_APP_KEY+1+i, sizeof(app_settings_wisun_t), status);
+                           NVM3_APP_KEY+1+i, sizeof(app_settings_wisun_t), write_status);
           } else {
               printfBoth("network %d parameters saved to nvm3 (key 0x%04x, %d bytes)\n",
                            i, NVM3_APP_KEY+1+i, sizeof(app_settings_wisun_t));
