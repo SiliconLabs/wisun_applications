@@ -84,6 +84,8 @@
 //                                   Includes
 // -----------------------------------------------------------------------------
 #include <stdint.h>
+#include <inttypes.h>
+#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include "cmsis_nvic_virtual.h"
@@ -153,6 +155,14 @@ static uint32_t app_scheduler_clear_and_reconnect_cb(void *context);
 static uint32_t app_scheduler_reboot_cb(void *context);
 static sl_wisun_coap_packet_t *coap_callback_test_lastgasp(
   const sl_wisun_coap_packet_t *const req_packet);
+#ifdef SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+static sl_wisun_coap_packet_t *coap_callback_lfn_unicast_interval(
+  const sl_wisun_coap_packet_t *const req_packet);
+#endif
+#ifdef SL_CATALOG_POWER_MANAGER_PRESENT
+static sl_wisun_coap_packet_t *coap_callback_lfn_statistics(
+  const sl_wisun_coap_packet_t *const req_packet);
+#endif
 
 static bool coap_parse_two_uint32_args(const sl_wisun_coap_packet_t *const req_packet,
                                        uint32_t *first_ms,
@@ -522,6 +532,47 @@ static sl_wisun_coap_packet_t *coap_callback_test_lastgasp(
 
   return app_coap_reply(coap_response, req_packet);
 }
+
+#ifdef SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+static sl_wisun_coap_packet_t *coap_callback_lfn_unicast_interval(
+  const sl_wisun_coap_packet_t *const req_packet)
+{
+  char *payload_str;
+  uint32_t interval_ms;
+  uint32_t restore_delay_ms = 0U;
+  int parsed = 0;
+  sl_status_t status;
+
+  if ((req_packet->msg_code == COAP_MSG_CODE_REQUEST_PUT) && req_packet->payload_len) {
+    payload_str = sl_wisun_coap_get_payload_str(req_packet);
+    if (payload_str != NULL) {
+      parsed = sscanf(payload_str, "%" SCNu32 " %" SCNu32,
+                      &interval_ms, &restore_delay_ms);
+      sl_free(payload_str);
+    }
+  }
+  if (parsed < 1) {
+    snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Use PUT with <interval_ms> [<restore_delay_ms>]");
+  } else {
+    status = app_set_lfn_unicast_interval_temporary(interval_ms, restore_delay_ms, parsed == 2);
+    if (status == SL_STATUS_OK) {
+      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Applied %" PRIu32 " ms", interval_ms);
+    } else {
+      snprintf(coap_response, COAP_MAX_RESPONSE_LEN, "Failed: %lu", (unsigned long)status);
+    }
+  }
+  return app_coap_reply(coap_response, req_packet);
+}
+#endif
+
+#ifdef SL_CATALOG_POWER_MANAGER_PRESENT
+static sl_wisun_coap_packet_t *coap_callback_lfn_statistics(
+  const sl_wisun_coap_packet_t *const req_packet)
+{
+  (void)app_format_lfn_power_manager_statistics(coap_response, sizeof(coap_response));
+  return app_coap_reply(coap_response, req_packet);
+}
+#endif
 
 sl_wisun_coap_packet_t * coap_callback_version (
       const  sl_wisun_coap_packet_t *const req_packet)  {
@@ -1502,6 +1553,26 @@ uint8_t app_coap_resources_init() {
   coap_resource.discoverable = true;
   assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
   count++;
+
+#ifdef SL_CATALOG_POWER_MANAGER_PRESENT
+  coap_resource.data.uri_path = "/statistics/lfn";
+  coap_resource.data.resource_type = "text";
+  coap_resource.data.interface = "node";
+  coap_resource.auto_response = coap_callback_lfn_statistics;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+#endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
+
+#ifdef SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+  coap_resource.data.uri_path = "/lfn/unicast_interval";
+  coap_resource.data.resource_type = "int";
+  coap_resource.data.interface = "lfn";
+  coap_resource.auto_response = coap_callback_lfn_unicast_interval;
+  coap_resource.discoverable = true;
+  assert(sl_wisun_coap_rhnd_resource_add(&coap_resource) == SL_STATUS_OK);
+  count++;
+#endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
 
 #ifdef    COAP_STACK_STATISTICS
   coap_resource.data.uri_path = "/statistics/stack/phy";

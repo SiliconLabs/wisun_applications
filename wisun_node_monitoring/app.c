@@ -36,10 +36,10 @@
 // -----------------------------------------------------------------------------
 //                                   Includes
 // -----------------------------------------------------------------------------
-#include "app_parameters.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <inttypes.h>
 #pragma message ("Build date: " __DATE__ " " __TIME__)
 
 #include "sl_assert.h"
@@ -56,10 +56,10 @@
 #include "sl_wisun_version.h"
 
 #include "app.h"
-
 #include "app_action_scheduler.h"
-
 #include "app_fb_lg.h"
+#include "app_parameters.h"
+#include "app_timestamp.h"
 
 #if __has_include("app_list_configs.h")
   /* app_list_configs.c/.h can be added/removed from the project */
@@ -69,10 +69,6 @@
 #if __has_include("app_crash_handler.h")
   /* sl_wisun_crash_handler.h comes with the Wi-SUN Crash Handler component */
   #include "app_crash_handler.h"
-#endif
-
-#if __has_include("sl_board_control.h")
-  #include "sl_board_control.h"
 #endif
 
 #ifdef SL_CATALOG_POWER_MANAGER_PRESENT
@@ -356,6 +352,10 @@ uint64_t connection_timestamp;
 
 static app_settings_wisun_t this_network;
 static void _refresh_notification_destinations(void);
+#ifdef SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+static uint32_t _app_restore_lfn_unicast_interval(void *context);
+static sl_status_t _app_set_lfn_unicast_interval(uint32_t interval_ms);
+#endif
 
 void app_update_current_network(void) {
   this_network = *get_network_parameters(get_app_parameters()->network_index);
@@ -378,6 +378,18 @@ sl_wisun_device_type_t app_get_current_network_device_type(void) {
 void app_parameters_changed_callback(void)
 {
   app_update_current_network();
+#ifdef SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+  (void)app_scheduler_action_stop(_app_restore_lfn_unicast_interval);
+  if ((this_network.device_type == SL_WISUN_LFN)
+      && (this_network.lfn_profile == SL_WISUN_LFN_PROFILE_AUTOMATIC)) {
+    sl_status_t status = _app_set_lfn_unicast_interval(this_network.lfn_unicast_interval_ms);
+    if (status != SL_STATUS_OK) {
+      printfBothTime("Failed to apply LFN unicast interval %u ms: %lu\n",
+                     (unsigned)this_network.lfn_unicast_interval_ms,
+                     (unsigned long)status);
+    }
+  }
+#endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
   app_restart_send_status();
 }
 
@@ -728,15 +740,13 @@ static uint16_t _get_cert_str_len(const uint8_t *cert, const uint16_t max_cert_l
 #endif
  * Usage:
   1) call init_power_manager_stats() once at init time
-  2) call print_power_manager_pm_transitions() to print the EM transitions table (count of transitions)
+  2) call _print_power_manager_statistics() to print transitions and time in each mode
       Example output:;
 EM transitions
             to EM0   to EM1   to EM2
 from EM0:        0       57     1155
 from EM1:     1086        0      105
 from EM2:      126     1134        0
-  3) call print_power_manager_delays() to print the time spent in each Energy Mode
-      Example output:;
 EM Ticks:   2166947    (      66.130 sec: 0-00:01:06)
  in EM0:     515284    (      15.725 sec: 0-00:00:15   23.8 %)
  in EM1:      34487    (       1.052 sec: 0-00:00:01    1.6 %)
@@ -796,24 +806,46 @@ EM Ticks:   2166947    (      66.130 sec: 0-00:01:06)
     printf("Power Manager: cleared stats\n");
   }
 
-  void print_power_manager_pm_transitions(void) {
-    printfTime("EM transitions\n            to EM0   to EM1   to EM2\nfrom EM0: %8ld %8ld %8ld \nfrom EM1: %8ld %8ld %8ld \nfrom EM2: %8ld %8ld %8ld\n",
+  size_t app_format_lfn_power_manager_statistics(char *buffer, size_t buffer_size) {
+    const uint64_t total_ticks = (uint64_t)pm_ticks_in_EM[0] + pm_ticks_in_EM[1] + pm_ticks_in_EM[2];
+    char total_time[24];
+    char mode_time[3][24];
+    float total_seconds = pm_tick_freq_hz ? (float)total_ticks / pm_tick_freq_hz : 0.0f;
+    for (uint8_t i = 0; i < 3; ++i) {
+      snprintf(mode_time[i], sizeof(mode_time[i]), "%s",
+               dhms((sl_sleeptimer_timestamp_64_t)(pm_tick_freq_hz
+                 ? (float)pm_ticks_in_EM[i] / pm_tick_freq_hz : 0.0f)));
+    }
+    snprintf(total_time, sizeof(total_time), "%s",
+             dhms((sl_sleeptimer_timestamp_64_t)total_seconds));
+    return (size_t)snprintf(buffer, buffer_size,
+      "EM transitions\n            to EM0   to EM1   to EM2\n"
+      "from EM0: %8" PRIu32 " %8" PRIu32 " %8" PRIu32 " \n"
+      "from EM1: %8" PRIu32 " %8" PRIu32 " %8" PRIu32 " \n"
+      "from EM2: %8" PRIu32 " %8" PRIu32 " %8" PRIu32 "\n"
+      "EM Ticks:%10" PRIu64 "    (%12.03f sec: %s)\n"
+      " in EM0: %10" PRIu32 "    (%12.03f sec: %s %6.01f %%)\n"
+      " in EM1: %10" PRIu32 "    (%12.03f sec: %s %6.01f %%)\n"
+      " in EM2: %10" PRIu32 "    (%12.03f sec: %s %6.01f %%)\n",
       pm_transitions[0][0], pm_transitions[0][1], pm_transitions[0][2],
       pm_transitions[1][0], pm_transitions[1][1], pm_transitions[1][2],
-      pm_transitions[2][0], pm_transitions[2][1], pm_transitions[2][2]
-    );
+      pm_transitions[2][0], pm_transitions[2][1], pm_transitions[2][2],
+      total_ticks, total_seconds, total_time,
+      pm_ticks_in_EM[0], (float)pm_ticks_in_EM[0] / (pm_tick_freq_hz ? pm_tick_freq_hz : 1U), mode_time[0],
+      total_ticks ? (float)pm_ticks_in_EM[0] / total_ticks * 100.0f : 0.0f,
+      pm_ticks_in_EM[1], (float)pm_ticks_in_EM[1] / (pm_tick_freq_hz ? pm_tick_freq_hz : 1U), mode_time[1],
+      total_ticks ? (float)pm_ticks_in_EM[1] / total_ticks * 100.0f : 0.0f,
+      pm_ticks_in_EM[2], (float)pm_ticks_in_EM[2] / (pm_tick_freq_hz ? pm_tick_freq_hz : 1U), mode_time[2],
+      total_ticks ? (float)pm_ticks_in_EM[2] / total_ticks * 100.0f : 0.0f);
   }
 
-  void print_power_manager_delays(void) {
-    uint64_t total_ticks = pm_ticks_in_EM[0] + pm_ticks_in_EM[1] + pm_ticks_in_EM[2];
-    printfTime("EM Ticks:%10lld    (%12.03f sec: %s)\n",
-      total_ticks,    (float)total_ticks/pm_tick_freq_hz,      dhms((sl_sleeptimer_timestamp_64_t)(total_ticks / pm_tick_freq_hz)));
-    printfTime(" in EM0: %10ld    (%12.03f sec: %s %6.01f %%)\n",
-      pm_ticks_in_EM[0], (float)pm_ticks_in_EM[0] / pm_tick_freq_hz, dhms((sl_sleeptimer_timestamp_64_t)((float)pm_ticks_in_EM[0] / pm_tick_freq_hz)), (float)pm_ticks_in_EM[0] / total_ticks * 100 );
-    printfTime(" in EM1: %10ld    (%12.03f sec: %s %6.01f %%)\n",
-      pm_ticks_in_EM[1], (float)pm_ticks_in_EM[1] / pm_tick_freq_hz, dhms((sl_sleeptimer_timestamp_64_t)((float)pm_ticks_in_EM[1] / pm_tick_freq_hz)), (float)pm_ticks_in_EM[1] / total_ticks * 100 );
-    printfTime(" in EM2: %10ld    (%12.03f sec: %s %6.01f %%)\n",
-      pm_ticks_in_EM[2], (float)pm_ticks_in_EM[2] / pm_tick_freq_hz, dhms((sl_sleeptimer_timestamp_64_t)((float)pm_ticks_in_EM[2] / pm_tick_freq_hz)), (float)pm_ticks_in_EM[2] / total_ticks * 100 );
+  static void _print_power_manager_statistics(void) {
+    char *statistics = sl_malloc(768);
+    if (statistics != NULL) {
+      (void)app_format_lfn_power_manager_statistics(statistics, 768);
+      printfTime("%s", statistics);
+      sl_free(statistics);
+    }
   }
 #endif /* SL_CATALOG_POWER_MANAGER_PRESENT */
 
@@ -834,6 +866,49 @@ static uint8_t app_set_option(app_settings_wisun_t *nwk_setting) {
   return ret;
 }
 
+#ifdef SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+static sl_status_t _app_set_lfn_unicast_interval(uint32_t interval_ms)
+{
+  sl_status_t status = SL_STATUS_OK;
+
+  status = sl_wisun_set_option(SL_WISUN_OPTION_LFN_UNICAST_INTERVAL_MS,
+                             &interval_ms,
+                             sizeof(interval_ms));
+
+  printfBothTime("LFN Set unicast interval to %lu ms, status=%lu\n", interval_ms, status);
+  return status;
+}
+
+static uint32_t _app_restore_lfn_unicast_interval(void *context)
+{
+  return (uint32_t)_app_set_lfn_unicast_interval((uint32_t)(uintptr_t)context);
+}
+
+sl_status_t app_set_lfn_unicast_interval_temporary(uint32_t interval_ms,
+                                                   uint32_t restore_delay_ms,
+                                                   bool restore_after_delay)
+{
+  sl_status_t status;
+
+  if ((this_network.device_type != SL_WISUN_LFN)
+      || (this_network.lfn_profile != SL_WISUN_LFN_PROFILE_AUTOMATIC)) {
+    return SL_STATUS_NOT_SUPPORTED;
+  }
+  (void)app_scheduler_action_stop(_app_restore_lfn_unicast_interval);
+  status = _app_set_lfn_unicast_interval(interval_ms);
+  if ((status == SL_STATUS_OK) && restore_after_delay
+      && !app_scheduler_action_schedule(_app_restore_lfn_unicast_interval,
+                                        restore_delay_ms,
+                                        0U,
+                                        (void *)(uintptr_t)this_network.lfn_unicast_interval_ms)) {
+    (void)_app_restore_lfn_unicast_interval((void *)(uintptr_t)this_network.lfn_unicast_interval_ms);
+    return SL_STATUS_FAIL;
+  }
+  return status;
+}
+
+#endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
+
 uint8_t app_join_network(uint8_t network_index) {
   sl_status_t ret;
   sl_wisun_connection_params_t connection_params;
@@ -842,6 +917,7 @@ uint8_t app_join_network(uint8_t network_index) {
   //sl_wisun_channel_mask_t channel_mask;
 #ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
   sl_wisun_lfn_params_t lfn_params;
+  uint32_t lfn_unicast_interval = LFN_UNICAST_INTERVAL_MIN;
 #endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
   uint8_t phy_mode_id_count, is_mdr_command_capable;
   uint8_t phy_mode_id[SL_WISUN_MAX_PHY_MODE_ID_COUNT];
@@ -894,6 +970,10 @@ uint8_t app_join_network(uint8_t network_index) {
         }
         case SL_WISUN_LFN_PROFILE_ECO: {
           sprintf(device_type_string, "LFN (Eco Profile)");
+          break;
+        }
+        case SL_WISUN_LFN_PROFILE_AUTOMATIC: {
+          sprintf(device_type_string, "LFN (Automatic Profile)");
           break;
         }
         default: {
@@ -1019,6 +1099,19 @@ uint8_t app_join_network(uint8_t network_index) {
     ret = sl_wisun_set_lfn_parameters(&lfn_params);
     if (ret != SL_STATUS_OK) {
       printfBoth("[Failed: unable to set LFN parameters: %lu]\r\n", ret);
+      ret = __LINE__; goto cleanup;
+    }
+  }
+  if ((this_network.device_type == SL_WISUN_LFN)
+      && (this_network.lfn_profile == SL_WISUN_LFN_PROFILE_AUTOMATIC)) {
+    ret = sl_wisun_set_option(SL_WISUN_OPTION_LFN_UNICAST_INTERVAL_MIN_MS,
+                                          &lfn_unicast_interval,
+                                          sizeof(lfn_unicast_interval));
+    ret |= _app_set_lfn_unicast_interval(this_network.lfn_unicast_interval_ms);
+    if (ret != SL_STATUS_OK) {
+      printfBoth("[Failed to set automatic LFN unicast interval %u ms: %lu]\r\n",
+                 (unsigned)this_network.lfn_unicast_interval_ms,
+                 (unsigned long)ret);
       ret = __LINE__; goto cleanup;
     }
   }
@@ -1763,8 +1856,7 @@ static uint32_t _app_power_manager_action(void *context)
 {
   (void)context;
 
-  print_power_manager_pm_transitions();
-  print_power_manager_delays();
+  _print_power_manager_statistics();
 
   return 0U;
 }

@@ -47,6 +47,8 @@ extern "C" {
 // -----------------------------------------------------------------------------
 #include <string.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #include "sl_component_catalog.h"
 
@@ -148,6 +150,14 @@ void app_get_heap_statistics(size_t *peak_before_join,
                              size_t *current_heap,
                              size_t *heap_peak,
                              size_t *heap_total);
+#ifdef SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
+sl_status_t app_set_lfn_unicast_interval_temporary(uint32_t interval_ms,
+                                                   uint32_t restore_delay_ms,
+                                                   bool restore_after_delay);
+#endif
+#ifdef SL_CATALOG_POWER_MANAGER_PRESENT
+size_t app_format_lfn_power_manager_statistics(char *buffer, size_t buffer_size);
+#endif
 /** Get the timestamp captured by the EMERGENCY propagation callback. */
 const char *app_get_emergency_saved_running_time(void);
 void app_reset_statistics(void);

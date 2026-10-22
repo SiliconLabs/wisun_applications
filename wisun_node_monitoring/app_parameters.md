@@ -64,6 +64,8 @@ network[i].network_size
 network[i].tx_power_ddbm
 network[i].regulation
 network[i].device_type
+network[i].lfn_profile
+network[i].lfn_unicast_interval_ms (applied when device_type is LFN and lfn_profile is automatic)
 network[i].phy.type
 network[i].phy.config.fan11.reg_domain
 network[i].phy.config.fan11.chan_plan_id
@@ -88,6 +90,8 @@ Example:
 ```bash
 coap-client-notls -m put -N -B 10 -t text coap://[<IPv6>]:5683/settings/parameter -e "first_breath 0 1"
 ```
+
+`lfn_unicast_interval_ms` applies to LFN automatic profile after saving.
 
 ## Example Use Cases ##
 

@@ -198,6 +198,7 @@ void print_network_parameters(int network_index) {
   printfBoth("network[%d] device_type      %d\n"           , i, network[i].device_type);
 #ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
   printfBoth("network[%d] lfn_profile      %d\n"           , i, network[i].lfn_profile);
+  printfBoth("network[%d] lfn_unicast_interval_ms %u\n", i, (unsigned)network[i].lfn_unicast_interval_ms);
 #endif /* SL_CATALOG_WISUN_FFN_DEVICE_SUPPORT_PRESENT */
   printfBoth("network[%d] auto_send_sec               %d\n", i, network[i].auto_send_sec);
   printfBoth("network[%d] tx_power_ddbm               %d\n", i, network[i].tx_power_ddbm);
@@ -301,6 +302,7 @@ void set_app_parameters_defaults(int network_indexes) {
   const sl_wisun_fan_version_t      FAN_VERSION[MAX_NETWORK_CONFIGS] = FAN_VERSIONs;
 #ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
   const uint8_t                     LFN_PROFILE[MAX_NETWORK_CONFIGS] = LFN_PROFILEs;
+  const uint32_t      LFN_UNICAST_INTERVAL_MS[MAX_NETWORK_CONFIGS] = LFN_UNICAST_INTERVAL_MSs;
 #endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
   const uint8_t                   TX_POWER_DDBM[MAX_NETWORK_CONFIGS] = TX_POWER_DDBMs;
   const uint8_t                 MAX_CHILD_COUNT[MAX_NETWORK_CONFIGS] = MAX_CHILD_COUNTs;
@@ -382,6 +384,7 @@ void set_app_parameters_defaults(int network_indexes) {
       } else {
         network[i].lfn_profile                   = LFN_PROFILE[i];
       }
+      network[i].lfn_unicast_interval_ms          = LFN_UNICAST_INTERVAL_MS[i];
 #endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
       network[i].fan_version                   = FAN_VERSION[i];
       network[i].tx_power_ddbm                 = TX_POWER_DDBM[i]; // 200 = 'MAX' (it's higher than the possible max)
@@ -591,6 +594,9 @@ static sl_status_t set_app_parameter_unlocked(char* parameter_name, int index, u
         if  (!match) { match = (sl_strcasecmp(parameter_name, "lfn_profile") == 0);
           if (match) { network[index].lfn_profile = (sl_wisun_lfn_profile_t)value; }
         }
+        if  (!match) { match = (sl_strcasecmp(parameter_name, "lfn_unicast_interval_ms") == 0);
+          if (match) { network[index].lfn_unicast_interval_ms = value; }
+        }
   #endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
         if  (!match) { match = (sl_strcasecmp(parameter_name, "fan_version") == 0);
           if (match) { network[index].fan_version = (sl_wisun_fan_version_t)value; }
@@ -745,6 +751,9 @@ sl_status_t get_app_parameter(char* parameter_name, int index, uint32_t* value, 
   #ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
       if  (!match) { match = (sl_strcasecmp(parameter_name, "lfn_profile") == 0);
         if (match) { *value = (uint32_t)network[index].lfn_profile; }
+      }
+      if  (!match) { match = (sl_strcasecmp(parameter_name, "lfn_unicast_interval_ms") == 0);
+        if (match) { *value = network[index].lfn_unicast_interval_ms; }
       }
   #endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
       if  (!match) { match = (sl_strcasecmp(parameter_name, "fan_version") == 0);

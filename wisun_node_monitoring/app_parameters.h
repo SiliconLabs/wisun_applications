@@ -75,7 +75,7 @@
   /* For example: adding a new parameter or changing the order of parameters in app_settings_wisun_t or app_wisun_parameters_t. */
   /* After updating the application with a new NVM3_APP_PARAMS_VERSION,                                                         */
   /*    the parameters will be reset to the new default values (when the code detects a change in NVM3_APP_PARAMS_VERSION)      */
-  #define NVM3_APP_PARAMS_VERSION   10013
+  #define NVM3_APP_PARAMS_VERSION   10014
 #endif /* NVM3_APP_PARAMS_VERSION */
 
 #ifndef   MAX_NETWORK_CONFIGS
@@ -94,6 +94,9 @@
 #define   SET_LEAF 0
 #endif /* SET_LEAF */
 
+#ifndef LFN_UNICAST_INTERVAL_MIN
+#define   LFN_UNICAST_INTERVAL_MIN 100
+#endif /* LFN_UNICAST_INTERVAL_MIN */
 
 /* network */
 #ifndef   NETWORK_NAMEs
@@ -151,8 +154,12 @@
 
 #ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
 #ifndef   LFN_PROFILEs
-  #define LFN_PROFILEs                    {     SL_WISUN_LFN_PROFILE_TEST,          SL_WISUN_LFN_PROFILE_TEST,        SL_WISUN_LFN_PROFILE_BALANCED }
+  #define LFN_PROFILEs                    {     SL_WISUN_LFN_PROFILE_AUTOMATIC,          SL_WISUN_LFN_PROFILE_TEST,        SL_WISUN_LFN_PROFILE_BALANCED }
 #endif /* LFN_PROFILEs */
+#ifndef   LFN_UNICAST_INTERVAL_MSs
+  /* Applied only when device_type is LFN and lfn_profile is automatic. */
+  #define LFN_UNICAST_INTERVAL_MSs        {                         6000,                             60000,                                60000 }
+#endif /* LFN_UNICAST_INTERVAL_MSs */
 #endif /* SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT */
 
 #ifndef   TX_POWER_DDBMs
@@ -287,6 +294,7 @@ typedef struct {
 //  uint16_t channel_id;
 #ifdef    SL_CATALOG_WISUN_LFN_DEVICE_SUPPORT_PRESENT
   sl_wisun_lfn_profile_t lfn_profile;
+  uint32_t lfn_unicast_interval_ms;
 #endif /* SL_CATALOG_WISUN_FFN_DEVICE_SUPPORT_PRESENT */
 //  uint8_t crc_type;
 //  uint8_t preamble_length;
